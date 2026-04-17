@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 name = "metabis"
 description = "Python tools for metabolic data analysis and metabolic graph visualization"
 readme = "README.md"
-license-files = { paths = ["LICENSE"] }
+license-files = { paths = ["LICENSE", "THIRD_PARTY_NOTICES.md", "THIRD_PARTY_LICENSES/*.txt"] }
 authors = [
     { name = "Guillermo Dufort y Álvarez", email = "gdufort@fing.edu.uy" },
     { name = "Luis Alonso", email = "luisalonsoesteban.1@gmail.com" },

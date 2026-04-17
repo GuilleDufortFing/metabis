@@ -2,6 +2,12 @@
 """
 Download and process the Compass Th17 dataset.
 
+The downloaded example inputs are based on the public Compass repository:
+https://github.com/wagnerlab-berkeley/Compass
+Compass is distributed under the BSD-3-Clause license. The associated
+publication is Wagner et al., Cell 2021:
+https://doi.org/10.1016/j.cell.2021.05.045
+
 Steps:
 1) Download reactions.tsv, linear_gene_expression_matrix.tsv, and cell_metadata.csv
 2) Run add_celltype_to_samples.py to annotate sample names with cell types
