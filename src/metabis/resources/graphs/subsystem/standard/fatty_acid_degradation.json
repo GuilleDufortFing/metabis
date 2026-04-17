@@ -1,0 +1,155 @@
+{
+  "glyphs": [
+    {
+      "id": "compartment_96025e3c",
+      "glyph_class": "compartment",
+      "label": "Cytosol",
+      "x": 178.74,
+      "y": 141.48,
+      "width": 427.88,
+      "height": 546.56
+    },
+    {
+      "id": "r_MAR20068",
+      "glyph_class": "reaction",
+      "label": "MAR20068",
+      "x": 173.34,
+      "y": 141.48,
+      "width": 50.0,
+      "height": 50.0,
+      "original_id": "MAR20068"
+    },
+    {
+      "id": "m_08fe3c03",
+      "glyph_class": "metabolite",
+      "label": "MAM01032c",
+      "x": 64.8,
+      "y": 239.76,
+      "width": 60.0,
+      "height": 40.0,
+      "original_id": "MAM01032c",
+      "subtype": "main"
+    },
+    {
+      "id": "m_MAR20068_MAM02552c",
+      "glyph_class": "metabolite",
+      "label": "MAM02552c",
+      "x": 173.34,
+      "y": 239.76,
+      "width": 40.0,
+      "height": 30.0,
+      "original_id": "MAM02552c",
+      "subtype": "intermediate"
+    },
+    {
+      "id": "m_MAR20068_MAM02039c",
+      "glyph_class": "metabolite",
+      "label": "MAM02039c",
+      "x": 86.39999999999999,
+      "y": 43.199999999999996,
+      "width": 40.0,
+      "height": 30.0,
+      "original_id": "MAM02039c",
+      "subtype": "intermediate"
+    },
+    {
+      "id": "m_MAR20068_MAM02553c",
+      "glyph_class": "metabolite",
+      "label": "MAM02553c",
+      "x": 173.34,
+      "y": 43.199999999999996,
+      "width": 40.0,
+      "height": 30.0,
+      "original_id": "MAM02553c",
+      "subtype": "intermediate"
+    },
+    {
+      "id": "m_5ab52d63",
+      "glyph_class": "metabolite",
+      "label": "MAM20060c",
+      "x": 281.88,
+      "y": 43.199999999999996,
+      "width": 60.0,
+      "height": 40.0,
+      "original_id": "MAM20060c",
+      "subtype": "main"
+    },
+    {
+      "id": "eg_r_MAR20068",
+      "glyph_class": "enzyme_group",
+      "label": "Enzymes for MAR20068",
+      "x": 292.68,
+      "y": 239.76,
+      "width": 70.0,
+      "height": 40.0,
+      "reaction_id": "MAR20068",
+      "enzymes": [
+        "ENSG00000196616"
+      ],
+      "glyph_ids": [
+        "g_r_MAR20068_ENSG00000196616"
+      ],
+      "outline_color": "#7B68EE",
+      "outline_width": 2,
+      "outline_dash": [
+        3,
+        3
+      ]
+    },
+    {
+      "id": "g_r_MAR20068_ENSG00000196616",
+      "glyph_class": "gene",
+      "label": "ENSG00000196616",
+      "x": 292.68,
+      "y": 239.76,
+      "width": 60.0,
+      "height": 30.0,
+      "associated_reaction": "r_MAR20068",
+      "enzyme_group": "eg_r_MAR20068"
+    }
+  ],
+  "connections": [
+    {
+      "id": "conn_m_08fe3c03_to_r_MAR20068",
+      "connection_class": "metabolic",
+      "source": "m_08fe3c03",
+      "target": "r_MAR20068",
+      "stoichiometry": null
+    },
+    {
+      "id": "conn_m_MAR20068_MAM02552c_to_r_MAR20068",
+      "connection_class": "metabolic",
+      "source": "m_MAR20068_MAM02552c",
+      "target": "r_MAR20068",
+      "stoichiometry": null
+    },
+    {
+      "id": "conn_r_MAR20068_to_m_MAR20068_MAM02039c",
+      "connection_class": "metabolic",
+      "source": "r_MAR20068",
+      "target": "m_MAR20068_MAM02039c",
+      "stoichiometry": null
+    },
+    {
+      "id": "conn_r_MAR20068_to_m_MAR20068_MAM02553c",
+      "connection_class": "metabolic",
+      "source": "r_MAR20068",
+      "target": "m_MAR20068_MAM02553c",
+      "stoichiometry": null
+    },
+    {
+      "id": "conn_r_MAR20068_to_m_5ab52d63",
+      "connection_class": "metabolic",
+      "source": "r_MAR20068",
+      "target": "m_5ab52d63",
+      "stoichiometry": null
+    },
+    {
+      "id": "regulatory_eg_r_MAR20068_r_MAR20068",
+      "connection_class": "regulatory",
+      "source": "eg_r_MAR20068",
+      "target": "r_MAR20068",
+      "stoichiometry": null
+    }
+  ]
+}

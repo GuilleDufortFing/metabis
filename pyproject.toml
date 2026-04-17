@@ -1,0 +1,88 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "metabis"
+description = "Python tools for metabolic data analysis and metabolic graph visualization"
+readme = "README.md"
+license-files = { paths = ["LICENSE"] }
+authors = [
+    { name = "Guillermo Dufort y Álvarez", email = "gdufort@fing.edu.uy" },
+    { name = "Luis Alonso", email = "luisalonsoesteban.1@gmail.com" },
+]
+requires-python = ">=3.11"
+dependencies = [
+    "anndata>=0.10",
+    "bokeh>=3.4",
+    "h5py>=3.10",
+    "matplotlib>=3.8",
+    "natsort>=8.4",
+    "networkx>=3.2",
+    "numba>=0.59",
+    "numpy>=1.26",
+    "pandas>=2.1",
+    "pillow>=10.0",
+    "pygraphviz>=1.11",
+    "python-libsbml>=5.20",
+    "pyyaml>=6.0",
+    "scanpy>=1.9",
+    "scikit-learn>=1.3",
+    "scipy>=1.11",
+    "seaborn>=0.13",
+    "statsmodels>=0.14",
+    "umap-learn>=0.5",
+]
+dynamic = [
+    "version",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ipykernel",
+    "ipython",
+    "pytest>=8.0",
+    "ruff",
+]
+importance = [
+    "shap>=0.44",
+    "xgboost>=2.0",
+]
+examples = [
+    "requests>=2.32",
+]
+
+[project.urls]
+Repository = "https://github.com/GuilleDufortFing/metabis"
+
+[tool.hatch.version]
+path = "src/metabis/version.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/metabis"]
+exclude = ["*.ipynb"]
+
+[tool.hatch.build.targets.sdist]
+exclude = [
+    "data/",
+    "scripts/",
+    "tests/",
+    "src/metabis/*.ipynb",
+]
+
+[tool.ruff.lint]
+extend-select = [
+    # pycodestyle
+    "E", "W",
+    # isort
+    "I",
+    # pep8-naming
+    "N",
+    # pydocstyle
+    "D", "D401"
+]
+
+[tool.ruff.lint.pydocstyle]
+# The Google convention includes all D errors apart from: D203, D204, D213, D215,
+# D400, D401, D404, D406, D407, D408, D409, and D413.
+convention = "google"

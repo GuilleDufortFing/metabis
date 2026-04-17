@@ -1,0 +1,11 @@
+# Python bytecode cache directories
+__pycache__/
+.ipynb_checkpoints/
+
+# Virtual environment directories
+src/metabis/resources/.cache/*
+/.venv/
+.venv/
+
+# Big data files
+data/*.csv

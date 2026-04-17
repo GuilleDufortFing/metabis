@@ -1,0 +1,899 @@
+{
+  "glyphs": [
+    {
+      "id": "compartment_1eb97971",
+      "glyph_class": "compartment",
+      "label": "Cytosol",
+      "x": 215.33999999999997,
+      "y": 148.98,
+      "width": 544.28,
+      "height": 583.16
+    },
+    {
+      "id": "r_MAR03977",
+      "glyph_class": "reaction",
+      "label": "MAR03977",
+      "x": 151.73999999999998,
+      "y": 119.88,
+      "width": 50.0,
+      "height": 50.0,
+      "original_id": "MAR03977"
+    },
+    {
+      "id": "m_MAR03977_MAM02040c",
+      "glyph_class": "metabolite",
+      "label": "MAM02040c",
+      "x": 43.199999999999996,
+      "y": 250.56,
+      "width": 40.0,
+      "height": 30.0,
+      "original_id": "MAM02040c",
+      "subtype": "intermediate"
+    },
+    {
+      "id": "m_4ccca25f",
+      "glyph_class": "metabolite",
+      "label": "MAM02759c",
+      "x": 151.73999999999998,
+      "y": 250.56,
+      "width": 60.0,
+      "height": 40.0,
+      "original_id": "MAM02759c",
+      "subtype": "main"
+    },
+    {
+      "id": "m_MAR03977_MAM02039c",
+      "glyph_class": "metabolite",
+      "label": "MAM02039c",
+      "x": 108.27,
+      "y": 32.4,
+      "width": 40.0,
+      "height": 30.0,
+      "original_id": "MAM02039c",
+      "subtype": "intermediate"
+    },
+    {
+      "id": "m_MAR03977_MAM02751c",
+      "glyph_class": "metabolite",
+      "label": "MAM02751c",
+      "x": 195.20999999999998,
+      "y": 32.4,
+      "width": 40.0,
+      "height": 30.0,
+      "original_id": "MAM02751c",
+      "subtype": "intermediate"
+    },
+    {
+      "id": "eg_r_MAR03977",
+      "glyph_class": "enzyme_group",
+      "label": "Enzymes for MAR03977",
+      "x": 357.47999999999996,
+      "y": 250.56,
+      "width": 130.0,
+      "height": 70.0,
+      "reaction_id": "MAR03977",
+      "enzymes": [
+        "ENSG00000143363",
+        "ENSG00000180817",
+        "ENSG00000138777",
+        "ENSG00000107902"
+      ],
+      "glyph_ids": [
+        "g_r_MAR03977_ENSG00000143363",
+        "g_r_MAR03977_ENSG00000180817",
+        "g_r_MAR03977_ENSG00000138777",
+        "g_r_MAR03977_ENSG00000107902"
+      ],
+      "outline_color": "#7B68EE",
+      "outline_width": 2,
+      "outline_dash": [
+        3,
+        3
+      ]
+    },
+    {
+      "id": "g_r_MAR03977_ENSG00000143363",
+      "glyph_class": "gene",
+      "label": "ENSG00000143363",
+      "x": 327.47999999999996,
+      "y": 235.56,
+      "width": 60.0,
+      "height": 30.0,
+      "associated_reaction": "r_MAR03977",
+      "enzyme_group": "eg_r_MAR03977"
+    },
+    {
+      "id": "g_r_MAR03977_ENSG00000180817",
+      "glyph_class": "gene",
+      "label": "ENSG00000180817",
+      "x": 387.47999999999996,
+      "y": 235.56,
+      "width": 60.0,
+      "height": 30.0,
+      "associated_reaction": "r_MAR03977",
+      "enzyme_group": "eg_r_MAR03977"
+    },
+    {
+      "id": "g_r_MAR03977_ENSG00000138777",
+      "glyph_class": "gene",
+      "label": "ENSG00000138777",
+      "x": 327.47999999999996,
+      "y": 265.56,
+      "width": 60.0,
+      "height": 30.0,
+      "associated_reaction": "r_MAR03977",
+      "enzyme_group": "eg_r_MAR03977"
+    },
+    {
+      "id": "g_r_MAR03977_ENSG00000107902",
+      "glyph_class": "gene",
+      "label": "ENSG00000107902",
+      "x": 387.47999999999996,
+      "y": 265.56,
+      "width": 60.0,
+      "height": 30.0,
+      "associated_reaction": "r_MAR03977",
+      "enzyme_group": "eg_r_MAR03977"
+    },
+    {
+      "id": "compartment_77c2dead",
+      "glyph_class": "compartment",
+      "label": "Mitochondria",
+      "x": 464.55,
+      "y": 945.74,
+      "width": 1042.6999999999998,
+      "height": 688.76
+    },
+    {
+      "id": "r_MAR06912",
+      "glyph_class": "reaction",
+      "label": "MAR06912",
+      "x": 151.73999999999998,
+      "y": 874.64,
+      "width": 50.0,
+      "height": 50.0,
+      "original_id": "MAR06912"
+    },
+    {
+      "id": "r_MAR06911",
+      "glyph_class": "reaction",
+      "label": "MAR06911",
+      "x": 650.16,
+      "y": 874.64,
+      "width": 50.0,
+      "height": 50.0,
+      "original_id": "MAR06911"
+    },
+    {
+      "id": "m_MAR06912_MAM02040m",
+      "glyph_class": "metabolite",
+      "label": "MAM02040m",
+      "x": 43.199999999999996,
+      "y": 1070.12,
+      "width": 40.0,
+      "height": 30.0,
+      "original_id": "MAM02040m",
+      "subtype": "intermediate"
+    },
+    {
+      "id": "m_90339993",
+      "glyph_class": "metabolite",
+      "label": "MAM02759m",
+      "x": 151.73999999999998,
+      "y": 1070.12,
+      "width": 60.0,
+      "height": 40.0,
+      "original_id": "MAM02759m",
+      "subtype": "main"
+    },
+    {
+      "id": "m_MAR06912_MAM02039m",
+      "glyph_class": "metabolite",
+      "label": "MAM02039m",
+      "x": 108.27,
+      "y": 776.36,
+      "width": 40.0,
+      "height": 30.0,
+      "original_id": "MAM02039m",
+      "subtype": "intermediate"
+    },
+    {
+      "id": "m_MAR06912_MAM02751m",
+      "glyph_class": "metabolite",
+      "label": "MAM02751m",
+      "x": 195.20999999999998,
+      "y": 776.36,
+      "width": 40.0,
+      "height": 30.0,
+      "original_id": "MAM02751m",
+      "subtype": "intermediate"
+    },
+    {
+      "id": "m_MAR06911_MAM01803m",
+      "glyph_class": "metabolite",
+      "label": "MAM01803m",
+      "x": 541.62,
+      "y": 1070.12,
+      "width": 40.0,
+      "height": 30.0,
+      "original_id": "MAM01803m",
+      "subtype": "intermediate"
+    },
+    {
+      "id": "m_1a867bde",
+      "glyph_class": "metabolite",
+      "label": "MAM03103m",
+      "x": 650.16,
+      "y": 1070.12,
+      "width": 60.0,
+      "height": 40.0,
+      "original_id": "MAM03103m",
+      "subtype": "main"
+    },
+    {
+      "id": "m_MAR06911_MAM01802m",
+      "glyph_class": "metabolite",
+      "label": "MAM01802m",
+      "x": 595.89,
+      "y": 776.36,
+      "width": 40.0,
+      "height": 30.0,
+      "original_id": "MAM01802m",
+      "subtype": "intermediate"
+    },
+    {
+      "id": "m_5e422331",
+      "glyph_class": "metabolite",
+      "label": "MAM03102m",
+      "x": 704.43,
+      "y": 776.36,
+      "width": 60.0,
+      "height": 40.0,
+      "original_id": "MAM03102m",
+      "subtype": "main"
+    },
+    {
+      "id": "eg_r_MAR06912",
+      "glyph_class": "enzyme_group",
+      "label": "Enzymes for MAR06912",
+      "x": 357.47999999999996,
+      "y": 1070.12,
+      "width": 130.0,
+      "height": 70.0,
+      "reaction_id": "MAR06912",
+      "enzymes": [
+        "ENSG00000143363",
+        "ENSG00000180817",
+        "ENSG00000138777",
+        "ENSG00000107902"
+      ],
+      "glyph_ids": [
+        "g_r_MAR06912_ENSG00000143363",
+        "g_r_MAR06912_ENSG00000180817",
+        "g_r_MAR06912_ENSG00000138777",
+        "g_r_MAR06912_ENSG00000107902"
+      ],
+      "outline_color": "#7B68EE",
+      "outline_width": 2,
+      "outline_dash": [
+        3,
+        3
+      ]
+    },
+    {
+      "id": "eg_r_MAR06911",
+      "glyph_class": "enzyme_group",
+      "label": "Enzymes for MAR06911",
+      "x": 855.9,
+      "y": 1070.12,
+      "width": 130.0,
+      "height": 130.0,
+      "reaction_id": "MAR06911",
+      "enzymes": [
+        "ENSG00000171503",
+        "ENSG00000115159",
+        "ENSG00000102967",
+        "ENSG00000016391",
+        "ENSG00000105379",
+        "ENSG00000140374",
+        "ENSG00000100033",
+        "ENSG00000250799"
+      ],
+      "glyph_ids": [
+        "g_r_MAR06911_ENSG00000171503",
+        "g_r_MAR06911_ENSG00000115159",
+        "g_r_MAR06911_ENSG00000102967",
+        "g_r_MAR06911_ENSG00000016391",
+        "g_r_MAR06911_ENSG00000105379",
+        "g_r_MAR06911_ENSG00000140374",
+        "g_r_MAR06911_ENSG00000100033",
+        "g_r_MAR06911_ENSG00000250799"
+      ],
+      "outline_color": "#7B68EE",
+      "outline_width": 2,
+      "outline_dash": [
+        3,
+        3
+      ]
+    },
+    {
+      "id": "g_r_MAR06912_ENSG00000143363",
+      "glyph_class": "gene",
+      "label": "ENSG00000143363",
+      "x": 327.47999999999996,
+      "y": 1055.12,
+      "width": 60.0,
+      "height": 30.0,
+      "associated_reaction": "r_MAR06912",
+      "enzyme_group": "eg_r_MAR06912"
+    },
+    {
+      "id": "g_r_MAR06912_ENSG00000180817",
+      "glyph_class": "gene",
+      "label": "ENSG00000180817",
+      "x": 387.47999999999996,
+      "y": 1055.12,
+      "width": 60.0,
+      "height": 30.0,
+      "associated_reaction": "r_MAR06912",
+      "enzyme_group": "eg_r_MAR06912"
+    },
+    {
+      "id": "g_r_MAR06912_ENSG00000138777",
+      "glyph_class": "gene",
+      "label": "ENSG00000138777",
+      "x": 327.47999999999996,
+      "y": 1085.12,
+      "width": 60.0,
+      "height": 30.0,
+      "associated_reaction": "r_MAR06912",
+      "enzyme_group": "eg_r_MAR06912"
+    },
+    {
+      "id": "g_r_MAR06912_ENSG00000107902",
+      "glyph_class": "gene",
+      "label": "ENSG00000107902",
+      "x": 387.47999999999996,
+      "y": 1085.12,
+      "width": 60.0,
+      "height": 30.0,
+      "associated_reaction": "r_MAR06912",
+      "enzyme_group": "eg_r_MAR06912"
+    },
+    {
+      "id": "g_r_MAR06911_ENSG00000171503",
+      "glyph_class": "gene",
+      "label": "ENSG00000171503",
+      "x": 825.9,
+      "y": 1025.12,
+      "width": 60.0,
+      "height": 30.0,
+      "associated_reaction": "r_MAR06911",
+      "enzyme_group": "eg_r_MAR06911"
+    },
+    {
+      "id": "g_r_MAR06911_ENSG00000115159",
+      "glyph_class": "gene",
+      "label": "ENSG00000115159",
+      "x": 885.9,
+      "y": 1025.12,
+      "width": 60.0,
+      "height": 30.0,
+      "associated_reaction": "r_MAR06911",
+      "enzyme_group": "eg_r_MAR06911"
+    },
+    {
+      "id": "g_r_MAR06911_ENSG00000102967",
+      "glyph_class": "gene",
+      "label": "ENSG00000102967",
+      "x": 825.9,
+      "y": 1055.12,
+      "width": 60.0,
+      "height": 30.0,
+      "associated_reaction": "r_MAR06911",
+      "enzyme_group": "eg_r_MAR06911"
+    },
+    {
+      "id": "g_r_MAR06911_ENSG00000016391",
+      "glyph_class": "gene",
+      "label": "ENSG00000016391",
+      "x": 885.9,
+      "y": 1055.12,
+      "width": 60.0,
+      "height": 30.0,
+      "associated_reaction": "r_MAR06911",
+      "enzyme_group": "eg_r_MAR06911"
+    },
+    {
+      "id": "g_r_MAR06911_ENSG00000105379",
+      "glyph_class": "gene",
+      "label": "ENSG00000105379",
+      "x": 825.9,
+      "y": 1085.12,
+      "width": 60.0,
+      "height": 30.0,
+      "associated_reaction": "r_MAR06911",
+      "enzyme_group": "eg_r_MAR06911"
+    },
+    {
+      "id": "g_r_MAR06911_ENSG00000140374",
+      "glyph_class": "gene",
+      "label": "ENSG00000140374",
+      "x": 885.9,
+      "y": 1085.12,
+      "width": 60.0,
+      "height": 30.0,
+      "associated_reaction": "r_MAR06911",
+      "enzyme_group": "eg_r_MAR06911"
+    },
+    {
+      "id": "g_r_MAR06911_ENSG00000100033",
+      "glyph_class": "gene",
+      "label": "ENSG00000100033",
+      "x": 825.9,
+      "y": 1115.12,
+      "width": 60.0,
+      "height": 30.0,
+      "associated_reaction": "r_MAR06911",
+      "enzyme_group": "eg_r_MAR06911"
+    },
+    {
+      "id": "g_r_MAR06911_ENSG00000250799",
+      "glyph_class": "gene",
+      "label": "ENSG00000250799",
+      "x": 885.9,
+      "y": 1115.12,
+      "width": 60.0,
+      "height": 30.0,
+      "associated_reaction": "r_MAR06911",
+      "enzyme_group": "eg_r_MAR06911"
+    },
+    {
+      "id": "compartment_32f1c799",
+      "glyph_class": "compartment",
+      "label": "Endoplasmic reticulum",
+      "x": 215.33999999999997,
+      "y": 1720.9,
+      "width": 544.28,
+      "height": 583.16
+    },
+    {
+      "id": "r_MAR03975",
+      "glyph_class": "reaction",
+      "label": "MAR03975",
+      "x": 151.73999999999998,
+      "y": 1691.8000000000002,
+      "width": 50.0,
+      "height": 50.0,
+      "original_id": "MAR03975"
+    },
+    {
+      "id": "m_MAR03975_MAM02040r",
+      "glyph_class": "metabolite",
+      "label": "MAM02040r",
+      "x": 43.199999999999996,
+      "y": 1822.48,
+      "width": 40.0,
+      "height": 30.0,
+      "original_id": "MAM02040r",
+      "subtype": "intermediate"
+    },
+    {
+      "id": "m_a45204fd",
+      "glyph_class": "metabolite",
+      "label": "MAM02759r",
+      "x": 151.73999999999998,
+      "y": 1822.48,
+      "width": 60.0,
+      "height": 40.0,
+      "original_id": "MAM02759r",
+      "subtype": "main"
+    },
+    {
+      "id": "m_MAR03975_MAM02039r",
+      "glyph_class": "metabolite",
+      "label": "MAM02039r",
+      "x": 108.27,
+      "y": 1604.3200000000002,
+      "width": 40.0,
+      "height": 30.0,
+      "original_id": "MAM02039r",
+      "subtype": "intermediate"
+    },
+    {
+      "id": "m_MAR03975_MAM02751r",
+      "glyph_class": "metabolite",
+      "label": "MAM02751r",
+      "x": 195.20999999999998,
+      "y": 1604.3200000000002,
+      "width": 40.0,
+      "height": 30.0,
+      "original_id": "MAM02751r",
+      "subtype": "intermediate"
+    },
+    {
+      "id": "eg_r_MAR03975",
+      "glyph_class": "enzyme_group",
+      "label": "Enzymes for MAR03975",
+      "x": 357.47999999999996,
+      "y": 1822.48,
+      "width": 130.0,
+      "height": 70.0,
+      "reaction_id": "MAR03975",
+      "enzymes": [
+        "ENSG00000143363",
+        "ENSG00000180817",
+        "ENSG00000138777",
+        "ENSG00000107902"
+      ],
+      "glyph_ids": [
+        "g_r_MAR03975_ENSG00000143363",
+        "g_r_MAR03975_ENSG00000180817",
+        "g_r_MAR03975_ENSG00000138777",
+        "g_r_MAR03975_ENSG00000107902"
+      ],
+      "outline_color": "#7B68EE",
+      "outline_width": 2,
+      "outline_dash": [
+        3,
+        3
+      ]
+    },
+    {
+      "id": "g_r_MAR03975_ENSG00000143363",
+      "glyph_class": "gene",
+      "label": "ENSG00000143363",
+      "x": 327.47999999999996,
+      "y": 1807.48,
+      "width": 60.0,
+      "height": 30.0,
+      "associated_reaction": "r_MAR03975",
+      "enzyme_group": "eg_r_MAR03975"
+    },
+    {
+      "id": "g_r_MAR03975_ENSG00000180817",
+      "glyph_class": "gene",
+      "label": "ENSG00000180817",
+      "x": 387.47999999999996,
+      "y": 1807.48,
+      "width": 60.0,
+      "height": 30.0,
+      "associated_reaction": "r_MAR03975",
+      "enzyme_group": "eg_r_MAR03975"
+    },
+    {
+      "id": "g_r_MAR03975_ENSG00000138777",
+      "glyph_class": "gene",
+      "label": "ENSG00000138777",
+      "x": 327.47999999999996,
+      "y": 1837.48,
+      "width": 60.0,
+      "height": 30.0,
+      "associated_reaction": "r_MAR03975",
+      "enzyme_group": "eg_r_MAR03975"
+    },
+    {
+      "id": "g_r_MAR03975_ENSG00000107902",
+      "glyph_class": "gene",
+      "label": "ENSG00000107902",
+      "x": 387.47999999999996,
+      "y": 1837.48,
+      "width": 60.0,
+      "height": 30.0,
+      "associated_reaction": "r_MAR03975",
+      "enzyme_group": "eg_r_MAR03975"
+    },
+    {
+      "id": "compartment_7426c41b",
+      "glyph_class": "compartment",
+      "label": "Peroxisome",
+      "x": 215.33999999999997,
+      "y": 2454.06,
+      "width": 544.28,
+      "height": 583.16
+    },
+    {
+      "id": "r_MAR03979",
+      "glyph_class": "reaction",
+      "label": "MAR03979",
+      "x": 151.73999999999998,
+      "y": 2424.96,
+      "width": 50.0,
+      "height": 50.0,
+      "original_id": "MAR03979"
+    },
+    {
+      "id": "m_MAR03979_MAM02040x",
+      "glyph_class": "metabolite",
+      "label": "MAM02040x",
+      "x": 43.199999999999996,
+      "y": 2555.64,
+      "width": 40.0,
+      "height": 30.0,
+      "original_id": "MAM02040x",
+      "subtype": "intermediate"
+    },
+    {
+      "id": "m_3ee7bc6a",
+      "glyph_class": "metabolite",
+      "label": "MAM02759x",
+      "x": 151.73999999999998,
+      "y": 2555.64,
+      "width": 60.0,
+      "height": 40.0,
+      "original_id": "MAM02759x",
+      "subtype": "main"
+    },
+    {
+      "id": "m_MAR03979_MAM02039x",
+      "glyph_class": "metabolite",
+      "label": "MAM02039x",
+      "x": 108.27,
+      "y": 2337.48,
+      "width": 40.0,
+      "height": 30.0,
+      "original_id": "MAM02039x",
+      "subtype": "intermediate"
+    },
+    {
+      "id": "m_MAR03979_MAM02751x",
+      "glyph_class": "metabolite",
+      "label": "MAM02751x",
+      "x": 195.20999999999998,
+      "y": 2337.48,
+      "width": 40.0,
+      "height": 30.0,
+      "original_id": "MAM02751x",
+      "subtype": "intermediate"
+    },
+    {
+      "id": "eg_r_MAR03979",
+      "glyph_class": "enzyme_group",
+      "label": "Enzymes for MAR03979",
+      "x": 357.47999999999996,
+      "y": 2555.64,
+      "width": 130.0,
+      "height": 70.0,
+      "reaction_id": "MAR03979",
+      "enzymes": [
+        "ENSG00000143363",
+        "ENSG00000180817",
+        "ENSG00000138777",
+        "ENSG00000107902"
+      ],
+      "glyph_ids": [
+        "g_r_MAR03979_ENSG00000143363",
+        "g_r_MAR03979_ENSG00000180817",
+        "g_r_MAR03979_ENSG00000138777",
+        "g_r_MAR03979_ENSG00000107902"
+      ],
+      "outline_color": "#7B68EE",
+      "outline_width": 2,
+      "outline_dash": [
+        3,
+        3
+      ]
+    },
+    {
+      "id": "g_r_MAR03979_ENSG00000143363",
+      "glyph_class": "gene",
+      "label": "ENSG00000143363",
+      "x": 327.47999999999996,
+      "y": 2540.64,
+      "width": 60.0,
+      "height": 30.0,
+      "associated_reaction": "r_MAR03979",
+      "enzyme_group": "eg_r_MAR03979"
+    },
+    {
+      "id": "g_r_MAR03979_ENSG00000180817",
+      "glyph_class": "gene",
+      "label": "ENSG00000180817",
+      "x": 387.47999999999996,
+      "y": 2540.64,
+      "width": 60.0,
+      "height": 30.0,
+      "associated_reaction": "r_MAR03979",
+      "enzyme_group": "eg_r_MAR03979"
+    },
+    {
+      "id": "g_r_MAR03979_ENSG00000138777",
+      "glyph_class": "gene",
+      "label": "ENSG00000138777",
+      "x": 327.47999999999996,
+      "y": 2570.64,
+      "width": 60.0,
+      "height": 30.0,
+      "associated_reaction": "r_MAR03979",
+      "enzyme_group": "eg_r_MAR03979"
+    },
+    {
+      "id": "g_r_MAR03979_ENSG00000107902",
+      "glyph_class": "gene",
+      "label": "ENSG00000107902",
+      "x": 387.47999999999996,
+      "y": 2570.64,
+      "width": 60.0,
+      "height": 30.0,
+      "associated_reaction": "r_MAR03979",
+      "enzyme_group": "eg_r_MAR03979"
+    }
+  ],
+  "connections": [
+    {
+      "id": "conn_m_MAR03977_MAM02040c_to_r_MAR03977",
+      "connection_class": "metabolic",
+      "source": "m_MAR03977_MAM02040c",
+      "target": "r_MAR03977",
+      "stoichiometry": null
+    },
+    {
+      "id": "conn_m_4ccca25f_to_r_MAR03977",
+      "connection_class": "metabolic",
+      "source": "m_4ccca25f",
+      "target": "r_MAR03977",
+      "stoichiometry": null
+    },
+    {
+      "id": "conn_r_MAR03977_to_m_MAR03977_MAM02039c",
+      "connection_class": "metabolic",
+      "source": "r_MAR03977",
+      "target": "m_MAR03977_MAM02039c",
+      "stoichiometry": null
+    },
+    {
+      "id": "conn_r_MAR03977_to_m_MAR03977_MAM02751c",
+      "connection_class": "metabolic",
+      "source": "r_MAR03977",
+      "target": "m_MAR03977_MAM02751c",
+      "stoichiometry": null
+    },
+    {
+      "id": "regulatory_eg_r_MAR03977_r_MAR03977",
+      "connection_class": "regulatory",
+      "source": "eg_r_MAR03977",
+      "target": "r_MAR03977",
+      "stoichiometry": null
+    },
+    {
+      "id": "conn_m_MAR06912_MAM02040m_to_r_MAR06912",
+      "connection_class": "metabolic",
+      "source": "m_MAR06912_MAM02040m",
+      "target": "r_MAR06912",
+      "stoichiometry": null
+    },
+    {
+      "id": "conn_m_90339993_to_r_MAR06912",
+      "connection_class": "metabolic",
+      "source": "m_90339993",
+      "target": "r_MAR06912",
+      "stoichiometry": null
+    },
+    {
+      "id": "conn_r_MAR06912_to_m_MAR06912_MAM02039m",
+      "connection_class": "metabolic",
+      "source": "r_MAR06912",
+      "target": "m_MAR06912_MAM02039m",
+      "stoichiometry": null
+    },
+    {
+      "id": "conn_r_MAR06912_to_m_MAR06912_MAM02751m",
+      "connection_class": "metabolic",
+      "source": "r_MAR06912",
+      "target": "m_MAR06912_MAM02751m",
+      "stoichiometry": null
+    },
+    {
+      "id": "conn_m_MAR06911_MAM01803m_to_r_MAR06911",
+      "connection_class": "metabolic",
+      "source": "m_MAR06911_MAM01803m",
+      "target": "r_MAR06911",
+      "stoichiometry": null
+    },
+    {
+      "id": "conn_m_1a867bde_to_r_MAR06911",
+      "connection_class": "metabolic",
+      "source": "m_1a867bde",
+      "target": "r_MAR06911",
+      "stoichiometry": null
+    },
+    {
+      "id": "conn_r_MAR06911_to_m_MAR06911_MAM01802m",
+      "connection_class": "metabolic",
+      "source": "r_MAR06911",
+      "target": "m_MAR06911_MAM01802m",
+      "stoichiometry": null
+    },
+    {
+      "id": "conn_r_MAR06911_to_m_5e422331",
+      "connection_class": "metabolic",
+      "source": "r_MAR06911",
+      "target": "m_5e422331",
+      "stoichiometry": null
+    },
+    {
+      "id": "regulatory_eg_r_MAR06912_r_MAR06912",
+      "connection_class": "regulatory",
+      "source": "eg_r_MAR06912",
+      "target": "r_MAR06912",
+      "stoichiometry": null
+    },
+    {
+      "id": "regulatory_eg_r_MAR06911_r_MAR06911",
+      "connection_class": "regulatory",
+      "source": "eg_r_MAR06911",
+      "target": "r_MAR06911",
+      "stoichiometry": null
+    },
+    {
+      "id": "conn_m_MAR03975_MAM02040r_to_r_MAR03975",
+      "connection_class": "metabolic",
+      "source": "m_MAR03975_MAM02040r",
+      "target": "r_MAR03975",
+      "stoichiometry": null
+    },
+    {
+      "id": "conn_m_a45204fd_to_r_MAR03975",
+      "connection_class": "metabolic",
+      "source": "m_a45204fd",
+      "target": "r_MAR03975",
+      "stoichiometry": null
+    },
+    {
+      "id": "conn_r_MAR03975_to_m_MAR03975_MAM02039r",
+      "connection_class": "metabolic",
+      "source": "r_MAR03975",
+      "target": "m_MAR03975_MAM02039r",
+      "stoichiometry": null
+    },
+    {
+      "id": "conn_r_MAR03975_to_m_MAR03975_MAM02751r",
+      "connection_class": "metabolic",
+      "source": "r_MAR03975",
+      "target": "m_MAR03975_MAM02751r",
+      "stoichiometry": null
+    },
+    {
+      "id": "regulatory_eg_r_MAR03975_r_MAR03975",
+      "connection_class": "regulatory",
+      "source": "eg_r_MAR03975",
+      "target": "r_MAR03975",
+      "stoichiometry": null
+    },
+    {
+      "id": "conn_m_MAR03979_MAM02040x_to_r_MAR03979",
+      "connection_class": "metabolic",
+      "source": "m_MAR03979_MAM02040x",
+      "target": "r_MAR03979",
+      "stoichiometry": null
+    },
+    {
+      "id": "conn_m_3ee7bc6a_to_r_MAR03979",
+      "connection_class": "metabolic",
+      "source": "m_3ee7bc6a",
+      "target": "r_MAR03979",
+      "stoichiometry": null
+    },
+    {
+      "id": "conn_r_MAR03979_to_m_MAR03979_MAM02039x",
+      "connection_class": "metabolic",
+      "source": "r_MAR03979",
+      "target": "m_MAR03979_MAM02039x",
+      "stoichiometry": null
+    },
+    {
+      "id": "conn_r_MAR03979_to_m_MAR03979_MAM02751x",
+      "connection_class": "metabolic",
+      "source": "r_MAR03979",
+      "target": "m_MAR03979_MAM02751x",
+      "stoichiometry": null
+    },
+    {
+      "id": "regulatory_eg_r_MAR03979_r_MAR03979",
+      "connection_class": "regulatory",
+      "source": "eg_r_MAR03979",
+      "target": "r_MAR03979",
+      "stoichiometry": null
+    }
+  ]
+}

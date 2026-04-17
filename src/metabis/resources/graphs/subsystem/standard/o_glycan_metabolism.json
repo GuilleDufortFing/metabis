@@ -1,0 +1,97 @@
+{
+  "glyphs": [
+    {
+      "id": "compartment_b6185d58",
+      "glyph_class": "compartment",
+      "label": "Cytosol",
+      "x": 129.87,
+      "y": 141.48,
+      "width": 330.14,
+      "height": 546.56
+    },
+    {
+      "id": "r_MAR07197",
+      "glyph_class": "reaction",
+      "label": "MAR07197",
+      "x": 129.87,
+      "y": 141.48,
+      "width": 50.0,
+      "height": 50.0,
+      "original_id": "MAR07197"
+    },
+    {
+      "id": "m_d4092f33",
+      "glyph_class": "metabolite",
+      "label": "MAM00196c",
+      "x": 64.8,
+      "y": 239.76,
+      "width": 60.0,
+      "height": 40.0,
+      "original_id": "MAM00196c",
+      "subtype": "main"
+    },
+    {
+      "id": "m_f5ec8162",
+      "glyph_class": "metabolite",
+      "label": "MAM02896c",
+      "x": 194.94,
+      "y": 239.76,
+      "width": 60.0,
+      "height": 40.0,
+      "original_id": "MAM02896c",
+      "subtype": "main"
+    },
+    {
+      "id": "m_61b0a8fe",
+      "glyph_class": "metabolite",
+      "label": "MAM00205c",
+      "x": 75.6,
+      "y": 43.199999999999996,
+      "width": 60.0,
+      "height": 40.0,
+      "original_id": "MAM00205c",
+      "subtype": "main"
+    },
+    {
+      "id": "m_MAR07197_MAM02040c",
+      "glyph_class": "metabolite",
+      "label": "MAM02040c",
+      "x": 184.14,
+      "y": 43.199999999999996,
+      "width": 40.0,
+      "height": 30.0,
+      "original_id": "MAM02040c",
+      "subtype": "intermediate"
+    }
+  ],
+  "connections": [
+    {
+      "id": "conn_m_d4092f33_to_r_MAR07197",
+      "connection_class": "metabolic",
+      "source": "m_d4092f33",
+      "target": "r_MAR07197",
+      "stoichiometry": null
+    },
+    {
+      "id": "conn_m_f5ec8162_to_r_MAR07197",
+      "connection_class": "metabolic",
+      "source": "m_f5ec8162",
+      "target": "r_MAR07197",
+      "stoichiometry": null
+    },
+    {
+      "id": "conn_r_MAR07197_to_m_61b0a8fe",
+      "connection_class": "metabolic",
+      "source": "r_MAR07197",
+      "target": "m_61b0a8fe",
+      "stoichiometry": null
+    },
+    {
+      "id": "conn_r_MAR07197_to_m_MAR07197_MAM02040c",
+      "connection_class": "metabolic",
+      "source": "r_MAR07197",
+      "target": "m_MAR07197_MAM02040c",
+      "stoichiometry": null
+    }
+  ]
+}

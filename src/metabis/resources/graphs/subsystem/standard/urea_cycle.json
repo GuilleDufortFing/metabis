@@ -1,0 +1,79 @@
+{
+  "glyphs": [
+    {
+      "id": "compartment_8d1cdfb5",
+      "glyph_class": "compartment",
+      "label": "Cytosol",
+      "x": 119.07,
+      "y": 141.48,
+      "width": 308.54,
+      "height": 546.56
+    },
+    {
+      "id": "r_MAR02527",
+      "glyph_class": "reaction",
+      "label": "MAR02527",
+      "x": 119.07,
+      "y": 141.48,
+      "width": 50.0,
+      "height": 50.0,
+      "original_id": "MAR02527"
+    },
+    {
+      "id": "m_75450d8e",
+      "glyph_class": "metabolite",
+      "label": "MAM00969c",
+      "x": 119.07,
+      "y": 239.76,
+      "width": 60.0,
+      "height": 40.0,
+      "original_id": "MAM00969c",
+      "subtype": "main"
+    },
+    {
+      "id": "m_84d1aad7",
+      "glyph_class": "metabolite",
+      "label": "MAM00557c",
+      "x": 64.8,
+      "y": 43.199999999999996,
+      "width": 60.0,
+      "height": 40.0,
+      "original_id": "MAM00557c",
+      "subtype": "main"
+    },
+    {
+      "id": "m_MAR02527_MAM02040c",
+      "glyph_class": "metabolite",
+      "label": "MAM02040c",
+      "x": 173.34,
+      "y": 43.199999999999996,
+      "width": 40.0,
+      "height": 30.0,
+      "original_id": "MAM02040c",
+      "subtype": "intermediate"
+    }
+  ],
+  "connections": [
+    {
+      "id": "conn_m_75450d8e_to_r_MAR02527",
+      "connection_class": "metabolic",
+      "source": "m_75450d8e",
+      "target": "r_MAR02527",
+      "stoichiometry": null
+    },
+    {
+      "id": "conn_r_MAR02527_to_m_84d1aad7",
+      "connection_class": "metabolic",
+      "source": "r_MAR02527",
+      "target": "m_84d1aad7",
+      "stoichiometry": null
+    },
+    {
+      "id": "conn_r_MAR02527_to_m_MAR02527_MAM02040c",
+      "connection_class": "metabolic",
+      "source": "r_MAR02527",
+      "target": "m_MAR02527_MAM02040c",
+      "stoichiometry": null
+    }
+  ]
+}
