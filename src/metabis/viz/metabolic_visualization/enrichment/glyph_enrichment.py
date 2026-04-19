@@ -110,6 +110,9 @@ def enrich_single_glyph(
     significant_nodes_set,
     influential_genes_set,
     missing_data_elements_dict,
+    show_hover_stats=True,
+    show_hover_distribution_plots=True,
+    show_hover_color_reference=True,
     focus_instance=None,
     graph_type=None,
 ):
@@ -127,6 +130,9 @@ def enrich_single_glyph(
         significant_nodes_set: Set of node IDs that are significant
         influential_genes_set: Set of gene IDs that are influential
         missing_data_elements_dict: Dictionary of element IDs that have missing data, with the reason as the value
+        show_hover_stats: Whether to include textual hover statistics
+        show_hover_distribution_plots: Whether to include violin/distribution hover plots
+        show_hover_color_reference: Whether to include color-reference hover blocks
         focus_instance: object that retrieves the IDs of the elements being visualized
         graph_type: Type of graph being generated ("subsystem", "compartment", etc.)
 
@@ -173,6 +179,9 @@ def enrich_single_glyph(
             data_manager,
             color_metric,
             missing_reason,
+            show_hover_stats=show_hover_stats,
+            show_hover_distribution_plots=show_hover_distribution_plots,
+            show_hover_color_reference=show_hover_color_reference,
         )
     elif glyph_class == GlyphClass.REACTION:
         return enrich_reaction_glyph_with_data(
@@ -182,6 +191,9 @@ def enrich_single_glyph(
             data_manager,
             color_metric,
             missing_reason,
+            show_hover_stats=show_hover_stats,
+            show_hover_distribution_plots=show_hover_distribution_plots,
+            show_hover_color_reference=show_hover_color_reference,
         )
     elif glyph_class == GlyphClass.COMPARTMENT:
         return enrich_compartment_glyph_with_data(
@@ -198,8 +210,11 @@ def enrich_single_glyph(
             color_metric,
             delta_options,
             missing_reason,
-            focus_instance,
-            graph_type,
+            show_hover_stats=show_hover_stats,
+            show_hover_distribution_plots=show_hover_distribution_plots,
+            show_hover_color_reference=show_hover_color_reference,
+            focus_instance=focus_instance,
+            graph_type=graph_type,
         )
     elif glyph_class == GlyphClass.SUBSYSTEM_CATEGORY:
         return enrich_subsystem_category_glyph_with_data(
@@ -300,6 +315,9 @@ def enrich_gene_glyph_with_data(
     data_manager,
     color_metric,
     missing_reason=None,
+    show_hover_stats=True,
+    show_hover_distribution_plots=True,
+    show_hover_color_reference=True,
     focus_instance=None,
     graph_type=None,
 ):
@@ -335,9 +353,9 @@ def enrich_gene_glyph_with_data(
             gene_id,
             "gene",
             color_metric=color_metric,
-            show_stats=True,
-            show_plot=True,
-            show_color_reference=True,
+            show_stats=show_hover_stats,
+            show_plot=show_hover_distribution_plots,
+            show_color_reference=show_hover_color_reference,
             missing_reason=missing_reason,
         )
         if missing_reason in {"no_experimental_data", "no_metadata"}:
@@ -377,6 +395,9 @@ def enrich_reaction_glyph_with_data(
     data_manager,
     color_metric,
     missing_reason=None,
+    show_hover_stats=True,
+    show_hover_distribution_plots=True,
+    show_hover_color_reference=True,
     focus_instance=None,
     graph_type=None,
 ):
@@ -410,9 +431,9 @@ def enrich_reaction_glyph_with_data(
             "reaction",
             use_main_direction=True,
             color_metric=color_metric,
-            show_stats=True,
-            show_plot=True,
-            show_color_reference=True,
+            show_stats=show_hover_stats,
+            show_plot=show_hover_distribution_plots,
+            show_color_reference=show_hover_color_reference,
             missing_reason=missing_reason,
         )
         if missing_reason in {"no_experimental_data", "no_metadata"}:
@@ -499,6 +520,9 @@ def enrich_subsystem_glyph_with_data(
     color_metric,
     delta_options,
     missing_reason=None,
+    show_hover_stats=True,
+    show_hover_distribution_plots=True,
+    show_hover_color_reference=True,
     focus_instance=None,
     graph_type=None,
 ):
@@ -539,9 +563,9 @@ def enrich_subsystem_glyph_with_data(
             color_metric=color_metric,
             delta_options=delta_options,
             missing_reason=missing_reason,
-            show_stats=True,
-            show_plot=True,
-            show_color_reference=True,
+            show_stats=show_hover_stats,
+            show_plot=show_hover_distribution_plots,
+            show_color_reference=show_hover_color_reference,
         )
         if missing_reason in {"no_experimental_data", "no_metadata"}:
             subsystem_color = VisualizationConstants.MISSING_DATA_COLOR

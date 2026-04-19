@@ -24,6 +24,9 @@ class EnrichmentConfig:
 
     color_metric: str = "log2_fc"
     delta_options: Dict[str, Any] = None
+    show_hover_stats: bool = True
+    show_hover_distribution_plots: bool = True
+    show_hover_color_reference: bool = True
     highlight_significant_reactions: bool = False
     highlight_significant_genes: bool = False
     highlight_gene_influence: bool = False
@@ -33,6 +36,9 @@ class EnrichmentConfig:
         return {
             "color_metric": self.color_metric,
             "delta_options": self.delta_options,
+            "show_hover_stats": self.show_hover_stats,
+            "show_hover_distribution_plots": self.show_hover_distribution_plots,
+            "show_hover_color_reference": self.show_hover_color_reference,
             "highlight_significant_reactions": self.highlight_significant_reactions,
             "highlight_significant_genes": self.highlight_significant_genes,
             "highlight_gene_influence": self.highlight_gene_influence,
@@ -143,6 +149,9 @@ class GraphEnricher:
                 significant_nodes_set,
                 influential_genes_set,
                 missing_data_elements,
+                config_dict["show_hover_stats"],
+                config_dict["show_hover_distribution_plots"],
+                config_dict["show_hover_color_reference"],
                 focus_instance=focus_instance,
                 graph_type=graph_type,
             )

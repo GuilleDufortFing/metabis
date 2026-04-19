@@ -102,6 +102,10 @@ def build_pipeline_config(
     layout_engine: str = "dot",
     color_metric: str = "log2_fc",
     delta_options: Optional[Dict[str, Any]] = None,
+    show_hover_plots: Optional[bool] = None,
+    show_hover_stats: bool = True,
+    show_hover_distribution_plots: Optional[bool] = None,
+    show_hover_color_reference: bool = True,
     highlight_significant_reactions: bool = False,
     highlight_significant_genes: bool = False,
     highlight_gene_influence: bool = False,
@@ -120,6 +124,12 @@ def build_pipeline_config(
 
     Explicit nested config objects take precedence over flat keyword values.
     """
+    if show_hover_distribution_plots is None:
+        if show_hover_plots is None:
+            show_hover_distribution_plots = True
+        else:
+            show_hover_distribution_plots = show_hover_plots
+
     if generation_config is None:
         generation_config = GraphGenerationConfig(
             use_human1_map=use_human1_map,
@@ -130,6 +140,9 @@ def build_pipeline_config(
         enrichment_config = EnrichmentConfig(
             color_metric=color_metric,
             delta_options=delta_options,
+            show_hover_stats=show_hover_stats,
+            show_hover_distribution_plots=show_hover_distribution_plots,
+            show_hover_color_reference=show_hover_color_reference,
             highlight_significant_reactions=highlight_significant_reactions,
             highlight_significant_genes=highlight_significant_genes,
             highlight_gene_influence=highlight_gene_influence,
@@ -218,12 +231,6 @@ class MetabolicGraphPipeline:
             )
             self._last_run_state.resolved_request = resolved_request
 
-            if config.enable_timing:
-                print(
-                    f"✅ Resolved graph request '{element_name}' -> "
-                    f"generator ID: '{resolved_request.generator_element_id}'"
-                )
-
         except ValueError as e:
             # Handle element not found with helpful error message
             raise ValueError(f"Element '{element_name}' not found: {e}")
@@ -258,7 +265,6 @@ class MetabolicGraphPipeline:
         if config.enable_timing:
             total_time = time.time() - t_start
             self._record_timing("total_pipeline", total_time)
-            print(f"Total pipeline time: {total_time:.3f} s")
 
         return plot
 
@@ -297,7 +303,6 @@ class MetabolicGraphPipeline:
         if config.enable_timing:
             elapsed = time.time() - t_start
             self._record_timing("generate_graph", elapsed)
-            print(f"Phase 1 (generate_graph): {elapsed:.3f} s")
 
         return glyphs, connections, display_title
 
@@ -345,7 +350,6 @@ class MetabolicGraphPipeline:
         if config.enable_timing:
             elapsed = time.time() - t_start
             self._record_timing("enrich_graph", elapsed)
-            print(f"Phase 2 (enrich_graph): {elapsed:.3f} s")
 
         return enriched_glyphs, enriched_connections, auxiliary_data
 
@@ -386,7 +390,6 @@ class MetabolicGraphPipeline:
         if config.enable_timing:
             elapsed = time.time() - t_start
             self._record_timing("render_graph", elapsed)
-            print(f"Phase 3 (render_graph): {elapsed:.3f} s")
 
         return plot
 

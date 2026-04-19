@@ -416,7 +416,9 @@ class HoverManager:
         subsystem_metric: str = "log2_fc",
         for_genes: bool = False,
         show_stats: bool = False,
-        delta_options: Dict[str, Any] = None) -> str:
+        show_color_reference: bool = False,
+        delta_options: Dict[str, Any] = None,
+    ) -> str:
         """Build hover text for subsystem/pathway bars in group comparison plots."""
         # Get full subsystem data (includes totals and regulation dicts)
         subsystem_data = self.data_provider.get_subsystem_data(
@@ -451,7 +453,7 @@ class HoverManager:
             color_metric=subsystem_metric,
             for_genes=for_genes,
             show_stats=show_stats,
-            show_color_reference=True,
+            show_color_reference=show_color_reference,
         )
 
         # If Experiment Analysis mode, attach EA stats and group_id for consistency
@@ -477,6 +479,7 @@ class HoverManager:
         delta_options: Dict[str, Any] = None,
         for_genes: bool = False,
         show_stats: bool = False,
+        show_color_reference: bool = False,
     ) -> str:
         """Get cached hover text for a subsystem/pathway.
 
@@ -491,7 +494,10 @@ class HoverManager:
             # Sort keys for consistency
             delta_items = sorted(delta_options.items())
             delta_str = "_".join(f"{k}-{v}" for k, v in delta_items)
-        hover_key = f"subsystem_{subsystem_name}_{subsystem_metric}_{element_type}_stats_{show_stats}"
+        hover_key = (
+            f"subsystem_{subsystem_name}_{subsystem_metric}_{element_type}"
+            f"_stats_{show_stats}_colorref_{show_color_reference}"
+        )
         if delta_str:
             hover_key += f"_delta_{delta_str}"
 
@@ -502,6 +508,7 @@ class HoverManager:
                 subsystem_metric=subsystem_metric,
                 for_genes=for_genes,
                 show_stats=show_stats,
+                show_color_reference=show_color_reference,
                 delta_options=delta_options,
             ),
         )
@@ -566,12 +573,12 @@ class HoverManager:
                     show_color_reference=show_color_reference,
                 )
             elif element_type == "subsystem":
-                # Subsystems currently don't include stats/plots toggles in interface
                 return self.get_subsystem_hover(
                     subsystem_name=element_id,
                     subsystem_metric=color_metric,
                     for_genes=False,
                     show_stats=show_stats,
+                    show_color_reference=show_color_reference,
                     delta_options=delta_options,
                 )
             elif element_type == "metabolite":

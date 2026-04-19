@@ -27,6 +27,10 @@ def plot_metabolic_graph(
     fit_view_to_bounds=False,
     color_metric="log2_fc",
     delta_options=None,
+    show_hover_plots=None,
+    show_hover_stats=True,
+    show_hover_distribution_plots=None,
+    show_hover_color_reference=True,
     highlight_significant_reactions=False,
     highlight_significant_genes=False,
     highlight_gene_influence=False,
@@ -34,6 +38,8 @@ def plot_metabolic_graph(
     enabled_toggle=None,
     subsystem_select=None,
     click_filename_prefix: str = "metabolic_element",
+    enable_timing=False,
+    return_metadata=False,
 ):
     """Create a Bokeh visualization of a metabolic graph.
 
@@ -65,21 +71,39 @@ def plot_metabolic_graph(
             - 'transform': Transformation to apply to delta values ['raw', 'abs', 'sign']
             - 'numerator_filter': Filter for numerator values ['significant', 'all']
             - 'denominator_filter': Filter for denominator values ['significant', 'all']
+        show_hover_stats (bool): Whether reaction, gene, and subsystem hover
+            panels should include textual statistics.
+        show_hover_distribution_plots (bool): Whether reaction and gene hover
+            panels should include violin/distribution plots during enrichment.
+        show_hover_color_reference (bool): Whether hover panels should include
+            the color-reference explanation block.
         highlight_significant_reactions (bool): Highlight significant reactions
         highlight_significant_genes (bool): Highlight significant genes
         highlight_gene_influence (bool): Highlight gene influence
         graph_type (str): Type of graph to generate ("subsystem",
             "compartment", or "metabolic_network"). Metabolic-network plots
             keep their existing packaged-resource behavior.
+        enable_timing (bool): Whether to collect per-phase pipeline timings.
+        return_metadata (bool): If True, return a `(plot, metadata)` tuple.
 
     Returns:
-        Bokeh plot object
+        Bokeh plot object, or `(plot, metadata)` when `return_metadata=True`
     """
+    if show_hover_distribution_plots is None:
+        if show_hover_plots is None:
+            show_hover_distribution_plots = True
+        else:
+            show_hover_distribution_plots = show_hover_plots
+
     pipeline_config = build_pipeline_config(
         use_human1_map=use_human1_map,
         layout_engine=layout_engine,
         color_metric=color_metric,
         delta_options=delta_options,
+        show_hover_plots=show_hover_plots,
+        show_hover_stats=show_hover_stats,
+        show_hover_distribution_plots=show_hover_distribution_plots,
+        show_hover_color_reference=show_hover_color_reference,
         highlight_significant_reactions=highlight_significant_reactions,
         highlight_significant_genes=highlight_significant_genes,
         highlight_gene_influence=highlight_gene_influence,
@@ -92,7 +116,7 @@ def plot_metabolic_graph(
         fit_view_to_bounds=fit_view_to_bounds,
         output_html=output_html,
         show_plot=True,
-        enable_timing=False,
+        enable_timing=enable_timing,
     )
 
     # Create and run pipeline
@@ -108,5 +132,13 @@ def plot_metabolic_graph(
         enabled_toggle=enabled_toggle,
         subsystem_select=subsystem_select,
     )
+
+    if return_metadata:
+        run_state = pipeline.get_intermediate_results()
+        metadata = {
+            "timings": pipeline.get_timings(),
+            "resolved_request": run_state.get("resolved_request"),
+        }
+        return plot, metadata
 
     return plot
