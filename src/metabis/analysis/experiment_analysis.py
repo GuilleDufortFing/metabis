@@ -32,11 +32,12 @@ class ExperimentAnalysis:
     "How does glycolysis compare to oxidative phosphorylation within group B?"
     """
 
-    def __init__(self, data_manager):
+    def __init__(self, data_manager, auto_run: bool = True):
         """Initialize the experiment analysis.
 
         Args:
             data_manager: An Experiment object with loaded data and defined groups
+            auto_run: Whether to immediately run the default analysis pipeline
 
         Raises:
             ValueError: If data_manager is invalid or missing required data
@@ -48,7 +49,7 @@ class ExperimentAnalysis:
         self._reaction_directions = None
         self._gene_avgs = None
         self._subsystem_avgs = None
-        
+
         # Dimensionality reduction module
         self.dim_reduction = DimensionalityReduction()
 
@@ -59,8 +60,10 @@ class ExperimentAnalysis:
         self.group_ids = list(data_manager.get_group_ids())
         self.n_groups = len(self.group_ids)
 
-        # Automatically run analysis like GroupComparison
-        self.run_analysis()
+        # Automatically run analysis like GroupComparison unless the caller
+        # needs to supply explicit analysis parameters first.
+        if auto_run:
+            self.run_analysis()
 
     @property
     def pca_results(self):
