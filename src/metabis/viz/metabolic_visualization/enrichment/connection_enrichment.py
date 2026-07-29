@@ -8,7 +8,6 @@ gene influence).
 from ..generation.data_structures.constants import VisualizationConstants
 from ..generation.data_structures.core_types import GlyphClass
 from ..generation.data_structures.enriched_factories import enrich_metabolic_connection
-from ....managers.data_manager_mode import DataManagerMode
 from .utilities import (
     calculate_arrowhead_vertices,
     calculate_influence_arrow_coords,
@@ -26,7 +25,6 @@ from .utilities import (
 def enrich_connections(
     connections,
     enriched_glyphs,
-    reaction_colors,
     highlight_significant_subgraph,
     significant_nodes_set,
     missing_data_elements_set,
@@ -38,12 +36,11 @@ def enrich_connections(
     Args:
         connections: List of basic connection dictionaries
         enriched_glyphs: List of enriched glyph dictionaries
-        reaction_colors: Dictionary mapping reaction IDs to colors (deprecated)
         highlight_significant_subgraph: Whether significant subgraph highlighting
                                          is enabled
         significant_nodes_set: Set of significant node IDs
         missing_data_elements_set: Set of missing data element IDs
-        data_manager: DataManager instance for accessing experimental data
+        data_manager: AnalysisWorkspace instance for accessing experimental data
         color_metric: The metric to use for coloring (e.g., 'log2_fc')
 
     Returns:
@@ -82,7 +79,7 @@ def enrich_connections(
             is_missing_connection,
         )
 
-        # Calculate color using DataManager API for consistency
+        # Calculate color using AnalysisWorkspace API for consistency
         color = get_connection_color(
             source_glyph,
             target_glyph,
@@ -98,7 +95,7 @@ def enrich_connections(
             # Subsystem connections: alpha proportional to shared metabolites
             # Calculate geometry
             (x0, y0), (x1, y1) = get_connection_coordinates(source_glyph, target_glyph)
-            
+
             alpha = _calculate_subsystem_connection_alpha(connection, connections)
 
             enriched_connection = {
@@ -119,7 +116,7 @@ def enrich_connections(
             # Regulatory connections: dashed lines, enzyme group color, no arrowheads
             # Calculate geometry
             (x0, y0), (x1, y1) = get_connection_coordinates(source_glyph, target_glyph)
-            
+
             if not is_missing_connection:
                 color = VisualizationConstants.ENZYME_GROUP_COLOR
 
@@ -139,10 +136,10 @@ def enrich_connections(
             }
         else:
             # Metabolic connections: with arrowheads and reaction-based coloring
-            
+
             # Calculate geometry
             (x0, y0), (x1, y1) = get_connection_coordinates(source_glyph, target_glyph)
-            
+
             # Align direction with metabolic model stoichiometry
             should_swap = align_connection_direction(
                 source_glyph, target_glyph, data_manager
@@ -150,7 +147,7 @@ def enrich_connections(
             if should_swap:
                 # Swap coordinates to reverse arrow direction
                 x0, y0, x1, y1 = x1, y1, x0, y0
-            
+
             # Calculate arrowhead coordinates
             arrowhead_xs, arrowhead_ys = calculate_arrowhead_vertices(x0, y0, x1, y1)
 
@@ -194,7 +191,7 @@ def process_influence_connections(
     Args:
         influence_connections_data: Dictionary mapping reaction IDs to gene influences
         glyph_dict: Dictionary mapping glyph IDs to glyph data
-        data_manager: DataManager instance for color calculations
+        data_manager: AnalysisWorkspace instance for color calculations
 
     Returns:
         dict: Dictionary containing influence line data for batch rendering
@@ -223,7 +220,7 @@ def process_influence_connections(
                 continue
             gene_glyph = glyph_dict[gene_glyph_id]
 
-            # Get color using generic DataManager method
+            # Get color using generic AnalysisWorkspace method
             if data_manager:
                 color = data_manager.get_influence_color(
                     correlation=gene_react_corr,
@@ -348,7 +345,7 @@ def align_connection_direction(source_glyph, target_glyph, data_manager):
     Args:
         source_glyph: Source glyph dictionary with 'glyph_class' and 'label'
         target_glyph: Target glyph dictionary with 'glyph_class' and 'label'
-        data_manager: DataManager with metabolic_model access
+        data_manager: AnalysisWorkspace with metabolic_model access
 
     Returns:
         bool: True if coordinates should be swapped (reversed), False otherwise
@@ -416,24 +413,20 @@ def align_connection_direction(source_glyph, target_glyph, data_manager):
             # If current direction is metabolite → reaction, we need to swap
             should_swap = not current_direction_is_reaction_to_metabolite
 
-        # Handle direction reversal for some connections
-        # Pre-fetch reaction activities for direction reversal
-        if data_manager.experiment_analysis:
-            if data_manager.get_mode() == DataManagerMode.GROUP_COMPARISON:  
-                reaction_activities = (
-                    data_manager.experiment_analysis.get_reaction_avgs().loc[
-                        data_manager.group_comparison.group_id_1
-                    ]
-                )
-            else:
-                reaction_activities = data_manager.experiment_analysis.get_reaction_avgs().loc[data_manager.group_manager.get_active_group()]
-            if should_reverse_direction(
-                source_glyph, target_glyph, reaction_activities
-            ):
-                should_swap = not should_swap
+        # A reversible reaction is drawn in one direction only, and which one is a
+        # single decision owned by the shared reaction-direction map -- the same
+        # answer the node colour and the hover are resolved from. Asking for it
+        # here, rather than re-deriving it from group averages, is what keeps the
+        # arrowhead from contradicting the hover it sits under (WP10/D-69).
+        if should_reverse_direction(
+            source_glyph,
+            target_glyph,
+            data_manager.get_display_direction(reaction_id),
+        ):
+            should_swap = not should_swap
 
         return should_swap
-    
-    except Exception as e:
+
+    except Exception:
         # If anything goes wrong, keep original direction
         return False

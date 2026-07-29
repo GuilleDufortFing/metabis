@@ -1,7 +1,7 @@
-from typing import Any, Dict
+from ...workspace_mode import AnalysisWorkspaceMode
 from ..interfaces import HoverSection
 from ..models import HoverContext, HoverData
-from ...data_manager_mode import DataManagerMode
+
 
 class SubsystemSection(HoverSection):
     """Section for subsystem/pathway information."""
@@ -9,7 +9,7 @@ class SubsystemSection(HoverSection):
     def should_include(self, data: HoverData, context: HoverContext) -> bool:
         """Include if this is a subsystem hover request."""
         # Hide this GC-oriented section in Experiment Analysis mode
-        if context.mode == DataManagerMode.EXPERIMENT_ANALYSIS:
+        if context.mode == AnalysisWorkspaceMode.EXPERIMENT_ANALYSIS:
             return False
         return context.hover_type == "subsystem"
 
@@ -18,7 +18,7 @@ class SubsystemSection(HoverSection):
         subsystem_name = data.get("subsystem_display_name", "Unknown")
         n_significant = data.get("n_significant", 0)
         n_total = data.get("n_total", 0)
-        regulation_score = data.get("regulation_score", 0)
+        net_direction_score = data.get("net_direction_score", 0)
         total_metric_value = data.get("total_metric_value", 0)
         metric = context.subsystem_metric or "log2_fc"
         for_genes = context.for_genes
@@ -38,13 +38,16 @@ class SubsystemSection(HoverSection):
         }
         display_name = metric_display_names.get(metric, metric)
 
-        # Format regulation direction text
-        if regulation_score > 0:
-            regulation_direction = "Up-regulated"
-        elif regulation_score < 0:
-            regulation_direction = "Down-regulated"
+        # State the net direction as Target minus Baseline. The score is the signed
+        # sum of the metric over the significant elements divided by its absolute
+        # sum, so it is a net share of effect magnitude, not a count of elements.
+        share = f"{abs(net_direction_score) * 100:.1f}%"
+        if net_direction_score > 0:
+            net_direction = f"{share} net higher in Target"
+        elif net_direction_score < 0:
+            net_direction = f"{share} net lower in Target (higher in Baseline)"
         else:
-            regulation_direction = "Mixed regulation"
+            net_direction = "balanced between both directions"
 
         parts = []
         parts.append(f"<div><strong>{category_term}:</strong> {subsystem_name}</div>")
@@ -53,21 +56,21 @@ class SubsystemSection(HoverSection):
             f"{n_significant} out of {n_total} ({percentage:.1f}%)</div>"
         )
         parts.append(
-            f"<div><strong>Regulation Direction:</strong> "
-            f"{abs(regulation_score)*100:.1f}% of significant reactions are {regulation_direction}</div>"
+            f"<div><strong>Net direction:</strong> "
+            f"significant {element_term.lower()} are {net_direction}</div>"
         )
-        
+
         # Display delta subsystem score with metadata
         delta_score = data.get("delta_subsystem_score")
         delta_meta = data.get("delta_subsystem_meta", {})
-        
+
         if delta_score is not None and delta_meta.get("computed", False):
             # Get delta configuration details
             delta_metric = delta_meta.get("metric", metric)
             transform = delta_meta.get("transform", "sign")
             numerator_filter = delta_meta.get("numerator_filter", "all")
             denominator_filter = delta_meta.get("denominator_filter", "all")
-            
+
             # Short metric name for equation
             metric_short_names = {
                 "cohens_d": "Cohen's d",
@@ -78,7 +81,7 @@ class SubsystemSection(HoverSection):
                 "neg_log_adj_pval": "-log(padj)"
             }
             m_sym = metric_short_names.get(delta_metric, delta_metric)
-            
+
             # Transform notation
             if transform == "sign":
                 term = f"sgn({m_sym})"
@@ -86,23 +89,23 @@ class SubsystemSection(HoverSection):
                 term = f"|{m_sym}|"
             else:
                 term = f"({m_sym})"
-                
+
             # Summation notation
             if numerator_filter == "significant":
                 numerator_str = f"Σ_{{sig}} {term}"
             else:
                 numerator_str = f"Σ {term}"
-                
+
             # Denominator notation
             if denominator_filter == "significant":
                 denom_str = "N_sig"
             else:
                 denom_str = "N_total"
-                
+
             equation = f"{numerator_str} / {denom_str}"
-            
+
             parts.append(
-                f"<div style='margin-top:4px;'><strong>Delta Score (ΔS):</strong></div>"
+                "<div style='margin-top:4px;'><strong>Delta Score (ΔS):</strong></div>"
             )
             parts.append(
                 f"<div style='font-size:11px; color:#333; margin-left:10px;'>"

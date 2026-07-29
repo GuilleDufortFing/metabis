@@ -11,10 +11,12 @@ https://doi.org/10.1016/j.cell.2021.05.045
 Steps:
 1) Download reactions.tsv, linear_gene_expression_matrix.tsv, and cell_metadata.csv
 2) Run add_celltype_to_samples.py to annotate sample names with cell types
-3) Convert processed TSVs to CSVs:
-    - Th17_Compass_reactions.csv
-    - Th17_Compass_expression.csv
-4) Remove original downloaded files and intermediate TSVs
+3) Write the published example matrices, tab-delimited under a `.tsv` suffix:
+    - Th17_Compass_reactions.tsv
+    - Th17_Compass_expression.tsv
+4) Write the sample sheet the app loads as standalone metadata:
+    - Th17_Compass_metadata.tsv
+5) Remove original downloaded files and intermediate TSVs
 """
 import hashlib
 import subprocess
@@ -22,8 +24,8 @@ import sys
 from pathlib import Path
 
 try:
-    import requests
     import pandas as pd
+    import requests
 except ImportError as e:
     print("Missing dependency:", e)
     print("Please install required packages: requests, pandas")
@@ -82,27 +84,68 @@ def run_processing_script(data_dir: Path) -> None:
         sys.exit(e.returncode)
 
 
-def convert_tsv_to_csv(data_dir: Path) -> None:
-    # Map intermediate TSVs to final CSV names
-    mapping = {
-        "reactions_with_celltype.tsv": "Th17_Compass_reactions.csv",
-        "linear_gene_expression_matrix_with_celltype.tsv": "Th17_Compass_expression.csv",
-    }
-    for src_name, out_name in mapping.items():
+# The published examples are tab-delimited, so they carry the `.tsv` suffix. They
+# were written tab-delimited under a `.csv` name until 2026-07-24, which forced a
+# caveat into every statement about them -- README, notebooks, third-party
+# notices, the server's format documentation -- and made the app's own delimiter
+# detection the only thing that knew the truth (D-14).
+EXAMPLE_OUTPUTS = {
+    "reactions_with_celltype.tsv": "Th17_Compass_reactions.tsv",
+    "linear_gene_expression_matrix_with_celltype.tsv": "Th17_Compass_expression.tsv",
+}
+
+
+def write_metabis_examples(data_dir: Path) -> None:
+    """Write the published example matrices from the annotated intermediates."""
+    for src_name, out_name in EXAMPLE_OUTPUTS.items():
         src = data_dir / src_name
         out = data_dir / out_name
         if not src.exists():
             print(f"Error: Expected processed file not found: {src}")
             sys.exit(1)
-        print(f"Converting {src.name} -> {out.name} (tab-delimited)")
+        print(f"Writing {src.name} -> {out.name} (tab-delimited)")
         try:
             df = pd.read_csv(src, sep='\t', index_col=0)
-            # Write final outputs as tab-delimited, keeping requested .csv filenames
             df.to_csv(out, sep='\t')
         except Exception as e:
-            print(f"Error converting {src} to CSV: {e}")
+            print(f"Error writing {out}: {e}")
             sys.exit(1)
         print(f"Saved {out.name} ({out.stat().st_size:,} bytes)")
+
+
+def write_sample_metadata(data_dir: Path) -> None:
+    """Ship the upstream cell metadata as a Metabis sample sheet.
+
+    The processed matrices name each sample ``{cell_type}_{cell_id}``, so the
+    sheet must carry that joined ID in its first column: Metabis aligns metadata
+    to the reaction matrix by exact sample ID, not by the original SRR accession.
+    Grouping then reads the ``cell_type`` column instead of re-parsing the sample
+    name. The upstream per-run columns (SRX accession, read and alignment counts)
+    are kept because they are the part of the sample sheet no naming convention
+    can encode.
+    """
+    source = data_dir / "cell_metadata.csv"
+    output = data_dir / "Th17_Compass_metadata.tsv"
+    if not source.exists():
+        print(f"Error: Expected metadata file not found: {source}")
+        sys.exit(1)
+    print(f"\nWriting sample sheet {output.name} …")
+    try:
+        frame = pd.read_csv(source)
+        frame.insert(
+            0, "sample", frame["cell_type"].astype(str) + "_" + frame["cell_id"].astype(str)
+        )
+        # Order the grouping column first so the app's "Group by Column" opens on
+        # it; every remaining column stays in its upstream order.
+        frame = frame[
+            ["sample", "cell_type", *[c for c in frame.columns if c not in ("sample", "cell_type")]]
+        ]
+        # A .tsv name must mean tab-delimited.
+        frame.to_csv(output, sep="\t", index=False)
+    except Exception as e:
+        print(f"Error writing {output}: {e}")
+        sys.exit(1)
+    print(f"Saved {output.name} ({len(frame):,} samples, {output.stat().st_size:,} bytes)")
 
 
 def cleanup_files(data_dir: Path) -> None:
@@ -134,16 +177,19 @@ def main():
 
     download_files(data_dir)
     run_processing_script(data_dir)
-    convert_tsv_to_csv(data_dir)
+    write_metabis_examples(data_dir)
+    write_sample_metadata(data_dir)
     cleanup_files(data_dir)
 
-    final_react = data_dir / "Th17_Compass_reactions.csv"
-    final_expr = data_dir / "Th17_Compass_expression.csv"
+    final_react = data_dir / "Th17_Compass_reactions.tsv"
+    final_expr = data_dir / "Th17_Compass_expression.tsv"
+    final_meta = data_dir / "Th17_Compass_metadata.tsv"
 
     print("\n=== Done ===")
     print("Created files:")
     print(f" - {final_react}")
     print(f" - {final_expr}")
+    print(f" - {final_meta}")
 
 
 if __name__ == "__main__":

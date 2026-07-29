@@ -1,11 +1,12 @@
-from typing import Any, Dict
 import numpy as np
-from ..interfaces import HoverSection
-from ..models import HoverContext, HoverData
+
+from ....visual_config import theme
 from ....viz.metabolic_visualization.generation.data_structures.constants import (
     VisualizationConstants,
 )
-from ....visual_config import theme
+from ..interfaces import HoverSection
+from ..models import HoverContext, HoverData
+
 
 class ReactionBasicInfoSection(HoverSection):
     """Section for basic reaction information (name, ID, equation, etc.)."""
@@ -27,7 +28,7 @@ class ReactionBasicInfoSection(HoverSection):
         category = data.get("subsystem_category") or (
             data.get("metadata", {}) or {}
         ).get("subsystem_category")
-        
+
         # Check reversibility based on data if available, otherwise equation
         equation = data.get("equation", "")
         is_reversible = data.get("is_reversible", False)
@@ -41,11 +42,11 @@ class ReactionBasicInfoSection(HoverSection):
                 equation = equation.replace("->", "<=>")
             elif "<-" in equation:
                 equation = equation.replace("<-", "<=>")
-        
+
         # If NOT reversible (per data) but equation shows it is, fix it
         elif not is_reversible and "<=>" in equation:
             equation = equation.replace("<=>", "=>")
-        
+
         suffix = ""
         direction = "forward"
         if is_reversible:
@@ -94,18 +95,18 @@ class ReactionBasicInfoSection(HoverSection):
 
     def _format_equation_with_direction(self, equation: str, direction: str) -> str:
         """Format equation with direction-aware arrow coloring.
-        
+
         Args:
             equation: The reaction equation string (e.g., "A + B => C" or "A + B <=> C")
             direction: Either "forward" or "backward"
-            
+
         Returns:
             HTML-formatted equation with colored arrows
         """
         # Colors
         highlight_color = theme.ACTIVITY_UP  # Highlighted direction
         gray_color = "#888"  # Gray for non-highlighted direction
-        
+
         # Check if equation contains bidirectional arrow
         if "<=>" in equation:
             # Split by the bidirectional arrow
@@ -125,7 +126,7 @@ class ReactionBasicInfoSection(HoverSection):
                         f"<span style='color:{gray_color};'>&gt;</span>"
                     )
                 return f"{left}{arrow_html}{right}"
-        
+
         # Check if equation contains unidirectional arrow
         elif "=>" in equation:
             parts = equation.split("=>")
@@ -141,6 +142,6 @@ class ReactionBasicInfoSection(HoverSection):
                         f"<span style='color:{gray_color};'>&gt;</span>"
                     )
                 return f"{left}{arrow_html}{right}"
-        
+
         # If no recognized arrow pattern, return as-is
         return equation

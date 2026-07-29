@@ -69,9 +69,15 @@ class DefaultLayout:
     COMPARTMENT_PADDING = 150  # Fixed padding between compartments
     MAX_COMPARTMENTS_PER_ROW = 3  # Maximum number of compartments per row
 
-    # Position scaling factors
-    X_SCALE = 0.03
-    Y_SCALE = 0.03
+    # Position scaling factors. Graphviz is given node sizes in inches
+    # (pixels / 72) and returns coordinates in points, so one point of layout
+    # output is one pixel of glyph space and no rescaling is needed. The
+    # previous 0.03 compensated for pixel dimensions being read as inches: it
+    # divided the resulting 72x drawing back down to a plausible size, which is
+    # why the unit error was invisible in the output scale while it distorted
+    # every proportion inside it.
+    X_SCALE = 1.0
+    Y_SCALE = 1.0
 
     # Compartment boundary padding
     COMPARTMENT_BOUNDARY_PADDING = 25
@@ -99,22 +105,91 @@ class DefaultEnzymeGroupLayout:
 
 
 class DefaultOptimization:
-    """Default parameters for layout optimization."""
+    """Default parameters for layout calculation."""
 
-    # Layout optimization multipliers
-    DISTANCE_MULTIPLIER = 2.5  # Multiplier for median distance threshold
+    # Graphviz measures node size in inches and reports positions in points.
+    # Glyph dimensions are pixels, so this converts between the two.
+    POINTS_PER_INCH = 72.0
 
-    # GraphViz layout arguments
-    GRAPHVIZ_ARGS = '-Grankdir="LR", -Gsplines=ortho'
+    # GraphViz layout arguments, one flag per option. The previous value was
+    # '-Grankdir="LR", -Gsplines=ortho': the comma belongs to no Graphviz
+    # syntax, so rankdir was set to `LR,`, rejected, and silently defaulted to
+    # top-to-bottom. Every "LR" metabolic graph this project produced was laid
+    # out TB. `splines` is not set because nothing consumes Graphviz's routing —
+    # every edge is drawn as a straight segment between node centres.
+    GRAPHVIZ_RANKDIR = "LR"  # Metabolic maps read left to right
+    GRAPHVIZ_NODESEP_INCHES = 0.5  # 36 px between nodes in one rank
+    GRAPHVIZ_RANKSEP_INCHES = 0.75  # 54 px between ranks
+    GRAPHVIZ_ARGS = (
+        f"-Grankdir={GRAPHVIZ_RANKDIR} "
+        f"-Gnodesep={GRAPHVIZ_NODESEP_INCHES} "
+        f"-Granksep={GRAPHVIZ_RANKSEP_INCHES}"
+    )
 
     # Spring layout parameters
     SPRING_K = 0.8  # Spring layout spring constant
     SPRING_ITERATIONS = 100  # Spring layout iterations
 
+    # Topology preparation and component packing (the automatic-layout redesign).
+    #
+    # A shared "main" metabolite touched by more than HUB_METABOLITE_DEGREE
+    # reactions is a star whose arms cross everything between them, and it is the
+    # dominant source of crossings in the automatic maps. Curators answer this by
+    # duplicating the metabolite beside a reaction — but only on the arms that are
+    # shortcuts, never on the arms that carry the pathway, which is why a curated
+    # map still reads as one network. split_hub_metabolites duplicates exactly the
+    # arms a spanning forest does not need, so this threshold decides which
+    # metabolites are *eligible* for duplication and connectivity decides which of
+    # their arms actually are.
+    #
+    # Duplicating every arm above this degree instead — the rule that shipped
+    # between 2026-07-25 and this change — cut the largest connected component of a
+    # compartment to roughly a third of the curated map's and turned the drawings
+    # into fields of detached motifs.
+    #
+    # Every copy keeps the parent's original_id, so colouring and selection still
+    # resolve to one entity — the same duplication the per-reaction intermediate
+    # metabolites already use.
+    HUB_METABOLITE_DEGREE = 3
+
+    # Connectivity is not the only thing worth preserving. A metabolite that is
+    # the sole path to dozens of reactions — a shared CoA or carnitine pool rather
+    # than a pathway junction — has no redundant arm to duplicate, so the rule
+    # above keeps all of them and hands the layout engine a 66-armed star. The
+    # curators do not draw that: across the 104 curated Human1 maps the highest
+    # metabolite degree is 14 and only one map exceeds 12, while our uncapped
+    # layouts put 15 of 145 above 12. Above this cap a metabolite keeps the arms
+    # holding the largest structures and the rest become per-reaction copies, which
+    # is the curators' own budget applied to the pools.
+    HUB_METABOLITE_DEGREE_CAP = 12
+
+    # After splitting, a compartment is a forest of small motifs. Laying each
+    # connected component out on its own and shelf-packing the results to a target
+    # aspect ratio replaces Graphviz's one-dimensional component packing, which
+    # spread everything along a single axis into a letterbox band.
+    COMPONENT_TARGET_ASPECT = 1.6  # width / height goal for the packed drawing
+    COMPONENT_PACKING_GAP = 120.0  # pixels of clear space between packed components
+
+    # Enzyme groups are demoted to satellites: they carry exactly one edge, they
+    # are large boxes, and letting them take part in rank assignment distorts the
+    # metabolic drawing. They take no part in it, but their footprint is reserved
+    # on the reaction they belong to, this far above it, so the layout engine keeps
+    # the space clear and the group cannot land on a neighbouring glyph. Reserving
+    # nothing and reattaching afterwards — the behaviour that shipped on
+    # 2026-07-25 — put an enzyme group on top of another component's reactions and
+    # metabolites in every subsystem measured.
+    ENZYME_SATELLITE_GAP = 70.0
+
 
 class MetabolicSerpentineLayoutDefaults:
     """Default configuration for the custom serpentine metabolic layout."""
     MULTIPLY = 6
+
+    # This layout emits its own coordinates rather than Graphviz points, and its
+    # spacing constants below are sized for a drawing scaled down by this
+    # factor. It used to be applied to every engine's output as
+    # DefaultLayout.X_SCALE; it belongs to this one.
+    POSITION_SCALE = 0.03
 
     REACTIONS_PER_ROW = 12   # Maximum number of reactions per serpentine row
     REACTION_HORIZONTAL_SPACING = 3200 * MULTIPLY # Distance between reactions in a row
@@ -175,7 +250,7 @@ class VisualizationConstants:
     ENZYME_GROUP_COLOR = "#F8C471"
     ENZYME_GROUP_DASH = "dashed"
     CYTOSOL_LINE_COLOR = "white"
-    DEFAULT_LINE_COLOR = "#606060" 
+    DEFAULT_LINE_COLOR = "#606060"
     # Global stroke/border color for glyph outlines and edge overlays
     GLOBAL_BORDER_COLOR = "#606060"
     # GLOBAL_BORDER_COLOR = DEFAULT_LINE_COLOR
@@ -262,43 +337,6 @@ class VisualizationConstants:
     # Subsystem name text wrapping
     SUBSYSTEM_NAME_MAX_LINE_LENGTH = 25  # Maximum characters per line
     SUBSYSTEM_NAME_MAX_LINES = 3  # Maximum number of lines for subsystem names
-
-    # Category color palette - colors assigned by category order in file
-    # Import from category_manager for the authoritative palette
-    # This property provides backward compatibility with existing code
-    CATEGORY_PALETTE = [
-        "#E74C3C",  # Red - Central Carbon & Bioenergetics
-        "#F1C40F",  # Yellow - Redox & Antioxidant Defense
-        "#C0392B",  # Dark red - Carbohydrate Interconversions
-        "#00B594",  # Teal - Short-Chain Fatty Acids
-        "#0971B6",  # Blue - Fatty Acid Biosynthesis & Activation
-        "#453792",  # Purple - Fatty Acid Oxidation
-        "#9B59B6",  # Light purple - Polyunsaturated Fatty Acids & Eicosanoids
-        "#E67E22",  # Orange - Membrane Lipids & Phospholipid Signaling
-        "#27AE60",  # Green - Sterols, Steroid Hormones & Bile Acids
-        "#F39C12",  # Yellow-orange - Amino Acid Metabolism
-        "#FF69B4",  # Hot pink - Sulfur Amino Acids & One-Carbon Metabolism
-        "#8B4513",  # Saddle brown - Nucleotide Metabolism
-        "#C16C04",  # Brown-orange - Glycans & Glycosylation
-        "#D35400",  # Dark orange - Vitamins, Cofactors & Heme
-        "#FF1493",  # Deep pink - Fat-Soluble Vitamins & Isoprenoids
-        "#1ABC9C",  # Teal - Xenobiotics & Detoxification
-        "#708090",  # Slate gray - Membrane Transport & Exchange
-        "#F17CEE",  # Orchid - Protein Processing & Turnover
-        "#95A5A6",  # Gray - Model Utilities & Non-human Pathways
-        "#34495E",  # Dark gray - Unknown
-        # Extended colors (10 new)
-        "#2ECC71",  # Emerald
-        "#3498DB",  # Peter river blue
-        "#9B2335",  # Jester red
-        "#5D3FD3",  # Iris purple
-        "#FF7F50",  # Coral
-        "#20B2AA",  # Light sea green
-        "#CD853F",  # Peru brown
-        "#4169E1",  # Royal blue
-        "#DA70D6",  # Orchid pink
-        "#2F4F4F",  # Dark slate gray
-    ]
 
     # Default category color for unmapped categories
     DEFAULT_CATEGORY_COLOR_UNMAPPED = "#34495E"  # Dark gray

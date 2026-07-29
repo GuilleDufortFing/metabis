@@ -24,8 +24,8 @@ def create_violin(
     significant: bool = False,
     width: int = 400,
     height: int = 400,
-    group1_name: str = "Group 1",
-    group2_name: str = "Group 2",
+    group1_name: str = "Target",
+    group2_name: str = "Baseline",
     border_color: str = "#1f77b4",  # Default blue border
     is_reversed: bool = False,  # Flag for reversed reactions
     hover_text: str = None,  # Added parameter for hover text
@@ -33,7 +33,13 @@ def create_violin(
     display_label: str = "",
     external_url: str = "",
 ) -> figure:
-    """Create an interactive violin plot using Bokeh."""
+    """Create an interactive violin plot using Bokeh.
+
+    ``group1_name`` and ``group2_name`` name the two plotted populations. They
+    default to ``Target``/``Baseline`` so a caller that omits them still states
+    the comparison orientation every signed metric is defined against, rather
+    than an anonymous ``Group 1``/``Group 2`` pair.
+    """
     # Calculate means for flow direction analysis
     mean1 = np.mean(dist1) if len(dist1) > 0 else 0
     mean2 = np.mean(dist2) if len(dist2) > 0 else 0
@@ -76,7 +82,12 @@ def create_violin(
         y_min, y_max = -1, 1  # Default range if no data
 
     for group, dist in [(group1_name, dist1), (group2_name, dist2)]:
-        if len(dist) > 0:
+        # A side with fewer than two distinct values has no kernel density
+        # estimate: its covariance is singular and SciPy raises. Blocked and
+        # constant reactions are ordinary in flux data, so the violin curve is
+        # simply omitted for that side while its box plot and sample points
+        # still render.
+        if len(dist) > 1 and float(np.ptp(dist)) > 0.0:
             # Use the calculated y-range for KDE instead of the full data range
             y_values = np.linspace(y_min, y_max, 100)
 
@@ -90,8 +101,10 @@ def create_violin(
                 "y": np.concatenate([y_values, y_values[::-1]]),
             }
 
-    y_min = min(curves[group]["y"])
-    y_max = max(curves[group]["y"])
+    # Every curve is drawn over the same ``linspace(y_min, y_max)``, so the plot
+    # range is already the padded data range computed above. Re-reading it from
+    # one curve only re-derived the same numbers, and failed when no side had a
+    # density curve to read.
 
     # Invert y-axis if mean is negative
     if mean1 < 0:
@@ -247,8 +260,8 @@ def create_html_violin_for_hover(
     x_label: str = "",
     y_label: str = "",
     plot_title: str = "",
-    group1_name: str = "Group 1",
-    group2_name: str = "Group 2",
+    group1_name: str = "Target",
+    group2_name: str = "Baseline",
     size: Optional[Tuple[int, int]] = None,
     min_y: Optional[float] = None,
     max_y: Optional[float] = None,
@@ -266,8 +279,8 @@ def create_html_violin_for_hover(
         x_label: Label for the x-axis
         y_label: Label for the y-axis
         plot_title: Title for the plot
-        group1_name: Name for first group
-        group2_name: Name for second group
+        group1_name: Name for the first (Target) population
+        group2_name: Name for the second (Baseline) population
         size: Optional (width, height) of the SVG container in pixels
         min_y: Optional lower bound for the y-axis
         max_y: Optional upper bound for the y-axis
@@ -314,7 +327,6 @@ def create_html_violin_for_hover(
         )
 
     mean1, mean2 = np.mean(dist1), np.mean(dist2)
-    std1, std2 = np.std(dist1), np.std(dist2)
     q1_1, med1, q3_1 = np.percentile(dist1, [25, 50, 75])
     q1_2, med2, q3_2 = np.percentile(dist2, [25, 50, 75])
 
@@ -484,30 +496,30 @@ def create_html_violin_for_hover(
             <rect width="{plot_area_width}" height="{plot_area_height}" x="{
         margin_left
     }" y="{margin_top}" fill="url(#grid)"/>
-            
+
             <!-- Y-axis -->
             <line x1="{margin_left}" y1="{margin_top}" x2="{margin_left}" y2="{
         margin_top + plot_area_height
     }" stroke="#333" stroke-width="1"/>
-            
+
             <!-- X-axis -->
             <line x1="{margin_left}" y1="{margin_top + plot_area_height}" x2="{
         margin_left + plot_area_width
     }" y2="{margin_top + plot_area_height}" stroke="#333" stroke-width="1"/>
-            
+
             <!-- Zero line (if reversed flow) -->
             {
         f'<line x1="{margin_left}" y1="{scale_y(0)}" x2="{margin_left + plot_area_width}" y2="{scale_y(0)}" stroke="red" stroke-width="1" stroke-dasharray="5,5" opacity="0.7"/>'
         if reversed_flow
         else ""
     }
-            
+
             <!-- Sample size display (above each violin) -->
-            <text x="{scale_x(1.0)}" y="{margin_top - 8}" 
+            <text x="{scale_x(1.0)}" y="{margin_top - 8}"
                   text-anchor="middle" font-size="10" fill="#888">n₁={n1}</text>
-            <text x="{scale_x(2.0)}" y="{margin_top - 8}" 
+            <text x="{scale_x(2.0)}" y="{margin_top - 8}"
                   text-anchor="middle" font-size="10" fill="#888">n₂={n2}</text>
-            
+
             <!-- Violin 1 -->
             {
         f'<text x="{scale_x(1.0)}" y="{margin_top + plot_area_height / 2}" text-anchor="middle" font-size="10" fill="#888">{empty_state_label}</text>'
@@ -518,7 +530,7 @@ def create_html_violin_for_hover(
             else ""
         )
     }
-            
+
             <!-- Violin 2 -->
             {
         f'<text x="{scale_x(2.0)}" y="{margin_top + plot_area_height / 2}" text-anchor="middle" font-size="10" fill="#888">{empty_state_label}</text>'
@@ -529,7 +541,7 @@ def create_html_violin_for_hover(
             else ""
         )
     }
-            
+
             <!-- Box plots (scaled for larger size) -->
             <!-- Box 1 (only if not all zeros) -->
             {
@@ -537,36 +549,36 @@ def create_html_violin_for_hover(
         if all_zeros_1
         else f"""<rect x="{scale_x(1.0) - 12}" y="{scale_y(q3_1)}" width="24" height="{
             scale_y(q1_1) - scale_y(q3_1)
-        }" 
+        }"
                   fill="black" opacity="0.5" stroke="none"/>
             <line x1="{scale_x(1.0) - 12}" y1="{scale_y(med1)}" x2="{
             scale_x(1.0) + 12
-        }" y2="{scale_y(med1)}" 
+        }" y2="{scale_y(med1)}"
                   stroke="white" stroke-width="2"/>
             <line x1="{scale_x(1.0)}" y1="{scale_y(np.min(dist1))}" x2="{
             scale_x(1.0)
-        }" y2="{scale_y(np.max(dist1))}" 
+        }" y2="{scale_y(np.max(dist1))}"
                   stroke="black" stroke-width="1"/>"""
     }
-            
+
             <!-- Box 2 (only if not all zeros) -->
             {
         ""
         if all_zeros_2
         else f"""<rect x="{scale_x(2.0) - 12}" y="{scale_y(q3_2)}" width="24" height="{
             scale_y(q1_2) - scale_y(q3_2)
-        }" 
+        }"
                   fill="black" opacity="0.5" stroke="none"/>
             <line x1="{scale_x(2.0) - 12}" y1="{scale_y(med2)}" x2="{
             scale_x(2.0) + 12
-        }" y2="{scale_y(med2)}" 
+        }" y2="{scale_y(med2)}"
                   stroke="white" stroke-width="2"/>
             <line x1="{scale_x(2.0)}" y1="{scale_y(np.min(dist2))}" x2="{
             scale_x(2.0)
-        }" y2="{scale_y(np.max(dist2))}" 
+        }" y2="{scale_y(np.max(dist2))}"
                   stroke="black" stroke-width="1"/>"""
     }
-            
+
             <!-- Scatter points (simplified, only for non-zero distributions) -->
             {
         "" if all_zeros_1 else _generate_scatter_points(dist1, 1.0, scale_x, scale_y)
@@ -574,40 +586,40 @@ def create_html_violin_for_hover(
             {
         "" if all_zeros_2 else _generate_scatter_points(dist2, 2.0, scale_x, scale_y)
     }
-            
+
             <!-- Median reference lines (only for non-zero distributions) -->
             <!-- Horizontal dashed lines at median heights with group colors and low opacity -->
             {
         ""
         if all_zeros_1
-        else f"""<line x1="{margin_left}" y1="{scale_y(med1)}" 
-                  x2="{margin_left + plot_area_width}" y2="{scale_y(med1)}" 
-                  stroke="{color1}" stroke-width="1" 
+        else f"""<line x1="{margin_left}" y1="{scale_y(med1)}"
+                  x2="{margin_left + plot_area_width}" y2="{scale_y(med1)}"
+                  stroke="{color1}" stroke-width="1"
               stroke-dasharray="3,3" opacity="0.3"/>"""
     }
             {
         ""
         if all_zeros_2
-        else f"""<line x1="{margin_left}" y1="{scale_y(med2)}" 
-                  x2="{margin_left + plot_area_width}" y2="{scale_y(med2)}" 
-                  stroke="{color2}" stroke-width="1" 
+        else f"""<line x1="{margin_left}" y1="{scale_y(med2)}"
+                  x2="{margin_left + plot_area_width}" y2="{scale_y(med2)}"
+                  stroke="{color2}" stroke-width="1"
               stroke-dasharray="3,3" opacity="0.3"/>"""
     }
-            
+
             <!-- X-axis labels -->
             <text x="{scale_x(1.0)}" y="{
         margin_top + plot_area_height + 25
-    }" text-anchor="middle" 
+    }" text-anchor="middle"
                   font-size="12" fill="#333" transform="rotate(-30 {scale_x(1.0)} {
         margin_top + plot_area_height + 25
     })">{group1_name}</text>
             <text x="{scale_x(2.0)}" y="{
         margin_top + plot_area_height + 25
-    }" text-anchor="middle" 
+    }" text-anchor="middle"
                   font-size="12" fill="#333" transform="rotate(-30 {scale_x(2.0)} {
         margin_top + plot_area_height + 25
     })">{group2_name}</text>
-            
+
             <!-- Y-axis labels (simplified) -->
             <text x="{margin_left - 5}" y="{
         scale_y(plot_max)
@@ -619,7 +631,7 @@ def create_html_violin_for_hover(
             <text x="{margin_left - 5}" y="{
         scale_y(plot_min)
     }" text-anchor="end" font-size="10" fill="#666">{plot_min:.2f}</text>
-            
+
             <!-- Axis labels -->
             {
         f'<text x="{margin_left + plot_area_width / 2}" y="{svg_height - 5}" text-anchor="middle" font-size="11" fill="#333">{x_label}</text>'
@@ -631,7 +643,7 @@ def create_html_violin_for_hover(
         if y_label
         else ""
     }
-            
+
             <!-- Title -->
             {
         f'<text x="{svg_width / 2}" y="25" text-anchor="middle" font-size="14" font-weight="bold" fill="#333">{plot_title}</text>'
@@ -677,8 +689,8 @@ def create_static_violin_for_hover(
     x_label: str = "",
     y_label: str = "",
     plot_title: str = "",
-    group1_name: str = "Group 1",
-    group2_name: str = "Group 2",
+    group1_name: str = "Target",
+    group2_name: str = "Baseline",
     use_html: bool = True,
     size: Optional[Tuple[int, int]] = None,
     min_y: Optional[float] = None,
@@ -694,8 +706,8 @@ def create_static_violin_for_hover(
         x_label: Label for the x-axis
         y_label: Label for the y-axis
         plot_title: Title for the plot
-        group1_name: Name for first group
-        group2_name: Name for second group
+        group1_name: Name for the first (Target) population
+        group2_name: Name for the second (Baseline) population
     use_html: If True, use fast HTML/SVG version; if False, use matplotlib
     size: Optional (width, height) of the SVG container in pixels
     min_y: Optional lower bound for the y-axis
@@ -741,8 +753,8 @@ def create_matplotlib_violin_for_hover(
     x_label: str = "",
     y_label: str = "",
     plot_title: str = "",
-    group1_name: str = "Group 1",
-    group2_name: str = "Group 2",
+    group1_name: str = "Target",
+    group2_name: str = "Baseline",
 ) -> str:
     """Create a static violin plot image for hover text based on create_violin styling.
 
@@ -757,8 +769,8 @@ def create_matplotlib_violin_for_hover(
         x_label: Label for the x-axis
         y_label: Label for the y-axis
         plot_title: Title for the plot
-        group1_name: Name for first group
-        group2_name: Name for second group
+        group1_name: Name for the first (Target) population
+        group2_name: Name for the second (Baseline) population
 
     Returns:
         str: HTML img tag containing the plot as a base64-encoded SVG
@@ -804,7 +816,7 @@ def create_matplotlib_violin_for_hover(
         pc.set_linewidth(0.5)
 
     # Add box plot inside violin - match create_violin styling
-    bp = ax.boxplot(
+    ax.boxplot(
         data,
         positions=positions,
         widths=0.1,  # Match the 0.1 width from create_violin
@@ -883,9 +895,15 @@ def plot_reaction_violins(
     enabled_toggle=None,
     click_filename_prefix: str = "reaction_violin",
 ) -> Optional[figure]:
-    """Create a grid of interactive violin plots for reactions in a subsystem."""
+    """Create a grid of interactive violin plots for reactions in a subsystem.
+
+    Each plot draws the installed comparison's Target side on the left and its
+    Baseline side on the right, labelled with the comparison's own frozen side
+    labels, so the figure reads in the same Target-minus-Baseline orientation as
+    the statistics in its hover.
+    """
     # Extract experiment and group_comparison from data_manager
-    group_comparison = data_manager.group_comparison
+    group_comparison = data_manager.get_group_comparison_artifact()
 
     if not group_comparison:
         raise ValueError("Group comparison not set in the data_manager")
@@ -919,6 +937,14 @@ def plot_reaction_violins(
         else data_manager.get_group_color(group_comparison.group_id_2)
     )
 
+    # Name each violin by the side it belongs to, so a notebook figure states the
+    # orientation every signed metric in its hover is defined against. The prefix
+    # also keeps the two categories distinct when a user gives both comparison
+    # sides the same comparison-local label.
+    membership = group_comparison.membership
+    target_violin_name = f"Target: {membership.target_label}"
+    baseline_violin_name = f"Baseline: {membership.baseline_label}"
+
     # Get significant elements from group_comparison
     significant_reactions = group_comparison.get_significant_elements(for_genes=False)
 
@@ -950,22 +976,18 @@ def plot_reaction_violins(
                 f"No significant reactions found for subsystem '{subsystem}'"
             )
 
-    # Calculate dimensions
-    plot_width = figsize[0] // plots_per_row
-    plot_height = plot_width
-
     plots = []
     for idx, (reaction_id, row) in enumerate(test_results.iterrows()):
-        # Get reaction data using data_manager's method instead of experiment directly
-        reaction_info = data_manager.get_sample_reaction(reaction_id)
-
-        # Get activity values for both groups
-        if "activity_values" in reaction_info:
-            dist1 = reaction_info["activity_values"]["group1"]
-            dist2 = reaction_info["activity_values"]["group2"]
-        else:
-            # Skip reactions with no activity values
+        # Read each side's per-sample values from the same provider seam the hover
+        # violins use, so the two never disagree about which samples a side holds.
+        distributions = data_manager.data_provider.get_reaction_flux_distributions(
+            reaction_id
+        )
+        if not distributions.get("has_distributions"):
+            # Skip reactions this dataset does not measure on both sides
             continue
+        dist1 = list(distributions["group1_values"])
+        dist2 = list(distributions["group2_values"])
 
         # Check if reaction is significant
         is_significant = row["is_significant"] == 1
@@ -975,19 +997,17 @@ def plot_reaction_violins(
         mean2 = np.mean(dist2) if len(dist2) > 0 else 0
         is_reversed = (mean1 * mean2) < 0
 
-        # Get border color based on metric if significant using data_manager's method
-        if is_significant:
-            # Get hover text and color from unified get_element_hover interface
-            hover_text = data_manager.get_element_hover(
-                element_id=reaction_id,
-                element_type="reaction",
-                reaction_format="mar_id",
-                color_metric=metric,
-                show_stats=True,
-                show_color_reference=True,
-            )
+        # Every reaction carries the same hover the graph would show; only the
+        # border encodes significance.
+        hover_text = data_manager.get_element_hover(
+            element_id=reaction_id,
+            element_type="reaction",
+            color_metric=metric,
+            show_stats=True,
+            show_color_reference=True,
+        )
 
-            # Get color separately
+        if is_significant:
             color_rgb = data_manager.get_element_color(reaction_id, "reaction", metric)
 
             if isinstance(color_rgb, tuple):
@@ -996,15 +1016,6 @@ def plot_reaction_violins(
             else:
                 border_color = color_rgb
         else:
-            # For non-significant reactions, still get hover text but use gray border
-            hover_text = data_manager.get_element_hover(
-                element_id=reaction_id,
-                element_type="reaction",
-                reaction_format="mar_id",
-                color_metric=metric,
-                show_stats=True,
-                show_color_reference=True,
-            )
             border_color = "#888888"  # Gray for non-significant
 
         reference_data = get_external_reference_data(
@@ -1023,8 +1034,8 @@ def plot_reaction_violins(
             x_label="Group",
             y_label="Activity",
             significant=is_significant,
-            group1_name=group_comparison.group_id_1,
-            group2_name=group_comparison.group_id_2,
+            group1_name=target_violin_name,
+            group2_name=baseline_violin_name,
             border_color=border_color,
             is_reversed=is_reversed,
             hover_text=hover_text,  # Pass the hover text to the create_violin function

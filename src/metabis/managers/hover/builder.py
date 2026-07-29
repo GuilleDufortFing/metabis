@@ -1,7 +1,9 @@
-from typing import List, Dict, Any
+from typing import List
+
+from ..workspace_mode import AnalysisWorkspaceMode
 from .interfaces import HoverSection
 from .models import HoverContext, HoverData
-from ..data_manager_mode import DataManagerMode
+
 
 class HoverTextBuilder:
     """Builder class for creating hover text with configurable sections."""
@@ -48,14 +50,13 @@ class HoverTextBuilder:
         Returns:
             str: Complete HTML hover text
         """
-
         element_type = context.element_type or "element"
         element_id = data.get(f"{element_type}_id", "Unknown")
-        
+
         # Check if element was found
         if not data.get("is_in_model", True):  # Default to True for backward compatibility
             # Highlighted notice when element was not found in the model
-            group_id = context.get("group_id") or data.get("experiment_stats", {}).get("group_id")
+            group_id = data.get("experiment_stats", {}).get("group_id")
             group_fragment = (
                 f" for group <span style='font-weight:bold;'>{group_id}</span>" if group_id else ""
             )
@@ -66,7 +67,7 @@ class HoverTextBuilder:
                 "<div style='font-weight:bold; color:#8a6d00; text-transform:uppercase; letter-spacing:0.5px;'>"
                 "No Metadata</div>"
                 f"<div style='margin-top:4px; color:#5c4f1a;'>No metadata available{group_fragment} "
-                f"for {element_type} <span style='font-family:monospace;'>{element_id}</span>." 
+                f"for {element_type} <span style='font-family:monospace;'>{element_id}</span>."
                 "</div>"
                 "<div style='margin-top:6px; font-size:10px; color:#7a6a24;'>"
                 "This element was not found in the Human1 metabolic model."
@@ -74,14 +75,14 @@ class HoverTextBuilder:
                 "</div>"
                 "</div></div>"
             )
-        
+
 
         if element_type == 'reaction' or element_type == 'gene':
             mode = context.mode
-    
-            if mode == DataManagerMode.EXPERIMENT_ANALYSIS:
+
+            if mode == AnalysisWorkspaceMode.EXPERIMENT_ANALYSIS:
                 has_statistical_data = data.get("experiment_stats", {}).get("has_experiment_data", False)
-            elif mode == DataManagerMode.GROUP_COMPARISON:
+            elif mode == AnalysisWorkspaceMode.GROUP_COMPARISON:
                 has_statistical_data = data.get("comparison_stats", {}).get("has_comparison_data", False)
             else:
                 has_statistical_data = False
@@ -99,7 +100,7 @@ class HoverTextBuilder:
 
         # Append banner last if no stats
         if (element_type == 'reaction' or element_type == 'gene') and not has_statistical_data and context.show_stats:
-            group_id = context.get("group_id") or data.get("experiment_stats", {}).get("group_id")
+            group_id = data.get("experiment_stats", {}).get("group_id")
             group_fragment = (
                 f" for group <span style='font-weight:bold;'>{group_id}</span>" if group_id else ""
             )
@@ -110,7 +111,7 @@ class HoverTextBuilder:
                 "<div style='font-weight:bold; color:#8a6d00; text-transform:uppercase; letter-spacing:0.5px;'>"
                 "No Experimental Data</div>"
                 f"<div style='margin-top:4px; color:#5c4f1a;'>No experimental data available{group_fragment} "
-                f"for {element_type} <span style='font-family:monospace;'>{element_id}</span>." 
+                f"for {element_type} <span style='font-family:monospace;'>{element_id}</span>."
                 "</div>"
                 "<div style='margin-top:6px; font-size:10px; color:#7a6a24;'>"
                 "Data may be missing because this element wasn't measured, filtered out, or the analysis hasn't been computed yet."

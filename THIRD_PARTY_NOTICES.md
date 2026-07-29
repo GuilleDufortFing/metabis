@@ -51,8 +51,8 @@ Human-GEM or Human-maps authors or maintainers.
 The public example files below are based on the Th17 example distributed in the
 Compass repository:
 
-- `data/Th17_Compass_reactions.csv`
-- `data/Th17_Compass_expression.csv`
+- `data/Th17_Compass_reactions.tsv`
+- `data/Th17_Compass_expression.tsv`
 - `data/download_and_process_compass.py`
 
 - Upstream project: Compass

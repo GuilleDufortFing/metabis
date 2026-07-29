@@ -13,13 +13,14 @@ Key features:
 - Improved error handling and validation
 """
 
+import copy
 import hashlib
 import io
 import os
 import pickle
 import time
-from contextlib import redirect_stdout
 from abc import ABC, abstractmethod
+from contextlib import redirect_stdout
 from typing import Dict, List, Optional, Tuple
 from urllib.parse import quote
 
@@ -244,6 +245,34 @@ class MetabolicModel(MetabolicModelInterface):
     # ============================================================================
     # Initialization and Data Loading Methods
     # ============================================================================
+
+    def reload_all_data(self) -> None:
+        """Reload the full reference model, discarding any subsystem filter.
+
+        The public inverse of :meth:`filter_by_subsystem_and_compartment`: it
+        returns the model to its complete state so a caller can reset a filter
+        without reaching into initialization internals.
+        """
+        self._initialize_all_data()
+
+    def copy(self) -> "MetabolicModel":
+        """Return a fresh, fully independent copy of this model.
+
+        The copy carries all of this model's current state -- applied alignment
+        corrections, an active subsystem/compartment filter, and any custom
+        subsystem categories -- but is a distinct object with its own entity
+        collections and category manager. Mutating one never reaches the other.
+
+        This is the primitive behind a *model transition* (AM8): a caller that
+        wants to filter, reset, or recategorize the installed model copies it,
+        applies the change to the copy, and installs the copy through
+        :meth:`AnalysisWorkspace.apply_model_transition`. Working on a fresh
+        object is required, not stylistic -- source identity is keyed on object
+        identity (ADR-0007), so re-identifying a model mutated in place would
+        return its stale fingerprint, and an in-flight worker still holding the
+        original could observe a torn read (MR-01).
+        """
+        return copy.deepcopy(self)
 
     def _initialize_all_data(self) -> None:
         """Initialize all data structures using individual loaders."""
@@ -901,7 +930,14 @@ class MetabolicModel(MetabolicModelInterface):
             subsystem: Name or ID of the subsystem
 
         Returns:
-            List of reaction IDs in the subsystem
+            List of reaction IDs in the subsystem, sorted
+
+        Note:
+            ``Subsystem.reaction_ids`` is a set, so an unsorted ``list()`` of it
+            orders differently in every process. That order reaches the automatic
+            subsystem layout as the order reactions are placed in, which made the
+            generated graph resources irreproducible (D-42). Sorting here is what
+            makes a regenerated layout comparable to the one it replaces.
         """
         # Get the subsystem entity by name (try both original and cleaned names)
         subsystem_entity = None
@@ -915,7 +951,7 @@ class MetabolicModel(MetabolicModelInterface):
 
         # Use direct relationships from the subsystem entity
         if hasattr(subsystem_entity, "reaction_ids") and subsystem_entity.reaction_ids:
-            return list(subsystem_entity.reaction_ids)
+            return sorted(subsystem_entity.reaction_ids)
 
         return []
 
@@ -926,7 +962,12 @@ class MetabolicModel(MetabolicModelInterface):
             subsystem: Name or ID of the subsystem
 
         Returns:
-            List of gene IDs for the subsystem
+            List of gene IDs for the subsystem, sorted
+
+        Note:
+            Sorted for the same reason as ``get_reactions_for_subsystem``: this is
+            the gene universe WP6 reports as an auditable ORA input, and a set's
+            iteration order makes that audit unreproducible across processes.
         """
         # Get the subsystem entity by name (try both original and cleaned names)
         subsystem_entity = None
@@ -940,7 +981,7 @@ class MetabolicModel(MetabolicModelInterface):
 
         # Use direct relationships from the subsystem entity
         if hasattr(subsystem_entity, "gene_ids") and subsystem_entity.gene_ids:
-            return list(subsystem_entity.gene_ids)
+            return sorted(subsystem_entity.gene_ids)
 
         return []
 
@@ -1294,6 +1335,53 @@ class MetabolicModel(MetabolicModelInterface):
             "external_id": external_id,
         }
 
+    def get_subsystem_reference_data(
+        self, subsystem_id_or_name: str
+    ) -> Dict[str, str]:
+        """Get display and external reference data for a subsystem.
+
+        The external URL is the Metabolic Atlas Human-GEM gem-browser subsystem
+        page. Its slug is the model's canonical subsystem ``id``, which is the
+        display name run through ``_clean_subsystem_name`` at load time. That
+        cleaning is the Metabolic Atlas subsystem slug (A-17: deterministically
+        derived, validated against the full Human-GEM subsystem list with zero
+        collisions and only URL-safe characters), so no maintained
+        name-to-slug map is required.
+
+        The argument accepts either the canonical subsystem id or its display
+        name, mirroring :meth:`get_subsystem_category`.
+        """
+        self._ensure_data_loaded("subsystems")
+
+        subsystem = self.subsystems.get(subsystem_id_or_name)
+        if not subsystem:
+            subsystem = self.find_subsystem_by_name(subsystem_id_or_name)
+
+        if not subsystem:
+            return {
+                "raw_id": subsystem_id_or_name,
+                "primary_id": subsystem_id_or_name,
+                "display_label": subsystem_id_or_name,
+                "external_url": "",
+                "external_source": "",
+                "external_id": "",
+            }
+
+        slug = subsystem.id
+        external_url = (
+            "https://metabolicatlas.org/explore/Human-GEM/gem-browser/subsystem/"
+            f"{quote(slug)}"
+        )
+
+        return {
+            "raw_id": subsystem.id,
+            "primary_id": subsystem.id,
+            "display_label": subsystem.name,
+            "external_url": external_url,
+            "external_source": "Metabolic Atlas",
+            "external_id": slug,
+        }
+
     # ============================================================================
     # Interface Implementation - Metadata Methods
     # ============================================================================
@@ -1496,6 +1584,83 @@ class MetabolicModel(MetabolicModelInterface):
 
             return metadata
 
+    def _reaction_subsystem_names(self) -> Dict[str, str]:
+        """Reaction ID -> subsystem name, built once per model.
+
+        The fan-out below asks this question once per incident reaction, and a
+        hub metabolite is incident to thousands of them. Resolving each through
+        ``self.reactions.get`` and then ``self.subsystems.get`` pays two indexed
+        entity lookups every time; this pays them once for the whole model.
+        """
+        cached = self._cache.get("reaction_subsystem_names")
+        if cached is not None:
+            return cached
+
+        names: Dict[str, str] = {}
+        for reaction in self.reactions.get_all():
+            subsystem_id = getattr(reaction, "subsystem_id", None)
+            if not subsystem_id:
+                continue
+            subsystem = self.subsystems.get(subsystem_id, "primary")
+            name = getattr(subsystem, "name", None) if subsystem else None
+            if name:
+                names[reaction.id] = name
+
+        self._cache["reaction_subsystem_names"] = names
+        return names
+
+    def _metabolite_subsystem_fanout(
+        self, metabolite: any
+    ) -> Tuple[Tuple[str, ...], Tuple[str, ...]]:
+        """Subsystems producing and consuming one metabolite, memoized.
+
+        This is a pure function of model structure, but it is O(degree) and the
+        degree distribution is brutally skewed: cytosolic water is incident to
+        3,352 reactions in Human1. Recomputing it per call made
+        ``get_metabolite_data`` 36x more expensive per call than its gene
+        sibling (48.9 ms versus 1.2 ms over comparable call counts) and drove
+        225,294 entity lookups while drawing a single 348-node subsystem graph,
+        because hover asks for the same metabolite up to 36 times per render.
+
+        Memoizing is safe precisely because AM8 made the model replace-only: a
+        filter, reload, or category change installs a *fresh* model object
+        through ``AnalysisWorkspace.apply_model_transition``, which clears this
+        cache (``managers/workspace.py``). Nothing mutates an installed model in
+        place -- ``test_installed_model_immutability.py`` forbids it -- so a structural memo
+        cannot go stale under the caller.
+        """
+        cache = self._cache.setdefault("metabolite_subsystem_fanout", {})
+        key = getattr(metabolite, "id", None)
+        if key is not None and key in cache:
+            return cache[key]
+
+        subsystem_names = self._reaction_subsystem_names()
+        produced_by_subsystems = set()
+        consumed_by_subsystems = set()
+        try:
+            for r_id in getattr(metabolite, "produced_by", []) or []:
+                name = subsystem_names.get(r_id)
+                if name:
+                    produced_by_subsystems.add(name)
+
+            for r_id in getattr(metabolite, "consumed_by", []) or []:
+                name = subsystem_names.get(r_id)
+                if name:
+                    consumed_by_subsystems.add(name)
+        except Exception:
+            # Be robust to partial data, as the per-call implementation was.
+            pass
+
+        # Tuples, not sets: the value is shared with every caller, and a caller
+        # that mutated it would silently repaint every later hover.
+        result = (
+            tuple(sorted(produced_by_subsystems)),
+            tuple(sorted(consumed_by_subsystems)),
+        )
+        if key is not None:
+            cache[key] = result
+        return result
+
     def get_metabolite_metadata(self, metabolite_id: str = None) -> Dict[str, any]:
         """Get metadata for metabolites.
 
@@ -1530,34 +1695,9 @@ class MetabolicModel(MetabolicModelInterface):
             except Exception:
                 compartment_str = ""
 
-            # Collect subsystems from reactions that produce/consume this metabolite
-            produced_by_subsystems = set()
-            consumed_by_subsystems = set()
-            try:
-                # Handle produced_by reactions
-                produced_by_reactions = list(getattr(metabolite, "produced_by", []))
-                for r_id in produced_by_reactions:
-                    reaction = self.reactions.get(r_id, "primary")
-                    if reaction and getattr(reaction, "subsystem_id", None):
-                        subsystem = self.subsystems.get(
-                            reaction.subsystem_id, "primary"
-                        )
-                        if subsystem and getattr(subsystem, "name", None):
-                            produced_by_subsystems.add(subsystem.name)
-
-                # Handle consumed_by reactions
-                consumed_by_reactions = list(getattr(metabolite, "consumed_by", []))
-                for r_id in consumed_by_reactions:
-                    reaction = self.reactions.get(r_id, "primary")
-                    if reaction and getattr(reaction, "subsystem_id", None):
-                        subsystem = self.subsystems.get(
-                            reaction.subsystem_id, "primary"
-                        )
-                        if subsystem and getattr(subsystem, "name", None):
-                            consumed_by_subsystems.add(subsystem.name)
-            except Exception:
-                # Be robust to partial data
-                pass
+            produced_by_subsystems, consumed_by_subsystems = (
+                self._metabolite_subsystem_fanout(metabolite)
+            )
 
             return {
                 "primary_id": metabolite.id,
@@ -1577,22 +1717,8 @@ class MetabolicModel(MetabolicModelInterface):
             # Get metadata for all metabolites
             metadata = {}
             for metabolite in self.metabolites.get_all():
-                # Collect subsystems for each metabolite
-                subsystems_set = set()
-                try:
-                    reaction_ids = list(getattr(metabolite, "produced_by", [])) + list(
-                        getattr(metabolite, "consumed_by", [])
-                    )
-                    for r_id in reaction_ids:
-                        reaction = self.reactions.get(r_id, "primary")
-                        if reaction and getattr(reaction, "subsystem_id", None):
-                            subsystem = self.subsystems.get(
-                                reaction.subsystem_id, "primary"
-                            )
-                            if subsystem and getattr(subsystem, "name", None):
-                                subsystems_set.add(subsystem.name)
-                except Exception:
-                    pass
+                produced, consumed = self._metabolite_subsystem_fanout(metabolite)
+                subsystems_set = set(produced) | set(consumed)
 
                 metadata[metabolite.id] = {
                     "primary_id": metabolite.id,

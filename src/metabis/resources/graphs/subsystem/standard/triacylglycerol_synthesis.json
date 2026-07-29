@@ -1,0 +1,115 @@
+{
+  "glyphs": [
+    {
+      "id": "compartment_peroxisome",
+      "glyph_class": "compartment",
+      "label": "Peroxisome",
+      "x": 139.0,
+      "y": 86.0,
+      "width": 478.0,
+      "height": 522.0
+    },
+    {
+      "id": "r_MAR09933",
+      "glyph_class": "reaction",
+      "label": "MAR09933",
+      "x": 139.0,
+      "y": 81.0,
+      "width": 50.0,
+      "height": 50.0,
+      "original_id": "MAR09933"
+    },
+    {
+      "id": "m_peroxisome_MAM01278x",
+      "glyph_class": "metabolite",
+      "label": "MAM01278x",
+      "x": 30.0,
+      "y": 152.0,
+      "width": 60.0,
+      "height": 40.0,
+      "original_id": "MAM01278x",
+      "subtype": "main"
+    },
+    {
+      "id": "m_MAR09933_MAM02039x",
+      "glyph_class": "metabolite",
+      "label": "MAM02039x",
+      "x": 30.0,
+      "y": 81.0,
+      "width": 40.0,
+      "height": 30.0,
+      "original_id": "MAM02039x",
+      "subtype": "intermediate"
+    },
+    {
+      "id": "m_MAR09933_MAM02555x",
+      "glyph_class": "metabolite",
+      "label": "MAM02555x",
+      "x": 30.0,
+      "y": 15.0,
+      "width": 40.0,
+      "height": 30.0,
+      "original_id": "MAM02555x",
+      "subtype": "intermediate"
+    },
+    {
+      "id": "m_MAR09933_MAM02554x",
+      "glyph_class": "metabolite",
+      "label": "MAM02554x",
+      "x": 248.0,
+      "y": 117.0,
+      "width": 40.0,
+      "height": 30.0,
+      "original_id": "MAM02554x",
+      "subtype": "intermediate"
+    },
+    {
+      "id": "m_peroxisome_MAM03419x",
+      "glyph_class": "metabolite",
+      "label": "MAM03419x",
+      "x": 248.0,
+      "y": 46.0,
+      "width": 60.0,
+      "height": 40.0,
+      "original_id": "MAM03419x",
+      "subtype": "main"
+    }
+  ],
+  "connections": [
+    {
+      "id": "conn_m_peroxisome_MAM01278x_to_r_MAR09933",
+      "connection_class": "metabolic",
+      "source": "m_peroxisome_MAM01278x",
+      "target": "r_MAR09933",
+      "stoichiometry": null
+    },
+    {
+      "id": "conn_m_MAR09933_MAM02039x_to_r_MAR09933",
+      "connection_class": "metabolic",
+      "source": "m_MAR09933_MAM02039x",
+      "target": "r_MAR09933",
+      "stoichiometry": null
+    },
+    {
+      "id": "conn_m_MAR09933_MAM02555x_to_r_MAR09933",
+      "connection_class": "metabolic",
+      "source": "m_MAR09933_MAM02555x",
+      "target": "r_MAR09933",
+      "stoichiometry": null
+    },
+    {
+      "id": "conn_r_MAR09933_to_m_MAR09933_MAM02554x",
+      "connection_class": "metabolic",
+      "source": "r_MAR09933",
+      "target": "m_MAR09933_MAM02554x",
+      "stoichiometry": null
+    },
+    {
+      "id": "conn_r_MAR09933_to_m_peroxisome_MAM03419x",
+      "connection_class": "metabolic",
+      "source": "r_MAR09933",
+      "target": "m_peroxisome_MAM03419x",
+      "stoichiometry": null
+    }
+  ]
+}

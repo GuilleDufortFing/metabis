@@ -48,7 +48,7 @@ def format_statistical_value(value: Any) -> str:
 def build_statistical_number_formatter() -> HTMLTemplateFormatter:
     """Build a formatter that mirrors the statistical value display rules."""
     return HTMLTemplateFormatter(
-        template="""
+        template=r"""
         <%
         function formatStatisticalValue(rawValue) {
             if (rawValue === null || rawValue === undefined) {

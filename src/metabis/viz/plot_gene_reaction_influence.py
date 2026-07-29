@@ -209,14 +209,10 @@ def plot_gene_reaction_influence_heatmap(
     # --- Define Color Palettes and Mappers ---
     # Diverging palettes for highly influenced - Darker first
     pos_palette = list(reversed(Greens[9][1:]))
-    neg_palette = list(
-        reversed(Oranges[9][1:])
-    )  # Use reversed Oranges too for consistency
     # Grayscale palette for non-highly influenced - Darker first
     gray_palette = list(reversed(Greys[9][1:]))
 
     # Define the range for mapping influence magnitude (0 to 100)
-    low_val = 0
     high_val = 100
 
     # Create a mapper for the COLOR BAR (representing correlation for highly influenced)
@@ -326,7 +322,7 @@ def plot_subsystem_influence_summary(
     Hover text is generated using data_manager.get_reaction_hover.
 
     Args:
-        data_manager: The DataManager object.
+        data_manager: The AnalysisWorkspace object.
         results: Results dictionary from analyze_subsystem_gene_deltas function.
         title: Title for the plot (defaults to subsystem name if available).
         height: Height of the plot in pixels.
@@ -340,7 +336,7 @@ def plot_subsystem_influence_summary(
         Bokeh figure object if return_plot=True, otherwise None (shows the plot).
     """
     if not data_manager:
-        raise ValueError("A DataManager object must be provided.")
+        raise ValueError("A AnalysisWorkspace object must be provided.")
 
     per_reaction = results.get("per_reaction", {})
     subsystem_name = results.get("subsystem", "Unknown Subsystem")
@@ -495,7 +491,7 @@ def plot_subsystem_influence_summary(
     )
 
     # Text labels
-    text_renderer = p.add_glyph(
+    p.add_glyph(
         source,
         Text(
             x="significant_genes_count",
@@ -557,7 +553,7 @@ def plot_subsystem_ranking_by_influence(
     """Create a horizontal bar chart showing subsystems ranked by gene influence metrics.
 
     Args:
-        data_manager: The DataManager object with experiment and group comparison data
+        data_manager: The AnalysisWorkspace object with experiment and group comparison data
         ranking_metric: Metric to use for ranking subsystems. Options:
             - "highly_influenced_reactions_count": Number of reactions with strong gene influence
             - "key_regulator_genes_count": Number of key regulator genes in the subsystem
@@ -575,7 +571,7 @@ def plot_subsystem_ranking_by_influence(
         Bokeh figure object if return_plot=True, otherwise None (shows the plot)
     """
     # Extract group comparison from data_manager
-    group_comparison = data_manager.group_comparison
+    group_comparison = data_manager.get_group_comparison_artifact()
 
     if not group_comparison:
         raise ValueError("Group comparison not set in the data_manager")
@@ -675,7 +671,7 @@ def plot_subsystem_ranking_by_influence(
             f"""
         <div>
             <span style="font-size: 14px;"><b>{row["subsystem"]}</b></span><br>
-            <b>Highly influenced reactions:</b> {row["highly_influenced_reactions_count"]} / {row["total_reactions"]} 
+            <b>Highly influenced reactions:</b> {row["highly_influenced_reactions_count"]} / {row["total_reactions"]}
                 ({row["highly_influenced_reactions_count"] / max(1, row["total_reactions"]):.0%})<br>
             <b>Key regulator genes:</b> {row["key_regulator_genes_count"]}<br>
             <b>Max reaction influence:</b> {row["max_reaction_influence"]:.1f}%<br>

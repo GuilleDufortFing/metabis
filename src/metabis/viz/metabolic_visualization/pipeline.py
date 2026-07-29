@@ -1,23 +1,80 @@
 """Metabolic Graph Visualization Pipeline.
 
-This module provides a unified pipeline for metabolic graph visualization that
-coordinates graph generation, enrichment, and rendering phases.
+The pipeline owns the one graph execution: it resolves a request, generates the
+structure, enriches it with experimental data, and returns a plain
+:class:`~metabis.viz.metabolic_visualization.artifact.GraphArtifact`. It builds no
+Bokeh model. Callers that want a plot render the artifact through the Bokeh adapter;
+callers that want a table read the same artifact through the export adapter. Nobody
+re-implements the execution. See ADR-0006.
 """
 
 import time
-from dataclasses import dataclass, field
-from typing import Any, Dict, Optional, Tuple
+from dataclasses import dataclass, field, replace
+from typing import TYPE_CHECKING, Any, Dict, Mapping, Optional, Tuple
 
-from bokeh.plotting import output_file, show
+from metabis.analysis.artifacts import (
+    AnalysisArtifactMetadata,
+    ArtifactDimension,
+    ArtifactKind,
+)
+from metabis.analysis_workspace import WorkspaceProvenance
 
+from .artifact import (
+    GraphArtifact,
+    GraphColorMeaning,
+    GraphRunMetadata,
+    PipelinePhaseMetric,
+    freeze_auxiliary,
+    freeze_node,
+    resolve_color_meaning,
+    resolve_hover_detail,
+)
+from .calculation_input import GraphCalculationInput
 from .enrichment.enricher import EnrichmentConfig, GraphEnricher
 from .enrichment.focus_instance import FocusInstance
+from .errors import GraphPipelineError
 from .generation.generator import GraphGenerationConfig, MetabolicGraphGenerator
 from .generation.utilities.compartment_resources import (
     get_compartment_display_title,
     normalize_compartment_resource_id,
 )
-from .rendering.renderer import GraphRenderer, RenderingConfig
+
+if TYPE_CHECKING:
+    # Rendering is a Bokeh adapter. Importing it here at runtime would make the
+    # module that owns `build_artifact` -- the one graph execution, which runs on
+    # a worker thread -- unimportable wherever Bokeh is absent, which is the
+    # property ADR-0006 exists to guarantee. `run_full_pipeline` and
+    # `_handle_output`, the two display methods, import it at call time instead.
+    from .rendering.renderer import RenderingConfig
+
+RUNTIME_LAYOUT_WARNING = "Runtime-generated layout was used; rendering may be slower."
+
+
+def as_calculation_input(
+    source: Any,
+    *,
+    activity_dual_evidence: bool = False,
+) -> GraphCalculationInput | None:
+    """Present whatever a caller supplied as the typed graph calculation input.
+
+    Enrichment reads a ``GraphCalculationInput`` and nothing else, so a caller
+    that still hands over an ``AnalysisWorkspace`` has it captured here, on the
+    calling thread, rather than deeper down where a workspace would reach the
+    enrichment implementation (AM10, M-12).
+    """
+    if source is None:
+        return source
+    calculation_input = (
+        source
+        if isinstance(source, GraphCalculationInput)
+        else GraphCalculationInput.from_workspace(source)
+    )
+    if calculation_input.activity_dual_evidence == activity_dual_evidence:
+        return calculation_input
+    return replace(
+        calculation_input,
+        activity_dual_evidence=activity_dual_evidence,
+    )
 
 
 @dataclass(frozen=True)
@@ -37,6 +94,8 @@ class PipelineRunState:
     original_element_name: Optional[str] = None
     resolved_request: Optional[ResolvedGraphRequest] = None
     timings: Dict[str, float] = field(default_factory=dict)
+    artifact: GraphArtifact | None = None
+    metadata: GraphRunMetadata | None = None
 
 
 def resolve_graph_request(
@@ -76,7 +135,7 @@ class PipelineConfig:
 
     generation_config: Optional[GraphGenerationConfig] = None
     enrichment_config: Optional[EnrichmentConfig] = None
-    rendering_config: Optional[RenderingConfig] = None
+    rendering_config: Optional["RenderingConfig"] = None
     output_html: Optional[str] = None
     show_plot: bool = True
     enable_timing: bool = False
@@ -89,84 +148,11 @@ class PipelineConfig:
         if self.enrichment_config is None:
             self.enrichment_config = EnrichmentConfig()
 
-        if self.rendering_config is None:
-            self.rendering_config = RenderingConfig()
-
-
-def build_pipeline_config(
-    *,
-    generation_config: Optional[GraphGenerationConfig] = None,
-    enrichment_config: Optional[EnrichmentConfig] = None,
-    rendering_config: Optional[RenderingConfig] = None,
-    use_human1_map: bool = True,
-    layout_engine: str = "dot",
-    color_metric: str = "log2_fc",
-    delta_options: Optional[Dict[str, Any]] = None,
-    show_hover_plots: Optional[bool] = None,
-    show_hover_stats: bool = True,
-    show_hover_distribution_plots: Optional[bool] = None,
-    show_hover_color_reference: bool = True,
-    highlight_significant_reactions: bool = False,
-    highlight_significant_genes: bool = False,
-    highlight_gene_influence: bool = False,
-    width: int = 1000,
-    height: int = 800,
-    sizing_mode: str = "fixed",
-    aspect_ratio: Optional[float] = 2.0,
-    zoom: float = 1.0,
-    match_aspect: bool = False,
-    fit_view_to_bounds: bool = False,
-    output_html: Optional[str] = None,
-    show_plot: bool = True,
-    enable_timing: bool = False,
-) -> PipelineConfig:
-    """Build a pipeline config from flat plotting parameters.
-
-    Explicit nested config objects take precedence over flat keyword values.
-    """
-    if show_hover_distribution_plots is None:
-        if show_hover_plots is None:
-            show_hover_distribution_plots = True
-        else:
-            show_hover_distribution_plots = show_hover_plots
-
-    if generation_config is None:
-        generation_config = GraphGenerationConfig(
-            use_human1_map=use_human1_map,
-            layout_engine=layout_engine,
-        )
-
-    if enrichment_config is None:
-        enrichment_config = EnrichmentConfig(
-            color_metric=color_metric,
-            delta_options=delta_options,
-            show_hover_stats=show_hover_stats,
-            show_hover_distribution_plots=show_hover_distribution_plots,
-            show_hover_color_reference=show_hover_color_reference,
-            highlight_significant_reactions=highlight_significant_reactions,
-            highlight_significant_genes=highlight_significant_genes,
-            highlight_gene_influence=highlight_gene_influence,
-        )
-
-    if rendering_config is None:
-        rendering_config = RenderingConfig(
-            width=width,
-            height=height,
-            sizing_mode=sizing_mode,
-            aspect_ratio=aspect_ratio,
-            zoom=zoom,
-            match_aspect=match_aspect,
-            fit_view_to_bounds=fit_view_to_bounds,
-        )
-
-    return PipelineConfig(
-        generation_config=generation_config,
-        enrichment_config=enrichment_config,
-        rendering_config=rendering_config,
-        output_html=output_html,
-        show_plot=show_plot,
-        enable_timing=enable_timing,
-    )
+        # `rendering_config` is deliberately left as None rather than defaulted
+        # to `RenderingConfig()`: constructing one here would import Bokeh at
+        # configuration time, in the module that owns `build_artifact`.
+        # `render_graph_artifact` applies exactly this default when it receives
+        # None, so the rendered result is unchanged.
 
 
 class MetabolicGraphPipeline:
@@ -188,35 +174,56 @@ class MetabolicGraphPipeline:
         self.metabolic_model = metabolic_model
         self.config = config or PipelineConfig()
 
-        # Initialize the three main components
+        # Generation and enrichment are the pipeline's own phases. Rendering is not:
+        # it is an adapter over the artifact, so the pipeline holds no renderer and
+        # cannot construct a Bokeh model.
         self.generator = MetabolicGraphGenerator(
             metabolic_model, self.config.generation_config
         )
         self.enricher = GraphEnricher(self.config.enrichment_config)
-        self.renderer = GraphRenderer(self.config.rendering_config)
 
-        # Storage for intermediate results
-        self._raw_graph_data = None
-        self._enriched_graph_data = None
         self._plot = None
         self._last_run_state = PipelineRunState()
 
-    def run_full_pipeline(self, element_name: str, graph_type: str, data_manager=None):
-        """Run the complete visualization pipeline.
+    def build_artifact(
+        self,
+        element_name: Optional[str],
+        graph_type: str,
+        data_manager=None,
+        *,
+        provenance: WorkspaceProvenance | None = None,
+        source_fingerprints: Mapping[str, str] | None = None,
+    ) -> GraphArtifact:
+        """Resolve, generate, and enrich one graph, and return it as plain data.
 
-        Args:
-            element_name: Name of the subsystem, compartment, or filter to visualize
-            graph_type: Type of graph to generate
-                       ("subsystem", "compartment", "metabolic_network")
-            data_manager: DataManager object with experimental data
+        This is the whole graph execution. It runs happily on a worker thread,
+        because it constructs no Bokeh model: every decision a renderer or an
+        export could need is made here and recorded on the returned artifact.
 
-        Returns:
-            Bokeh plot object
+        When ``provenance`` and ``source_fingerprints`` are both supplied, the
+        graph carries portable provenance like every other artifact family, so a
+        node audit can state which workspace and which inputs it was drawn from.
+        Both arrive as explicit parameters, captured on the document thread from
+        the real, loaded workspace that paid for input identity at its load
+        writer. ``build_artifact`` never reads identity off ``data_manager``: the
+        server hands the graph worker a *detached* ``AnalysisWorkspace`` facade over
+        frames the session already owns, and that facade recorded its inputs but
+        never went through a load writer, so reading its ``source_fingerprints``
+        would SHA-256 the whole reaction matrix, the whole expression matrix, and
+        the entire model on every render -- the MR-10 regression ADR-0007 exists
+        to prevent. A structure-only graph built with no workspace legitimately
+        has no provenance, so its metadata stays ``None``.
+
+        ``data_manager`` may be a ``GraphCalculationInput`` -- the typed seam
+        enrichment actually reads -- or an ``AnalysisWorkspace``, which is
+        captured into one here, before anything downstream can see a workspace.
         """
-        config = self.config
+        calculation_input = as_calculation_input(
+            data_manager,
+            activity_dual_evidence=graph_type == "subsystem",
+        )
         self._last_run_state = PipelineRunState(original_element_name=element_name)
-
-        t_start = time.time()
+        started = time.perf_counter()
 
         try:
             resolved_request = resolve_graph_request(
@@ -230,46 +237,242 @@ class MetabolicGraphPipeline:
                 element_type=resolved_request.focus_element_type,
             )
             self._last_run_state.resolved_request = resolved_request
+        except Exception as exc:
+            raise GraphPipelineError(
+                f"Element '{element_name}' could not be resolved: {exc}",
+                phase="resolve",
+                element_id=element_name,
+            ) from exc
+        if self.config.enable_timing:
+            self._record_timing("resolve_request", time.perf_counter() - started)
 
-        except ValueError as e:
-            # Handle element not found with helpful error message
-            raise ValueError(f"Element '{element_name}' not found: {e}")
+        try:
+            glyphs, connections, generated_title = self.generate_graph(
+                resolved_request.generator_element_id,
+                graph_type,
+            )
+        except Exception as exc:
+            if isinstance(exc, GraphPipelineError):
+                raise
+            raise GraphPipelineError(
+                f"Graph generation failed: {exc}",
+                phase="generate",
+                resource_path=self.generator.last_resource_path,
+                element_id=resolved_request.generator_element_id,
+            ) from exc
 
-        # Phase 1: Generate graph
-        glyphs, connections, display_title = self.generate_graph(
-            resolved_request.generator_element_id,
-            graph_type,
+        provider = (
+            getattr(calculation_input, "data_provider", None)
+            if calculation_input is not None
+            else None
         )
+        previous_dual_evidence = (
+            getattr(provider, "activity_dual_evidence", False)
+            if provider is not None
+            else False
+        )
+        if provider is not None:
+            provider.activity_dual_evidence = bool(
+                calculation_input.activity_dual_evidence
+            )
+        try:
+            enriched_glyphs, enriched_connections, auxiliary_data = self.enrich_graph(
+                glyphs,
+                connections,
+                focus_instance,
+                data_manager=calculation_input,
+                graph_type=graph_type,
+            )
+        except Exception as exc:
+            raise GraphPipelineError(
+                f"Graph enrichment failed: {exc}",
+                phase="enrich",
+                resource_path=self.generator.last_resource_path,
+                element_id=resolved_request.generator_element_id,
+            ) from exc
+        finally:
+            if provider is not None:
+                provider.activity_dual_evidence = previous_dual_evidence
 
-        # Phase 2: Enrich graph
-        enriched_glyphs, enriched_connections, auxiliary_data = self.enrich_graph(
-            glyphs,
-            connections,
-            focus_instance,
-            data_manager=data_manager,
+        enrichment = self.config.enrichment_config
+        timings = self._last_run_state.timings
+        item_counts = {
+            "generate_graph": len(glyphs) + len(connections),
+            "enrich_graph": len(enriched_glyphs) + len(enriched_connections),
+        }
+        # Colour meaning, hover level, and warnings are resolved once, because the
+        # provenance metadata records the same facts the artifact carries and the
+        # two must not disagree about what this run was.
+        color = resolve_color_meaning(
+            calculation_input, color_metric=enrichment.color_metric
+        )
+        hover_detail = resolve_hover_detail(
+            show_hover_distribution_plots=enrichment.show_hover_distribution_plots,
+            show_hover_color_reference=enrichment.show_hover_color_reference,
+        )
+        warnings = (
+            (RUNTIME_LAYOUT_WARNING,) if self.generator.used_runtime_layout else ()
+        )
+        artifact = GraphArtifact(
             graph_type=graph_type,
+            element_id=resolved_request.generator_element_id,
+            display_title=resolved_request.display_title or generated_title,
+            nodes=tuple(freeze_node(glyph) for glyph in enriched_glyphs),
+            edges=tuple(freeze_node(connection) for connection in enriched_connections),
+            auxiliary=freeze_auxiliary(auxiliary_data),
+            color=color,
+            resource_path=self.generator.last_resource_path,
+            resource_variant=self.generator.last_resource_variant,
+            layout_engine=self.config.generation_config.layout_engine,
+            used_runtime_layout=self.generator.used_runtime_layout,
+            hover_detail=hover_detail,
+            phases=tuple(
+                PipelinePhaseMetric(name, elapsed, item_count=item_counts.get(name))
+                for name, elapsed in timings.items()
+            ),
+            warnings=warnings,
+            metadata=self._graph_metadata(
+                graph_type=graph_type,
+                element_id=resolved_request.generator_element_id,
+                color=color,
+                hover_detail=hover_detail,
+                node_count=len(enriched_glyphs),
+                edge_count=len(enriched_connections),
+                warnings=warnings,
+                provenance=provenance,
+                source_fingerprints=source_fingerprints,
+            ),
+        )
+        self._last_run_state.artifact = artifact
+        return artifact
+
+    def _graph_metadata(
+        self,
+        *,
+        graph_type: str,
+        element_id: Optional[str],
+        color: GraphColorMeaning,
+        hover_detail: str,
+        node_count: int,
+        edge_count: int,
+        warnings: Tuple[str, ...],
+        provenance: WorkspaceProvenance | None,
+        source_fingerprints: Mapping[str, str] | None,
+    ) -> AnalysisArtifactMetadata | None:
+        """Project the live workspace's identity onto the graph, if a caller gave it.
+
+        Input identity is *read* from the ``source_fingerprints`` the caller
+        captured, never recomputed here: hashing a full matrix per render is the
+        reverted MR-10 regression (ADR-0007). The method names how the graph was
+        painted, the configuration is the generation and enrichment settings the
+        run actually used, the scientific identity is the element that was drawn,
+        and the dimensions are the node and edge counts -- which
+        ``GraphArtifact`` validation requires to match the payload.
+
+        Both parameters are needed to mint provenance; a graph built with no
+        workspace has none, and does not invent one from an arbitrary manager.
+        """
+        if provenance is None or source_fingerprints is None:
+            return None
+
+        generation = self.config.generation_config
+        enrichment = self.config.enrichment_config
+        return AnalysisArtifactMetadata.from_workspace(
+            kind=ArtifactKind.GRAPH,
+            provenance=provenance,
+            source_fingerprints=source_fingerprints,
+            method=color.mode,
+            configuration={
+                "graph_type": graph_type,
+                "layout_engine": generation.layout_engine,
+                "use_human1_map": bool(generation.use_human1_map),
+                "resource_variant": self.generator.last_resource_variant,
+                "color_metric": color.metric,
+                "color_saturation_limit": (
+                    None
+                    if color.saturation_limit is None
+                    else float(color.saturation_limit)
+                ),
+                "delta_options": enrichment.delta_options,
+                "hover_detail": hover_detail,
+                "show_hover_stats": bool(enrichment.show_hover_stats),
+                "show_hover_distribution_plots": bool(
+                    enrichment.show_hover_distribution_plots
+                ),
+                "show_hover_color_reference": bool(
+                    enrichment.show_hover_color_reference
+                ),
+                "highlight_significant_reactions": bool(
+                    enrichment.highlight_significant_reactions
+                ),
+                "highlight_significant_genes": bool(
+                    enrichment.highlight_significant_genes
+                ),
+                "highlight_gene_influence": bool(enrichment.highlight_gene_influence),
+            },
+            scientific_identity={
+                "graph_type": graph_type,
+                "element_id": element_id,
+            },
+            dimensions=(
+                ArtifactDimension("nodes", node_count),
+                ArtifactDimension("edges", edge_count),
+            ),
+            warnings=warnings,
         )
 
-        # Phase 3: Render graph
-        final_display_title = resolved_request.display_title or display_title
-        plot = self.render_graph(
-            enriched_glyphs,
-            enriched_connections,
-            auxiliary_data,
-            final_display_title,
+    def run_full_pipeline(
+        self,
+        element_name: str,
+        graph_type: str,
+        data_manager=None,
+        *,
+        provenance: WorkspaceProvenance | None = None,
+        source_fingerprints: Mapping[str, str] | None = None,
+    ):
+        """Build the graph artifact and render it as a Bokeh plot.
+
+        Args:
+            element_name: Name of the subsystem, compartment, or filter to visualize
+            graph_type: Type of graph to generate
+                       ("subsystem", "compartment", "metabolic_network")
+            data_manager: AnalysisWorkspace object with experimental data
+            provenance: Live workspace freshness token captured on the document
+                thread. Supplied with ``source_fingerprints`` to give the graph
+                portable provenance; see ``build_artifact``.
+            source_fingerprints: Portable input identity read from the workspace
+                that paid for it at load, never recomputed here.
+
+        Returns:
+            Bokeh plot object
+        """
+        # Imported at call time, not module scope: this is the display half, and
+        # `build_artifact` above must stay importable without Bokeh (ADR-0006).
+        from .rendering.renderer import render_graph_artifact
+
+        artifact = self.build_artifact(
+            element_name,
+            graph_type,
+            data_manager=data_manager,
+            provenance=provenance,
+            source_fingerprints=source_fingerprints,
         )
+        rendered = render_graph_artifact(artifact, self.config.rendering_config)
 
-        self._handle_output(plot, config)
+        self._plot = rendered.plot
+        self._last_run_state.metadata = rendered.metadata
+        self._handle_output(rendered.plot, self.config)
 
-        # Total timing
-        if config.enable_timing:
-            total_time = time.time() - t_start
-            self._record_timing("total_pipeline", total_time)
-
-        return plot
+        return rendered.plot
 
     def _handle_output(self, plot: Any, config: PipelineConfig) -> None:
         """Write and/or display the rendered plot for a pipeline run."""
+        if not (config.output_html or config.show_plot):
+            return
+
+        # Call-time import: see `run_full_pipeline`.
+        from bokeh.plotting import output_file, show
+
         if config.output_html:
             output_file(config.output_html)
 
@@ -293,7 +496,7 @@ class MetabolicGraphPipeline:
         config = self.config
 
         if config.enable_timing:
-            t_start = time.time()
+            t_start = time.perf_counter()
 
         glyphs, connections, display_title = self.generator.create_graph(element_id, graph_type)
 
@@ -301,7 +504,7 @@ class MetabolicGraphPipeline:
         self._raw_graph_data = (glyphs, connections, display_title)
 
         if config.enable_timing:
-            elapsed = time.time() - t_start
+            elapsed = time.perf_counter() - t_start
             self._record_timing("generate_graph", elapsed)
 
         return glyphs, connections, display_title
@@ -320,7 +523,7 @@ class MetabolicGraphPipeline:
             glyphs: Raw glyph data from generation phase
             connections: Raw connection data from generation phase
             focus_instance: object that retrieves the IDs of the elements being visualized
-            data_manager: DataManager object with experimental data
+            data_manager: AnalysisWorkspace object with experimental data
             graph_type: Type of graph being generated ("subsystem", "compartment", etc.)
 
         Returns:
@@ -329,7 +532,7 @@ class MetabolicGraphPipeline:
         config = self.config
 
         if config.enable_timing:
-            t_start = time.time()
+            t_start = time.perf_counter()
 
         enriched_glyphs, enriched_connections, auxiliary_data = self.enricher.enrich(
             glyphs=glyphs,
@@ -348,70 +551,10 @@ class MetabolicGraphPipeline:
         )
 
         if config.enable_timing:
-            elapsed = time.time() - t_start
+            elapsed = time.perf_counter() - t_start
             self._record_timing("enrich_graph", elapsed)
 
         return enriched_glyphs, enriched_connections, auxiliary_data
-
-    def render_graph(
-        self,
-        enriched_glyphs,
-        enriched_connections,
-        auxiliary_data,
-        display_title: str,
-    ):
-        """Phase 3: Create the final Bokeh visualization.
-
-        Args:
-            enriched_glyphs: Enriched glyph data from enrichment phase
-            enriched_connections: Enriched connection data from enrichment phase
-            auxiliary_data: Auxiliary data from enrichment phase
-            display_title: Title for the plot
-
-        Returns:
-            Bokeh plot object
-        """
-        config = self.config
-
-        if config.enable_timing:
-            t_start = time.time()
-
-        plot = self.renderer.render(
-            enriched_glyphs=enriched_glyphs,
-            enriched_connections=enriched_connections,
-            auxiliary_data=auxiliary_data,
-            display_title=display_title,
-            config_override=config.rendering_config,
-        )
-
-        # Store final result
-        self._plot = plot
-
-        if config.enable_timing:
-            elapsed = time.time() - t_start
-            self._record_timing("render_graph", elapsed)
-
-        return plot
-
-    def get_intermediate_results(self) -> Dict[str, Any]:
-        """Get intermediate results from pipeline execution.
-
-        Returns:
-            Dictionary containing intermediate results from each phase
-        """
-        resolved_request = None
-        timings = {}
-        if self._last_run_state is not None:
-            resolved_request = self._last_run_state.resolved_request
-            timings = dict(self._last_run_state.timings)
-
-        return {
-            "raw_graph_data": self._raw_graph_data,
-            "enriched_graph_data": self._enriched_graph_data,
-            "final_plot": self._plot,
-            "resolved_request": resolved_request,
-            "timings": timings,
-        }
 
     def get_timings(self) -> Dict[str, float]:
         """Get timing information for pipeline phases.
@@ -424,6 +567,14 @@ class MetabolicGraphPipeline:
 
         return dict(self._last_run_state.timings)
 
+    def get_run_metadata(self) -> GraphRunMetadata | None:
+        """Return telemetry for the last run. Only a rendered run has render timings."""
+        return self._last_run_state.metadata if self._last_run_state else None
+
+    def get_artifact(self) -> GraphArtifact | None:
+        """Return the artifact the last run produced, rendered or not."""
+        return self._last_run_state.artifact if self._last_run_state else None
+
     def _record_timing(self, phase_name: str, elapsed: float) -> None:
         """Persist a phase timing on the current run state."""
         if self._last_run_state is None:
@@ -435,22 +586,15 @@ class MetabolicGraphPipeline:
 def create_metabolic_graph_pipeline(
     metabolic_model,
     config: Optional[PipelineConfig] = None,
-    **config_params,
 ) -> MetabolicGraphPipeline:
-    """Create a MetabolicGraphPipeline with the specified configuration.
+    """Create a MetabolicGraphPipeline from a pipeline configuration.
 
     Args:
-        metabolic_model: The metabolic model to use
-        config: Explicit pipeline configuration object.
-        **config_params: Flat configuration parameters translated into nested configs.
+        metabolic_model: The metabolic model to use.
+        config: Pipeline configuration built from nested config objects. When
+            omitted, the pipeline uses default nested configs.
 
     Returns:
         Configured MetabolicGraphPipeline instance
     """
-    if config is not None and config_params:
-        raise TypeError("Pass either 'config' or flat configuration parameters, not both")
-
-    if config is None:
-        config = build_pipeline_config(**config_params)
-
     return MetabolicGraphPipeline(metabolic_model, config)

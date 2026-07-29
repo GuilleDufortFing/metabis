@@ -1,10 +1,10 @@
 from typing import Dict, Optional
+
 from metabis.domain.metabolic_model import MetabolicModel
 
 
 class FocusInstance:
-    """
-    Recursively retrieve a single parent chain
+    """Recursively retrieve a single parent chain
     (reaction → subsystem → category).
     """
 
@@ -59,7 +59,7 @@ class FocusInstance:
             return "subsystem"
         if self.element_id in self.model.get_subsystem_categories():
             return "category"
-        
+
         element_type = self.detect_element_name()
         if element_type:
             return element_type
@@ -103,8 +103,7 @@ class FocusInstance:
     # Recursive chain builder
     # ------------------------------------------------------------
     def get_ancestor_ids(self) -> Dict[str, str]:
-        """
-        Returns a recursive mapping of {type: id} for all parent levels.
+        """Returns a recursive mapping of {type: id} for all parent levels.
         Example: reaction → {"subsystem": S, "category": C}
         """
         if self.element_id and self.element_type:

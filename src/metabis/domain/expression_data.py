@@ -1,21 +1,65 @@
+import warnings
 from typing import Any, Dict, List, Optional
 
+import numpy as np
 import pandas as pd
 import scanpy as sc
 
+from .expression_matrix import (
+    DenseExpressionMatrix,
+    DenseMaterializationError,
+    ExpressionMatrix,
+    SparseExpressionMatrix,
+    freeze_matrix_buffers,
+    is_sparse,
+)
+from .h5ad_embedding_input import capture_h5ad_embedding_input
+from .preprocessing import (
+    ExpressionInputState,
+    ExpressionPreprocessingConfig,
+    PreprocessingReport,
+    estimate_dense_bytes,
+)
+
 
 class ExpressionData:
+    """Aligned expression input, loaded from a CSV/TSV table or an h5ad file.
+
+    Storage and sparsity (AM6)
+    --------------------------
+    An h5ad whose ``X`` is sparse is kept sparse through the load and through
+    every supported analysis. Reads go through the :meth:`matrix` seam, which
+    serves sample/feature identity, a single feature column, and the bounded
+    dense blocks (a group's samples, the top-N variable features) that group
+    summaries, the two-group comparison, the supported reductions
+    (PCA/t-SNE/UMAP), and the activity z-score need -- so the whole matrix is
+    never densified for a supported workflow. A dense CSV/TSV has no sparsity to
+    preserve and is materialized at load exactly as before.
+
+    The full dense frame is built only by the explicit escape hatch
+    (:meth:`get_expression_df` / :meth:`ExpressionMatrix.to_dense_frame`). When a
+    ``dense_memory_budget_bytes`` is set, an over-budget full densification is
+    rejected before allocation from the shape/dtype estimate. A dense load is
+    likewise rejected at load if over budget.
+
+    Measured: at 5% nonzero the dense frame is ~10x the sparse storage; a
+    sparse-first load plus a bounded reduction peaks several times below one
+    resident dense frame, which the pre-AM6 load allocated and kept for the whole
+    session. See ``MetabisReview/architecture-migration/am6-inventory.md``.
+    """
+
     @classmethod
     def create_with_validation(
         cls,
         path: str,
         gene_list: List[str],
-        normalization_options: List[str] = None,
         gene_format: str = "ensmbl_id",
         metabolic_model=None,
         data_format: str = "csv",
         csv_separator: str = ",",
         samples_in: str = "rows",
+        preprocessing: ExpressionPreprocessingConfig | None = None,
+        dense_memory_budget_bytes: int | None = None,
     ) -> tuple["ExpressionData", Dict[str, Any]]:
         """Create ExpressionData instance with validation results.
 
@@ -28,12 +72,13 @@ class ExpressionData:
             instance = cls(
                 path=path,
                 gene_list=gene_list,
-                normalization_options=normalization_options,
                 gene_format=gene_format,
                 metabolic_model=metabolic_model,
                 data_format=data_format,
                 csv_separator=csv_separator,
                 samples_in=samples_in,
+                preprocessing=preprocessing,
+                dense_memory_budget_bytes=dense_memory_budget_bytes,
             )
 
             # Perform validation after successful creation
@@ -41,6 +86,7 @@ class ExpressionData:
                 # Generate alignment report
                 alignment_report = instance.get_alignment_report()
                 validation_results["alignment_report"] = alignment_report
+                validation_results["preprocessing_report"] = instance.preprocessing_report
 
                 # Determine status based on mapping results
                 if alignment_report["mapped_count"] == 0:
@@ -93,62 +139,73 @@ class ExpressionData:
         self,
         path: str,
         gene_list: List[str],
-        normalization_options: List[str] = None,
         gene_format: str = "ensmbl_id",
         metabolic_model=None,
         data_format: str = "csv",  # Added
         csv_separator: str = ",",  # Added
         samples_in: str = "rows",  # Added
+        preprocessing: ExpressionPreprocessingConfig | None = None,
+        dense_memory_budget_bytes: int | None = None,
     ):
         """Initialize the ExpressionData class.
 
         Args:
             path: Path to expression data file
             gene_list: List of valid genes from the metabolic model
-            normalization_options: List of normalization options to apply
             gene_format: Format of gene IDs in the input file
             metabolic_model: MetabolicModel instance for gene translation
             data_format (str): Format of the input data ('h5ad' or 'csv'). Default is 'csv'.
             csv_separator (str): Separator used if format is 'csv'. Default is ','.
             samples_in (str): Location of sample names in 'csv' format ('rows' or 'columns'). Default is 'rows'.
+            dense_memory_budget_bytes: Optional preflight budget (AM6 slice 6). When
+                set, a load whose dense materialization would exceed it is rejected
+                *before* allocation with ``DenseMaterializationError``. ``None`` (the
+                default) means no limit, so library-standalone use is unaffected; the
+                server injects its configured budget.
         """
         # Data storage
         self.adata = None
         self.df_expression_data = None
+        self.embedding_input = None
         self.format = None  # Will be set in build based on data_format
         self.gene_list = []
         self.metabolic_model = metabolic_model
 
         # File info
         self.source_path = None
+        self.preprocessing_report = None
+        preprocessing = preprocessing or ExpressionPreprocessingConfig()
+
+        self.dense_memory_budget_bytes = dense_memory_budget_bytes
 
         # Call build method with all parameters
         self.build(
             path,
             gene_list,
-            normalization_options,
             gene_format,
             data_format,
             csv_separator,
             samples_in,
+            preprocessing,
+            dense_memory_budget_bytes,
         )
 
     def build(
         self,
         path: str,
         gene_list: List[str],
-        normalization_options: List[str],
         gene_format: str = "ensmbl_id",
         data_format: str = "csv",  # Added
         csv_separator: str = ",",  # Added
         samples_in: str = "rows",  # Added
+        preprocessing: ExpressionPreprocessingConfig | None = None,
+        dense_memory_budget_bytes: int | None = None,
     ):
         """Build the expression data object from the specified path.
 
         Args:
             path (str): Path to the expression data file.
             gene_list (List[str]): List of genes from the metabolic model (expected in ensmbl_id format).
-            normalization_options (List[str]): List of normalization options to apply.
             gene_format (str): Format of gene IDs in the input file. Default is "ensmbl_id".
             data_format (str): Format of the input data ('h5ad' or 'csv'). Default is 'csv'.
             csv_separator (str): Separator used if format is 'csv'. Default is ','.
@@ -268,15 +325,15 @@ class ExpressionData:
             # Filter genes by the model gene list (gene_list should be ensmbl_id)
             # Ensure self.adata.var_names are in ensmbl_id format (or original if translation failed)
             # The gene_list provided to the constructor should be in ensmbl_id format
-            
+
             # Count genes before filtering for mapping statistics
             total_input_genes = len(self.adata.var_names)
             gene_list_set = set(gene_list)
-            
+
             valid_genes_in_model_list = [
                 g for g in self.adata.var_names if g in gene_list_set
             ]
-            
+
             # Store mapping statistics
             self.mapping_stats = {
                 "total_input_genes": total_input_genes,
@@ -297,19 +354,108 @@ class ExpressionData:
                 # Filter adata to keep only genes present in the model list
                 self.adata = self.adata[:, valid_genes_in_model_list].copy()
 
-            # --- Create DataFrame View ---
-            # Create dataframe view (samples x genes) from the final filtered/translated adata
-            self.df_expression_data = self.adata.to_df()
-
             # --- Normalization ---
-            # Apply normalizations (operates on self.adata inplace)
-            self._apply_normalizations(normalization_options)
-            # Update the dataframe view if normalization changed the data
-            if normalization_options:
+            config = preprocessing or ExpressionPreprocessingConfig()
+            before_shape = tuple(self.adata.shape)
+            zeros_before, non_finite_before = self._matrix_zero_and_nonfinite_counts()
+            if non_finite_before:
+                raise ValueError(
+                    f"Expression input contains {non_finite_before} non-finite value(s)"
+                )
+            report_warnings = []
+            if config.input_state is ExpressionInputState.NORMALIZED and (
+                config.normalize_total or config.log1p
+            ):
+                report_warnings.append(
+                    "Input was declared normalized; requested transforms may duplicate preprocessing."
+                )
+            self._apply_preprocessing(config)
+
+            # Capture imported coordinates and PCA metadata while the h5ad load is
+            # being written. Workers receive this detached, read-only value rather
+            # than the live AnnData object, and source identity can include the
+            # already-paid embedding fingerprint without hashing during analysis.
+            self.embedding_input = (
+                capture_h5ad_embedding_input(self.adata)
+                if data_format == "h5ad"
+                else None
+            )
+
+            # AM6 slice 7: sparsity is preserved through the load. A sparse input
+            # is *not* densified here -- the matrix seam (``matrix()``) serves
+            # identity and the bounded reads (a group's samples, the top-N variable
+            # features) the supported analyses need, so the whole dense frame is
+            # never built. A dense input (CSV) has no sparsity to preserve, so it
+            # densifies now exactly as before, keeping the dense path byte-for-byte
+            # unchanged. Storage-mode provenance records which arrived.
+            input_storage = "sparse" if is_sparse(self.adata.X) else "dense"
+            dense_bytes = estimate_dense_bytes(self.adata)
+            if input_storage == "dense":
+                # The dense path materializes the frame now, so an over-budget
+                # densification is rejected *before* allocation from the shape/dtype
+                # estimate. ``None`` means no limit (the library default).
+                if (
+                    dense_memory_budget_bytes is not None
+                    and dense_bytes > dense_memory_budget_bytes
+                ):
+                    raise DenseMaterializationError(
+                        dense_bytes, dense_memory_budget_bytes
+                    )
+                if dense_bytes >= 1_000_000_000:
+                    message = (
+                        f"Materializing expression data densely requires approximately "
+                        f"{dense_bytes / 1_000_000_000:.2f} GB."
+                    )
+                    warnings.warn(message, ResourceWarning, stacklevel=2)
+                    report_warnings.append(message)
                 self.df_expression_data = self.adata.to_df()
+            else:
+                # Sparse-first: no dense frame at load. The dense-memory budget does
+                # not bite here -- a large sparse dataset must *load* and be analysed
+                # through its bounded reads; the budget guards the explicit escape
+                # hatch (``get_expression_df`` / ``ExpressionMatrix.to_dense_frame``)
+                # if a full densification is ever genuinely forced.
+                self.df_expression_data = None
+
+            # The load performs no full-matrix conversion now -- the dense path
+            # arrived dense, the sparse path stays sparse -- so none is recorded.
+            conversions: tuple[str, ...] = ()
+            zeros_after, non_finite_after = self._matrix_zero_and_nonfinite_counts()
+            if non_finite_after:
+                raise ValueError(
+                    f"Expression output contains {non_finite_after} non-finite value(s)"
+                )
+            methods = [
+                method
+                for enabled, method in (
+                    (config.normalize_total, "normalize_total"),
+                    (config.log1p, "log1p"),
+                )
+                if enabled
+            ]
+            self.preprocessing_report = PreprocessingReport(
+                method="+".join(methods) or "none",
+                parameters={
+                    "input_state": config.input_state.value,
+                    "target_sum": config.target_sum,
+                },
+                input_shape=before_shape,
+                output_shape=tuple(self.adata.shape),
+                zeros_before=zeros_before,
+                zeros_after=zeros_after,
+                non_finite_before=non_finite_before,
+                non_finite_after=non_finite_after,
+                warnings=tuple(report_warnings),
+                input_storage=input_storage,
+                conversions=conversions,
+            )
 
         except FileNotFoundError:
             raise FileNotFoundError(f"Expression data file not found: {path}")
+        except DenseMaterializationError:
+            # The preflight rejection is a clean, actionable budget error; surface it
+            # as-is rather than burying it in a load-failure traceback string.
+            raise
         except Exception as e:
             # Improve error message context
             import traceback
@@ -319,44 +465,82 @@ class ExpressionData:
                 f"Error loading/processing expression data from '{path}' (format: {data_format}, gene_fmt: {gene_format}): {str(e)}\nTraceback:\n{tb_str}"
             )
 
-    def _apply_normalizations(self, normalization_options: List[str]) -> None:
-        """Apply normalization methods to the expression data.
+    def _matrix_zero_and_nonfinite_counts(self) -> tuple[int, int]:
+        """``(zeros, non_finite)`` over the current matrix, sparse-aware, no densify.
 
-        Args:
-            normalization_options (List[str]): List of normalization options to apply.
-
-        Returns:
-            None
+        For sparse ``X`` the counts come from the stored nonzeros and ``nnz`` -- an
+        implicit zero is an exact, finite zero -- so the whole matrix is never
+        materialized. For dense ``X`` they come from the array. Used for both the
+        pre- and post-preprocessing accounting the ``PreprocessingReport`` records
+        (AM6 slice 7: the report no longer reads a densified frame).
         """
-        if not normalization_options:
+        matrix_x = self.adata.X
+        if is_sparse(matrix_x):
+            stored = np.asarray(matrix_x.data)
+            zeros = int(np.prod(self.adata.shape) - matrix_x.nnz)
+            non_finite = int((~np.isfinite(stored)).sum())
+        else:
+            values = np.asarray(matrix_x)
+            zeros = int((values == 0).sum())
+            non_finite = int((~np.isfinite(values)).sum())
+        return zeros, non_finite
+
+    def _reject_over_budget_densification(self) -> None:
+        """Refuse an escape-hatch full densification that exceeds the load budget.
+
+        AM6 slice 7 moves the dense-memory budget off the sparse load and onto the
+        point where a full dense frame is genuinely forced. The estimate reads only
+        shape and dtype, so an over-budget densification is rejected *before*
+        allocation. ``None`` (the default) means no limit.
+        """
+        budget = getattr(self, "dense_memory_budget_bytes", None)
+        if budget is None or self.adata is None:
             return
+        estimated = estimate_dense_bytes(self.adata)
+        if estimated > budget:
+            raise DenseMaterializationError(estimated, budget)
 
-        for normalization in normalization_options:
-            if normalization.lower() == "cpm":
-                # Counts per million normalization using scanpy
-                sc.pp.normalize_total(self.adata, target_sum=1e6, inplace=True)
-                # Update the transposed view
-                self.df_expression_data = self.adata.to_df()
+    def _apply_preprocessing(self, config: ExpressionPreprocessingConfig) -> None:
+        """Apply a typed expression preprocessing configuration in order."""
+        if config.normalize_total:
+            sc.pp.normalize_total(self.adata, target_sum=config.target_sum, inplace=True)
+        if config.log1p:
+            sc.pp.log1p(self.adata)
 
-            elif normalization.lower() == "log":
-                # Log transformation (log1p to handle zeros)
-                sc.pp.log1p(self.adata)
-                # Update the transposed view
-                self.df_expression_data = self.adata.to_df()
+    def freeze(self) -> None:
+        """Mark the canonical expression buffers read-only (M-11, AM9).
 
-            else:
-                print(f"Warning: Unknown normalization option: {normalization}")
+        The Analysis Workspace calls this when it installs this data, sealing the
+        replace-only contract: after install the resident matrix must not be
+        edited in place while a worker snapshot references it. ``adata.X`` is the
+        canonical store the AM9 sparse snapshot reads through the ``matrix()``
+        seam, so freezing its buffers makes a same-shape in-place edit raise at
+        its source (prevention, the mechanism M-11 chose). ``df_expression_data``
+        is a ``to_df`` copy no analysis mutates, and a pandas frame cannot be
+        reliably frozen under Copy-on-Write, so it is left to the static boundary
+        guard. Idempotent, so re-installing an unchanged matrix is harmless.
+        """
+        freeze_matrix_buffers(getattr(self.adata, "X", None))
 
     def get_expression_df(self) -> pd.DataFrame:
         """Get the expression data as a pandas DataFrame (samples x genes).
+
+        This is the explicit full-densification escape hatch. AM6 slice 7 stops the
+        load building this frame for a sparse input, so for a sparse load the first
+        call materializes the whole matrix dense (and caches it). The supported
+        analyses no longer reach here -- they read the bounded ``matrix()`` seam --
+        so a caller landing here genuinely wants the whole dense frame. When a
+        dense-memory budget is set, an over-budget materialization is rejected
+        before allocation.
 
         Returns:
             pd.DataFrame: Expression data as a DataFrame.
         """
         if self.df_expression_data is None:
-            # Check if adata exists but df is None (e.g., error during build)
+            # Check if adata exists but df is None (sparse-first load, or an error
+            # during build). Materialize it now, honouring the budget first.
             if self.adata is not None:
-                # Attempt to create it now
+                self._reject_over_budget_densification()
                 self.df_expression_data = self.adata.to_df()
                 if self.df_expression_data is not None:
                     return self.df_expression_data
@@ -365,6 +549,32 @@ class ExpressionData:
             )
 
         return self.df_expression_data
+
+    def matrix(self) -> Optional[ExpressionMatrix]:
+        """The expression-matrix seam over the loaded data (AM6 slices 2-3).
+
+        Every value reader goes through this one seam. When ``X`` is sparse it
+        returns a sparse adapter that serves identity and a single feature column
+        without densifying the whole matrix; otherwise a dense adapter over the
+        built frame. Either way the values are identical -- a caller cannot tell
+        which adapter it holds by results, only by memory cost. Returns ``None``
+        when no data is loaded, matching the readers that already tolerate an
+        unloaded matrix. It does not build the dense frame -- ``get_expression_df``
+        owns that lazy materialization -- so a caller that only wants identity or
+        one column never forces the full densification here.
+
+        The load's ``dense_memory_budget_bytes`` (``None`` for direct-library use)
+        rides onto the adapter, so every bounded block and the escape hatch this
+        seam serves are preflight-gated by the same budget (M-11, AM9). Threading
+        it here means a worker reading through ``StableMatrixReference`` -> this
+        ``matrix()`` inherits it without any per-call plumbing.
+        """
+        budget = getattr(self, "dense_memory_budget_bytes", None)
+        if self.adata is not None and is_sparse(self.adata.X):
+            return SparseExpressionMatrix(self.adata, max_bytes=budget)
+        if self.df_expression_data is not None:
+            return DenseExpressionMatrix(self.df_expression_data, max_bytes=budget)
+        return None
 
     def get_gene_row(
         self, gene_id: str, gene_format: str = "ensmbl_id"
@@ -378,7 +588,8 @@ class ExpressionData:
         Returns:
             pd.Series or None: Series with sample IDs as index and gene expression values, or None if not found
         """
-        if self.df_expression_data is None:
+        matrix = self.matrix()
+        if matrix is None:
             return None
 
         # Since our internal data is already in ensmbl_id format, we expect gene_format to be 'ensmbl_id'
@@ -393,21 +604,41 @@ class ExpressionData:
                     gene_id = translated_id
             # If translation fails, continue with original ID (might still work)
 
-        if gene_id not in self.df_expression_data.columns:
-            return None
+        # A single feature column never needs the whole matrix dense; read it
+        # through the seam so a sparse adapter can serve it from one column.
+        return matrix.feature_column(gene_id)
 
-        # Return the column as a Series (samples x values)
-        return self.df_expression_data[gene_id]
-    
+    def get_feature_ids(self) -> List[str]:
+        """Feature (gene) identifiers, without materializing the dense matrix.
+
+        A caller that needs only the column labels -- a subsystem membership
+        check, a hover existence test -- should not force the whole matrix dense
+        to read them. This reads ``var_names`` from the AnnData, which carries the
+        feature identity whether ``X`` is sparse or dense, and equals the dense
+        frame's columns exactly (``to_df`` builds its columns from ``var_names``).
+        It falls back to the dense frame only when there is no AnnData.
+
+        This is groundwork for the AM6 sparse path: today ``build`` densifies, so
+        the labels are available either way, but these readers no longer depend on
+        the densification and will not force it once ``build`` preserves sparsity.
+        """
+        if self.adata is not None:
+            return [str(name) for name in self.adata.var_names]
+        matrix = self.matrix()
+        if matrix is not None:
+            return [str(column) for column in matrix.feature_ids]
+        return []
+
     def get_sample_ids(self) -> List[str]:
         """Get the list of sample IDs in the expression data.
 
         Returns:
             List[str]: List of sample IDs.
         """
-        if self.df_expression_data is None:
+        matrix = self.matrix()
+        if matrix is None:
             return []
-        return self.df_expression_data.index.tolist()
+        return matrix.sample_ids
 
     def get_alignment_report(self) -> Dict[str, Any]:
         """Generate an alignment report showing coverage statistics.

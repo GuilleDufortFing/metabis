@@ -1,6 +1,6 @@
-from typing import Any, Dict
 from ..interfaces import HoverSection
 from ..models import HoverContext, HoverData
+
 
 class GeneBasicInfoSection(HoverSection):
     """Section for basic gene information (name, ID, etc.)."""

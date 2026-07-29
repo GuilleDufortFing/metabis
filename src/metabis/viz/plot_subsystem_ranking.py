@@ -13,9 +13,18 @@ from bokeh.models import (
 )
 from bokeh.plotting import figure, show
 
-from ..managers.data_manager_mode import DataManagerMode
+from ..analysis.activity_analysis import (
+    PLOT_SATURATION_QUANTILE,
+    ActivityOverlay,
+    displayed_feature_id,
+)
+from ..managers.workspace_mode import AnalysisWorkspaceMode
 from ..visual_config import theme
 from .click_behavior import add_click_behavior, get_external_reference_data
+from .color_reference import (
+    GradientColorReference,
+    build_reference_from_distribution,
+)
 from .metabolic_visualization.generation.data_structures.constants import (
     VisualizationConstants,
 )
@@ -23,6 +32,32 @@ from .metabolic_visualization.rendering.js_callbacks import (
     add_factor_range_zoom_alpha_callback,
 )
 from .plot_utils import apply_academic_style
+
+
+def _attach_color_reference(
+    all_data: Dict[str, List[Any]],
+    reference: Optional[GradientColorReference],
+) -> str:
+    """Attach compact point markers and return one shared hover template.
+
+    ``all_data["x"]`` still holds each element's true value at call time; the
+    marker must show where the element sits in the distribution, not where the
+    axis clamp later drew it.
+    """
+    if reference is None:
+        return "@desc{safe}"
+    values = [
+        float(value) if value is not None and np.isfinite(value) else 0.0
+        for value in all_data["x"]
+    ]
+    all_data["color_reference_value"] = values
+    all_data["color_reference_marker_x"] = [
+        reference.marker_x(value) for value in values
+    ]
+    return "@desc{safe}" + reference.hover_template(
+        marker_x_field="color_reference_marker_x",
+        value_field="color_reference_value",
+    )
 
 
 def plot_subsystem_comparison(
@@ -48,7 +83,7 @@ def plot_subsystem_comparison(
     Metric values are displayed on the x-axis.
 
     Args:
-        data_manager: The DataManager object.
+        data_manager: The AnalysisWorkspace object.
         subsystem_stats: DataFrame containing ranked subsystem statistics.
         metric: The metric to plot (e.g., "cohens_d", "log2_fc").
         max_points_per_subsystem: Maximum number of points to plot per subsystem.
@@ -68,7 +103,9 @@ def plot_subsystem_comparison(
         return None
 
     # Get global test results
-    test_results = data_manager.group_comparison.get_test_results(for_genes=for_genes)
+    test_results = data_manager.get_group_comparison_artifact().get_test_results(
+        for_genes=for_genes
+    )
     if test_results is None or metric not in test_results.columns:
         print(f"Metric '{metric}' not found in test results.")
         return None
@@ -107,7 +144,7 @@ def plot_subsystem_comparison(
     }
 
     # Get significant elements
-    significant_set = data_manager.group_comparison.get_significant_elements(
+    significant_set = data_manager.get_group_comparison_artifact().get_significant_elements(
         for_genes=for_genes
     )
     element_type = "gene" if for_genes else "reaction"
@@ -120,11 +157,27 @@ def plot_subsystem_comparison(
         if for_genes:
             elements = data_manager.metabolic_model.get_genes_for_subsystem(subsystem)
         else:
-            elements = data_manager.metabolic_model.get_reactions_for_subsystem(
-                subsystem
+            base_elements = (
+                data_manager.metabolic_model.get_reactions_for_subsystem(subsystem)
+                or []
             )
-            # Add _back suffix for reverse reactions
-            elements += [f"{e}_back" for e in elements]
+            direction_map = (
+                data_manager.subsystem_analysis.get_reaction_direction_map()
+                if getattr(data_manager, "subsystem_analysis", None) is not None
+                else None
+            )
+            # Use the exact same one-column-per-base map as Delta aggregation.
+            # A compatibility caller without an installed Delta Artifact receives
+            # base columns only; it never regains the old forward+_back duplication.
+            elements = (
+                [
+                    source
+                    for base_id in base_elements
+                    if (source := direction_map.source_column_for(base_id)) is not None
+                ]
+                if direction_map is not None
+                else list(base_elements)
+            )
 
         # Filter elements present in test results
         valid_elements = [e for e in elements if e in test_results.index]
@@ -154,6 +207,25 @@ def plot_subsystem_comparison(
     if not all_metric_values:
         print("No data points found for the selected subsystems.")
         return None
+
+    # The dots are painted from the comparison distribution of `metric`, so the
+    # plot carries that distribution as a reference. A non-significant dot is
+    # overpainted gray, which the threshold drawn on the reference explains.
+    thresholds = data_manager.get_group_comparison_artifact().get_thresholds(
+        for_genes=for_genes
+    )
+    hover_tooltip = _attach_color_reference(
+        all_data,
+        build_reference_from_distribution(
+            getattr(data_manager, "color_manager", None),
+            mode=AnalysisWorkspaceMode.GROUP_COMPARISON,
+            element_type=element_type,
+            element_id=all_data["element_id"][0],
+            metric_name=metric,
+            metric_label=metric,
+            threshold=(thresholds or {}).get(metric),
+        ),
+    )
 
     # Calculate x-range with padding
     x_min, x_max = min(all_metric_values), max(all_metric_values)
@@ -246,7 +318,7 @@ def plot_subsystem_comparison(
 
     # Configure Hover
     hover = p.select(dict(type=HoverTool))
-    hover.tooltips = "@desc{safe}"
+    hover.tooltips = hover_tooltip
 
     add_click_behavior(
         p,
@@ -261,25 +333,326 @@ def plot_subsystem_comparison(
         return None
 
 
+def _saturating_axis_bounds(
+    values: List[float], quantile: float = PLOT_SATURATION_QUANTILE
+) -> Tuple[float, float]:
+    """Axis bounds covering the bulk of the data, always including zero.
+
+    Zero is the reference activity, so it must stay on the axis even when every
+    plotted value sits to one side of it.
+    """
+    array = np.asarray(values, dtype=float)
+    array = array[np.isfinite(array)]
+    if array.size == 0:
+        return -1.0, 1.0
+
+    tail = (1.0 - quantile) / 2.0
+    lower = float(np.nanquantile(array, tail))
+    upper = float(np.nanquantile(array, 1.0 - tail))
+
+    lower = min(lower, 0.0)
+    upper = max(upper, 0.0)
+
+    if upper <= lower:
+        # Degenerate (every value identical): fall back to a unit window so the
+        # points are still drawn instead of collapsing to a zero-width axis.
+        span = abs(upper) or 1.0
+        return lower - span, upper + span
+    return lower, upper
+
+
+def plot_subsystem_activity_ranking(
+    data_manager,
+    activity_artifact,
+    overlay: ActivityOverlay | str | None = None,
+    max_points_per_subsystem: int = 50,
+    width: int = None,
+    height: int = None,
+    return_plot: bool = False,
+    title: str = None,
+    background_fill_color: str = "#ffffff",
+    sizing_mode: str = "stretch_width",
+    enabled_toggle=None,
+    click_filename_prefix: str = "subsystem_element",
+):
+    """Rank subsystems by single-group activity, grouped by metabolic category.
+
+    The comparison-mode ranking (:func:`plot_subsystem_comparison`) is built on a
+    delta score over *significant* elements, which does not exist here: nothing is
+    being compared and nothing is significant. This plot ranks subsystems by their
+    activity score (the median of measured member scores) and plots every measured
+    member's relative activity score, with coverage reported in the hover.
+
+    Args:
+        data_manager: The AnalysisWorkspace object.
+        activity_artifact: The installed ActivityArtifact.
+        max_points_per_subsystem: Cap on plotted member points per subsystem.
+        return_plot: Whether to return the figure or show it.
+
+    Returns:
+        Bokeh figure if return_plot is True, else None.
+    """
+    family = ActivityOverlay(
+        overlay
+        if overlay is not None
+        else getattr(data_manager, "activity_overlay", ActivityOverlay.REACTION)
+    )
+    subsystem_stats = activity_artifact.subsystems_for(family)
+    if subsystem_stats is None or subsystem_stats.empty:
+        print("No subsystem activity available.")
+        return None
+
+    feature_result = activity_artifact.feature_result_for(family)
+    scores = feature_result.activity_score
+    overlay_name = family.value
+    is_reaction_overlay = family is ActivityOverlay.REACTION
+
+    ordered_data = _prepare_category_ordered_subsystems(
+        data_manager=data_manager,
+        subsystem_stats=subsystem_stats,
+        score_column="activity_score",
+    )
+
+    if not ordered_data["factors"]:
+        print("No subsystems contained measured features.")
+        return None
+
+    y_factors = ordered_data["factors"][::-1]
+    y_range = FactorRange(factors=y_factors, bounds="auto", range_padding=0.02)
+    ordered_data["y_factors"] = y_factors
+
+    all_data = {
+        "y": [],
+        "x": [],
+        "element_id": [],
+        "display_label": [],
+        "external_url": [],
+        "subsystem": [],
+        "category": [],
+        "size": [],
+        "alpha": [],
+        "color": [],
+        "marker": [],
+        "desc": [],
+    }
+    all_metric_values: List[float] = []
+    activity_metric = activity_artifact.metric_key_for(family)
+
+    for category, subsystem in ordered_data["factors"]:
+        if is_reaction_overlay:
+            members = data_manager.metabolic_model.get_reactions_for_subsystem(subsystem)
+            feature_ids = [
+                displayed_feature_id(feature_result.activity_score, member)
+                for member in members
+            ]
+        else:
+            feature_ids = data_manager.metabolic_model.get_genes_for_subsystem(subsystem)
+
+        measured = [
+            feature_id
+            for feature_id in dict.fromkeys(feature_ids)
+            if feature_id in scores.index and not pd.isna(scores.loc[feature_id])
+        ]
+        if not measured:
+            continue
+
+        if len(measured) > max_points_per_subsystem:
+            # Keep the strongest signals deterministically rather than sampling.
+            measured = (
+                scores.loc[measured]
+                .abs()
+                .sort_values(ascending=False, kind="mergesort")
+                .index[:max_points_per_subsystem]
+                .tolist()
+            )
+
+        colors = data_manager.color_manager.get_colors_from_distribution(
+            mode=AnalysisWorkspaceMode.EXPERIMENT_ANALYSIS,
+            element_type=overlay_name,
+            metric_name=activity_metric,
+            element_ids=pd.Index(measured),
+        )
+
+        for feature_id in measured:
+            value = float(scores.loc[feature_id])
+            reference = get_external_reference_data(
+                data_manager, feature_id, overlay_name
+            )
+            all_data["y"].append((category, subsystem))
+            all_data["x"].append(value)
+            all_data["element_id"].append(feature_id)
+            all_data["display_label"].append(reference["display_label"])
+            all_data["external_url"].append(reference["external_url"])
+            all_data["subsystem"].append(subsystem)
+            all_data["category"].append(category)
+            all_data["size"].append(7)
+            all_data["alpha"].append(0.85)
+            all_data["color"].append(colors.loc[feature_id])
+            all_data["marker"].append("circle")
+            all_data["desc"].append(
+                data_manager.get_element_hover(
+                    element_id=feature_id,
+                    element_type=overlay_name,
+                    show_stats=True,
+                )
+            )
+            all_metric_values.append(value)
+
+    if not all_metric_values:
+        print("No measured elements found for the ranked subsystems.")
+        return None
+
+    # The plot colors its dots from the activity distribution, so it carries the
+    # same color reference as graph hovers. The distribution is shared by every
+    # point and only the marker moves.
+    # This runs before the axis clamp so a clamped point still marks its true score.
+    hover_tooltip = _attach_color_reference(
+        all_data,
+        build_reference_from_distribution(
+            getattr(data_manager, "color_manager", None),
+            mode=AnalysisWorkspaceMode.EXPERIMENT_ANALYSIS,
+            element_type=overlay_name,
+            element_id=all_data["element_id"][0],
+            metric_name=activity_metric,
+            metric_label="Activity score",
+        ),
+    )
+
+    # Bound the axis by the bulk of the data, not by its most extreme point. A
+    # single reaction far from the rest otherwise stretches the axis until every
+    # other point collapses onto the zero line and the ranking cannot be read.
+    lower, upper = _saturating_axis_bounds(all_metric_values)
+    clamped = 0
+    for index, value in enumerate(all_data["x"]):
+        if value < lower or value > upper:
+            all_data["x"][index] = min(max(value, lower), upper)
+            all_data["marker"][index] = "diamond"
+            clamped += 1
+
+    padding = (upper - lower) * 0.05
+    x_range = Range1d(lower - padding, upper + padding)
+
+    if height is None:
+        height = max(600, len(ordered_data["factors"]) * 20)
+
+    if title is None:
+        element_label = "reaction" if is_reaction_overlay else "gene"
+        title = (
+            f"Subsystem activity ranking - {activity_artifact.group_id} "
+            f"({element_label} overlay)"
+        )
+
+    figure_kwargs = {
+        "width": width,
+        "height": height,
+        "x_range": x_range,
+        "y_range": y_range,
+        "title": title,
+        "tools": "hover,tap,pan,wheel_zoom,reset,save",
+        "toolbar_location": "above",
+        "x_axis_location": "above",
+        "background_fill_color": background_fill_color,
+        "border_fill_color": "rgba(255,255,255,0)",
+    }
+    if sizing_mode:
+        figure_kwargs["sizing_mode"] = sizing_mode
+
+    p = figure(**figure_kwargs)
+    apply_academic_style(p)
+
+    _add_category_decorations_horizontal(p=p, ordered_data=ordered_data, x_range=x_range)
+
+    p.add_layout(
+        Span(
+            location=0,
+            dimension="height",
+            line_color=theme.THRESHOLD_LINE_COLOR,
+            line_dash=theme.THRESHOLD_LINE_DASH,
+            line_width=theme.THRESHOLD_LINE_WIDTH,
+            line_alpha=0.7,
+        )
+    )
+
+    p.ygrid.grid_line_color = None
+    p.xgrid.grid_line_color = "#404040"
+    p.xgrid.grid_line_alpha = 0.5
+
+    source = ColumnDataSource(all_data)
+    p.scatter(
+        x="x",
+        y="y",
+        source=source,
+        marker="marker",
+        size="size",
+        color="color",
+        alpha="alpha",
+        line_color="white",
+        line_width=0.5,
+    )
+
+    axis_label = "Normalized group summary"
+    if clamped:
+        # Say that the axis is bounded rather than quietly moving points: a clamped
+        # point is drawn as a diamond at the edge and its hover still reports the
+        # true score.
+        axis_label += (
+            f" - {clamped} point(s) beyond [{lower:.2f}, {upper:.2f}] "
+            "shown as diamonds at the edge"
+        )
+    p.xaxis.axis_label = axis_label
+    p.yaxis.axis_label = None
+    p.yaxis.visible = False
+
+    _create_zoom_dependent_labels(
+        p=p,
+        ordered_data=ordered_data,
+        x_range=x_range,
+        data_manager=data_manager,
+    )
+
+    hover = p.select(dict(type=HoverTool))
+    hover.tooltips = hover_tooltip
+
+    add_click_behavior(
+        p,
+        filename_prefix=click_filename_prefix,
+        enabled_toggle=enabled_toggle,
+    )
+
+    if return_plot:
+        return p
+    show(p)
+    return None
+
+
 def _prepare_category_ordered_subsystems(
     data_manager,
     subsystem_stats: pd.DataFrame,
+    score_column: str = "delta_score",
 ) -> Dict[str, Any]:
-    """Prepare subsystems ordered by category and delta score.
+    """Prepare subsystems ordered by category and score.
+
+    Args:
+        data_manager: The AnalysisWorkspace object.
+        subsystem_stats: One row per subsystem, with a ``subsystem`` column.
+        score_column: Column holding the score subsystems are ranked by
+            ("delta_score" for comparison, "activity_score" for activity mode).
 
     Returns a dict with:
         - factors: List of (category, subsystem) tuples for FactorRange
         - category_info: Dict with category metadata (color, subsystem count, boundaries)
-        - subsystem_full_names: Dict mapping truncated names to full names
+        - sorted_categories: Categories ordered by mean absolute score
     """
     metabolic_model = data_manager.metabolic_model
 
-    # Build category -> subsystems mapping with delta scores
+    # Build category -> subsystems mapping with scores
     category_subsystems: Dict[str, List[Tuple[str, float]]] = {}
 
     for _, row in subsystem_stats.iterrows():
         subsystem = row["subsystem"]
-        delta_score = row.get("delta_score", 0)
+        delta_score = row.get(score_column, 0)
+        if delta_score is None or pd.isna(delta_score):
+            continue
 
         # Get category for this subsystem
         category = metabolic_model.get_subsystem_category(subsystem)
@@ -411,7 +784,7 @@ def _prepare_subsystem_scatter_data_horizontal(
 
     # Assign colors
     colors = data_manager.color_manager.get_colors_from_distribution(
-        mode=DataManagerMode.GROUP_COMPARISON,
+        mode=AnalysisWorkspaceMode.GROUP_COMPARISON,
         element_type=element_type,
         metric_name=metric,
         element_ids=filtered_results.index,
@@ -594,7 +967,7 @@ def _create_zoom_dependent_labels(
         p: Bokeh figure
         ordered_data: Dict with factors, category_info, sorted_categories, y_factors
         x_range: Range1d for x-axis positioning
-        data_manager: DataManager for getting subsystem names
+        data_manager: AnalysisWorkspace for getting subsystem names
 
     Returns:
         Tuple of (subsystem_label_source, category_label_source) ColumnDataSources
@@ -681,7 +1054,6 @@ def _create_zoom_dependent_labels(
     initial_category_alpha = VisualizationConstants.COMPARISON_CATEGORY_LABEL_ALPHA_MAX
 
     # Get group_padding for position calculation
-    group_padding = getattr(p.y_range, "group_padding", 0.1)
 
     # Build position mapping for categories (same logic as _add_category_decorations_horizontal)
     category_positions: Dict[str, Dict[str, int]] = {}

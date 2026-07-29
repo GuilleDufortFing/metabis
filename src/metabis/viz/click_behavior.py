@@ -1,8 +1,19 @@
-"""Shared click behavior helpers for Bokeh plots."""
+"""Shared click behavior helpers for Bokeh plots.
+
+Only ``add_click_behavior`` touches Bokeh, and it imports what it needs at call
+time. ``get_external_reference_data`` beside it is pure data resolution, and
+graph glyph enrichment calls it -- so a module-level Bokeh import here would
+make graph *calculation* Bokeh-dependent through a transitive edge no static
+per-module scan would show. See ADR-0006 and am10-inventory.md (AM10/MR-15).
+"""
 
 from typing import Any, Dict
 
-from bokeh.models import CustomJS, Plot, TapTool
+__all__ = [
+    "add_click_behavior",
+    "get_external_reference_data",
+    "CLICK_BEHAVIOR_TAG",
+]
 
 CLICK_BEHAVIOR_TAG = "metabis_click_behavior_attached"
 
@@ -282,7 +293,7 @@ def get_external_reference_data(
     element_id: Any,
     element_type: str,
 ) -> Dict[str, str]:
-    """Get display and external reference data for a reaction or gene."""
+    """Get display and external reference data for a reaction, gene, or subsystem."""
     element_id_str = str(element_id)
     metabolic_model = getattr(data_manager, "metabolic_model", None)
     if metabolic_model is None:
@@ -296,6 +307,8 @@ def get_external_reference_data(
         reference_data = metabolic_model.get_gene_reference_data(element_id_str)
     elif element_type == "reaction":
         reference_data = metabolic_model.get_reaction_reference_data(element_id_str)
+    elif element_type == "subsystem":
+        reference_data = metabolic_model.get_subsystem_reference_data(element_id_str)
     else:
         reference_data = {
             "raw_id": element_id_str,
@@ -317,6 +330,8 @@ def add_click_behavior(
     subsystem_select: Any = None,
 ) -> Any:
     """Attach click behavior to eligible Bokeh data sources in a model tree."""
+    from bokeh.models import CustomJS, Plot, TapTool
+
     references = {model}
     if hasattr(model, "references"):
         references.update(model.references())

@@ -716,55 +716,6 @@ class ImportanceAnalysis:
 
         return aggregated_results
 
-    def run_single_reaction_analysis(
-        self,
-        gene_df: pd.DataFrame,
-        reaction_df: pd.DataFrame,
-        reaction_id: str,
-        group1_samples: List[str],
-        group2_samples: List[str],
-        **kwargs,
-    ) -> Dict:
-        """High-level interface for single reaction analysis.
-
-        This method provides backward compatibility with the original function interface.
-        """
-        # Update configuration with any provided kwargs
-        for key, value in kwargs.items():
-            if hasattr(self, key):
-                setattr(self, key, value)
-            elif key in self.config:
-                self.config[key] = value
-
-        return self.analyze_single_reaction_influence(
-            gene_df, reaction_df, reaction_id, group1_samples, group2_samples
-        )
-
-    def run_subsystem_analysis(
-        self,
-        gene_df: pd.DataFrame,
-        reaction_df: pd.DataFrame,
-        reactions: List[str],
-        group1_samples: List[str],
-        group2_samples: List[str],
-        **kwargs,
-    ) -> Dict:
-        """High-level interface for subsystem analysis.
-
-        This method provides backward compatibility with the original function interface.
-        """
-        # Update configuration with any provided kwargs
-        for key, value in kwargs.items():
-            if hasattr(self, key):
-                setattr(self, key, value)
-            elif key in self.config:
-                self.config[key] = value
-
-        return self.analyze_subsystem_influence(
-            gene_df, reaction_df, reactions, group1_samples, group2_samples
-        )
-
-
 # 1. Define model factory and strategy classes
 class ModelFactory:
     """Factory class to create different regression models."""

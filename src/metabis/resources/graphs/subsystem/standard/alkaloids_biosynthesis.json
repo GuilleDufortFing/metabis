@@ -1,40 +1,62 @@
 {
   "glyphs": [
     {
-      "id": "compartment_ba9c1f5d",
+      "id": "compartment_endoplasmic_reticulum",
       "glyph_class": "compartment",
       "label": "Endoplasmic reticulum",
-      "x": 206.01,
-      "y": 239.76,
-      "width": 482.41999999999996,
-      "height": 743.12
-    },
-    {
-      "id": "r_MAR01591",
-      "glyph_class": "reaction",
-      "label": "MAR01591",
-      "x": 216.81,
-      "y": 141.48,
-      "width": 50.0,
-      "height": 50.0,
-      "original_id": "MAR01591"
+      "x": 248.0,
+      "y": 121.5,
+      "width": 696.0,
+      "height": 593.0
     },
     {
       "id": "r_MAR00447",
       "glyph_class": "reaction",
       "label": "MAR00447",
-      "x": 64.8,
-      "y": 338.03999999999996,
+      "x": 139.0,
+      "y": 25.0,
       "width": 50.0,
       "height": 50.0,
       "original_id": "MAR00447"
     },
     {
+      "id": "r_MAR01591",
+      "glyph_class": "reaction",
+      "label": "MAR01591",
+      "x": 357.0,
+      "y": 129.0,
+      "width": 50.0,
+      "height": 50.0,
+      "original_id": "MAR01591"
+    },
+    {
+      "id": "m_endoplasmic_reticulum_MAM01766r",
+      "glyph_class": "metabolite",
+      "label": "MAM01766r",
+      "x": 30.0,
+      "y": 25.0,
+      "width": 60.0,
+      "height": 40.0,
+      "original_id": "MAM01766r",
+      "subtype": "main"
+    },
+    {
+      "id": "m_endoplasmic_reticulum_MAM03849r",
+      "glyph_class": "metabolite",
+      "label": "MAM03849r",
+      "x": 248.0,
+      "y": 25.0,
+      "width": 60.0,
+      "height": 40.0,
+      "original_id": "MAM03849r",
+      "subtype": "main"
+    },
+    {
       "id": "m_MAR01591_MAM01371r",
       "glyph_class": "metabolite",
       "label": "MAM01371r",
-      "x": 173.34,
-      "y": 239.76,
+      "x": 248.0,
+      "y": 228.0,
       "width": 40.0,
       "height": 30.0,
       "original_id": "MAM01371r",
@@ -44,8 +66,8 @@
       "id": "m_MAR01591_MAM01597r",
       "glyph_class": "metabolite",
       "label": "MAM01597r",
-      "x": 260.28,
-      "y": 239.76,
+      "x": 248.0,
+      "y": 162.0,
       "width": 40.0,
       "height": 30.0,
       "original_id": "MAM01597r",
@@ -55,70 +77,69 @@
       "id": "m_MAR01591_MAM02039r",
       "glyph_class": "metabolite",
       "label": "MAM02039r",
-      "x": 347.21999999999997,
-      "y": 239.76,
+      "x": 248.0,
+      "y": 96.0,
       "width": 40.0,
       "height": 30.0,
       "original_id": "MAM02039r",
       "subtype": "intermediate"
     },
     {
-      "id": "m_dd4ee249",
-      "glyph_class": "metabolite",
-      "label": "MAM03849r",
-      "x": 64.8,
-      "y": 239.76,
-      "width": 60.0,
-      "height": 40.0,
-      "original_id": "MAM03849r",
-      "subtype": "main"
-    },
-    {
-      "id": "m_c84301fd",
+      "id": "m_endoplasmic_reticulum_MAM01334r",
       "glyph_class": "metabolite",
       "label": "MAM01334r",
-      "x": 86.67,
-      "y": 43.199999999999996,
+      "x": 466.0,
+      "y": 205.0,
       "width": 60.0,
       "height": 40.0,
       "original_id": "MAM01334r",
       "subtype": "main"
     },
     {
-      "id": "m_993fd180",
+      "id": "m_endoplasmic_reticulum_MAM02759r",
       "glyph_class": "metabolite",
       "label": "MAM02759r",
-      "x": 216.81,
-      "y": 43.199999999999996,
+      "x": 466.0,
+      "y": 129.0,
       "width": 60.0,
       "height": 40.0,
       "original_id": "MAM02759r",
       "subtype": "main"
     },
     {
-      "id": "m_2ad951fb",
+      "id": "m_endoplasmic_reticulum_MAM03850r",
       "glyph_class": "metabolite",
       "label": "MAM03850r",
-      "x": 346.95,
-      "y": 43.199999999999996,
+      "x": 466.0,
+      "y": 53.0,
       "width": 60.0,
       "height": 40.0,
       "original_id": "MAM03850r",
       "subtype": "main"
-    },
-    {
-      "id": "m_4633a70f",
-      "glyph_class": "metabolite",
-      "label": "MAM01766r",
-      "x": 64.8,
-      "y": 436.32,
-      "width": 60.0,
-      "height": 40.0,
-      "original_id": "MAM01766r",
-      "subtype": "main"
     }
   ],
   "connections": [
+    {
+      "id": "conn_m_endoplasmic_reticulum_MAM01766r_to_r_MAR00447",
+      "connection_class": "metabolic",
+      "source": "m_endoplasmic_reticulum_MAM01766r",
+      "target": "r_MAR00447",
+      "stoichiometry": null
+    },
+    {
+      "id": "conn_r_MAR00447_to_m_endoplasmic_reticulum_MAM03849r",
+      "connection_class": "metabolic",
+      "source": "r_MAR00447",
+      "target": "m_endoplasmic_reticulum_MAM03849r",
+      "stoichiometry": null
+    },
+    {
+      "id": "conn_m_endoplasmic_reticulum_MAM03849r_to_r_MAR01591",
+      "connection_class": "metabolic",
+      "source": "m_endoplasmic_reticulum_MAM03849r",
+      "target": "r_MAR01591",
+      "stoichiometry": null
+    },
     {
       "id": "conn_m_MAR01591_MAM01371r_to_r_MAR01591",
       "connection_class": "metabolic",
@@ -141,45 +162,24 @@
       "stoichiometry": null
     },
     {
-      "id": "conn_m_dd4ee249_to_r_MAR01591",
-      "connection_class": "metabolic",
-      "source": "m_dd4ee249",
-      "target": "r_MAR01591",
-      "stoichiometry": null
-    },
-    {
-      "id": "conn_r_MAR00447_to_m_dd4ee249",
-      "connection_class": "metabolic",
-      "source": "r_MAR00447",
-      "target": "m_dd4ee249",
-      "stoichiometry": null
-    },
-    {
-      "id": "conn_r_MAR01591_to_m_c84301fd",
+      "id": "conn_r_MAR01591_to_m_endoplasmic_reticulum_MAM01334r",
       "connection_class": "metabolic",
       "source": "r_MAR01591",
-      "target": "m_c84301fd",
+      "target": "m_endoplasmic_reticulum_MAM01334r",
       "stoichiometry": null
     },
     {
-      "id": "conn_r_MAR01591_to_m_993fd180",
+      "id": "conn_r_MAR01591_to_m_endoplasmic_reticulum_MAM02759r",
       "connection_class": "metabolic",
       "source": "r_MAR01591",
-      "target": "m_993fd180",
+      "target": "m_endoplasmic_reticulum_MAM02759r",
       "stoichiometry": null
     },
     {
-      "id": "conn_r_MAR01591_to_m_2ad951fb",
+      "id": "conn_r_MAR01591_to_m_endoplasmic_reticulum_MAM03850r",
       "connection_class": "metabolic",
       "source": "r_MAR01591",
-      "target": "m_2ad951fb",
-      "stoichiometry": null
-    },
-    {
-      "id": "conn_m_4633a70f_to_r_MAR00447",
-      "connection_class": "metabolic",
-      "source": "m_4633a70f",
-      "target": "r_MAR00447",
+      "target": "m_endoplasmic_reticulum_MAM03850r",
       "stoichiometry": null
     }
   ]

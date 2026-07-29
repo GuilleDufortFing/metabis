@@ -378,6 +378,11 @@ def _draw_enriched_nodes(plot, grouped_glyphs, influence_circles):
     return renderers
 
 
+def _label_only_data(data):
+    """Project glyph data to fields labels use, excluding rich hover HTML."""
+    return {key: value for key, value in data.items() if key != "hover"}
+
+
 def _draw_enriched_main_metabolites(plot, metabolite_glyphs):
     """Draw main metabolites using enriched glyph data."""
     # Convert enriched glyphs to ColumnDataSource format
@@ -412,7 +417,7 @@ def _draw_enriched_main_metabolites(plot, metabolite_glyphs):
     initial_alpha = VisualizationConstants.SUBSYSTEM_LABEL_ALPHA_MAX
 
     # Add alpha values to the data source for labels
-    label_data = dict(data)
+    label_data = _label_only_data(data)
     # Respect element alpha in label visibility
     label_data["base_alpha"] = label_data.get("alpha", [1.0] * len(label_data["x"]))
     label_data["text_alpha"] = [a * initial_alpha for a in label_data["base_alpha"]]
@@ -479,7 +484,7 @@ def _draw_enriched_intermediate_metabolites(plot, metabolite_glyphs):
     initial_alpha = VisualizationConstants.SUBSYSTEM_LABEL_ALPHA_MAX
 
     # Add alpha values to the data source for labels
-    label_data = dict(data)
+    label_data = _label_only_data(data)
     label_data["base_alpha"] = label_data.get("alpha", [1.0] * len(label_data["x"]))
     label_data["text_alpha"] = [a * initial_alpha for a in label_data["base_alpha"]]
     label_source = ColumnDataSource(label_data)
@@ -546,7 +551,7 @@ def _draw_enriched_genes(plot, gene_glyphs):
     initial_alpha = VisualizationConstants.SUBSYSTEM_LABEL_ALPHA_MAX
 
     # Add alpha values to the data source for labels
-    label_data = dict(data)
+    label_data = _label_only_data(data)
     label_data["base_alpha"] = label_data.get("alpha", [1.0] * len(label_data["x"]))
     label_data["text_alpha"] = [a * initial_alpha for a in label_data["base_alpha"]]
     label_source = ColumnDataSource(label_data)
@@ -616,7 +621,7 @@ def _draw_enriched_reactions(plot, reaction_glyphs):
     initial_alpha = VisualizationConstants.SUBSYSTEM_LABEL_ALPHA_MAX
 
     # Add alpha values to the data source for labels
-    label_data = dict(data)
+    label_data = _label_only_data(data)
     label_data["base_alpha"] = label_data.get("alpha", [1.0] * len(label_data["x"]))
     label_data["text_alpha"] = [a * initial_alpha for a in label_data["base_alpha"]]
     label_source = ColumnDataSource(label_data)
@@ -677,7 +682,7 @@ def _draw_enriched_compartments(plot, compartment_glyphs):
     initial_alpha = VisualizationConstants.SUBSYSTEM_LABEL_ALPHA_MAX
 
     # Add alpha values to the data source for labels
-    label_data = dict(data)
+    label_data = _label_only_data(data)
     label_data["base_alpha"] = label_data.get("alpha", [1.0] * len(label_data["x"]))
     label_data["text_alpha"] = [a * initial_alpha for a in label_data["base_alpha"]]
     label_source = ColumnDataSource(label_data)
@@ -772,7 +777,7 @@ def _draw_enriched_subsystems(plot, subsystem_glyphs):
     initial_alpha = VisualizationConstants.SUBSYSTEM_LABEL_ALPHA_MIN
 
     # Add alpha values to the data source for labels
-    label_data = dict(data)
+    label_data = _label_only_data(data)
     label_data["text_alpha"] = [initial_alpha] * len(label_data["x"])
     label_source = ColumnDataSource(label_data)
 

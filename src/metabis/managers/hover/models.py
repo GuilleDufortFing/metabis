@@ -1,56 +1,51 @@
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Union, TYPE_CHECKING, TypedDict
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, TypedDict
 
 if TYPE_CHECKING:
-    from ..data_provider import DataProvider
+    from ...analysis.comparison_artifact import GroupComparisonArtifact
     from ..color_manager import ColorManager
-    from ..group_comparison import GroupComparison
-    from ..data_manager_mode import DataManagerMode
+    from ..data_provider import DataProvider
+    from ..workspace_mode import AnalysisWorkspaceMode
 
 @dataclass
 class HoverContext:
-    """
-    Context object containing view configuration, environment settings, 
+    """Context object containing view configuration, environment settings,
     and services required for generating hover text.
     """
     # View Configuration
-    mode: "DataManagerMode"
+    mode: "AnalysisWorkspaceMode"
     hover_type: str  # "gene", "reaction", "metabolite", "subsystem"
     element_type: str # "gene", "reaction", ...
     element_id: Optional[str] = None
-    
+
     # Visualization Settings
     main_direction: str = "forward"
+    # Which population chose `main_direction`, taken from the installed reaction
+    # direction map. A hover that names the deciding group has to name the one
+    # the map actually used, not assume Target (WP10/D-70).
+    direction_criterion: Optional[Any] = None
     subsystem_metric: str = "log2_fc"
     color_metric: str = "log2_fc"
-    
+
     # Toggles
     show_plot: bool = False
     show_stats: bool = False
     show_influence: bool = False
     show_color_reference: bool = False
     show_comparison: bool = False
-    
+
     # Context-specific State
     current_subsystem: Optional[str] = None
     current_category: Optional[str] = None
     for_genes: bool = False
-    
+
     # Services & Dependencies
     data_provider: Optional["DataProvider"] = None
     color_manager: Optional["ColorManager"] = None
-    group_comparison: Optional["GroupComparison"] = None
-    
+    group_comparison: Optional["GroupComparisonArtifact"] = None
+
     # Extra
     analysis_type: Optional[str] = None
-
-    def get(self, key: str, default: Any = None) -> Any:
-        """Backward compatibility method to allow dict-like access."""
-        return getattr(self, key, default)
-
-    def __getitem__(self, key: str) -> Any:
-        """Backward compatibility method to allow dict-like access."""
-        return getattr(self, key)
 
 class ComparisonStatsData(TypedDict, total=False):
     has_comparison_data: bool
@@ -86,44 +81,46 @@ class InfluenceData(TypedDict, total=False):
     max_influence: float
 
 class HoverData(TypedDict, total=False):
-    """
-    Typed dictionary representing the data structure passed to hover builders.
+    """Typed dictionary representing the data structure passed to hover builders.
     """
     # Common
     is_in_model: bool
     metadata: Dict[str, Any]
-    
+
     # Identifiers
     gene_id: str
     reaction_id: str
     metabolite_id: str
     primary_id: str
-    
+
     # Display Info
     symbol: str
     name: str
     label: str
     description: str
     equation: str
-    
+    is_reversible: bool
+    # WP10/D-65: directions Compass reports no flux for in this dataset, so a
+    # blocked result is not silently rendered as missing data.
+    blocked_directions: Tuple[str, ...]
+
     # Categorization
     subsystem: str
     subsystem_category: str
     consumed_by_subsystems: List[str]
     produced_by_subsystems: List[str]
-    
+
     # Analysis Data
     comparison_stats: ComparisonStatsData
     experiment_stats: ExperimentStatsData
     distributions: DistributionData
     influence: InfluenceData
-    
+
     # Subsystem Specific
     subsystem_display_name: str
     n_significant: int
     n_total: int
-    regulation_score: float
+    net_direction_score: float
     total_metric_value: float
     delta_subsystem_score: Optional[float]
     delta_subsystem_meta: Dict[str, Any]
-

@@ -11,7 +11,7 @@ authors = [
     { name = "Guillermo Dufort y Álvarez", email = "gdufort@fing.edu.uy" },
     { name = "Luis Alonso", email = "luisalonsoesteban.1@gmail.com" },
 ]
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 dependencies = [
     "anndata>=0.10",
     "bokeh>=3.4",
@@ -41,9 +41,13 @@ dynamic = [
 dev = [
     "ipykernel",
     "ipython",
+    "mypy",
+    "nbclient",
+    "nbformat",
     "pytest>=8.0",
     "ruff",
 ]
+benchmark = []
 importance = [
     "shap>=0.44",
     "xgboost>=2.0",
@@ -64,25 +68,75 @@ exclude = ["*.ipynb"]
 
 [tool.hatch.build.targets.sdist]
 exclude = [
+    ".git",
     "data/",
     "scripts/",
     "tests/",
     "src/metabis/*.ipynb",
 ]
 
+[tool.ruff]
+# The supported runtime is Python 3.12 (see README); parse and lint against it.
+target-version = "py312"
+
 [tool.ruff.lint]
-extend-select = [
-    # pycodestyle
-    "E", "W",
-    # isort
-    "I",
-    # pep8-naming
-    "N",
-    # pydocstyle
-    "D", "D401"
-]
+# The enforced lint gate: mechanical rules to zero. `ruff check` is the gate and
+# must stay green. F (pyflakes) is on by ruff's default select.
+#   - pycodestyle E/W, isort I, pep8-naming N
+# Additional checks surfaced on demand rather than gated:
+#   - E501 (line-length): reaching zero requires a whole-repo `ruff format`,
+#     a deliberate formatting pass, not part of the migration.
+#   - D (pydocstyle): ~300 public members lack Google-style docstrings.
+# To see the deferred debt: `ruff check --extend-select D --select E501`.
+extend-select = ["E", "W", "I", "N"]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+# Conventional scientific names kept as written: the sklearn feature matrix `X`,
+# hypergeometric population/success counts `N`/`K`, and statistical group labels
+# `A`/`B`. Lowercasing them would hurt, not help, readability.
+"src/metabis/analysis/importance_analysis.py" = ["N803", "N806"]
+"src/metabis/analysis/statistical_analysis.py" = ["N803", "N806"]
+"src/metabis/analysis/reaction_set_enrichment.py" = ["N806"]
 
 [tool.ruff.lint.pydocstyle]
+# Applies when D is re-enabled (see the deferred-debt note above).
 # The Google convention includes all D errors apart from: D203, D204, D213, D215,
 # D400, D401, D404, D406, D407, D408, D409, and D413.
 convention = "google"
+
+[tool.mypy]
+# The enforced type gate is scoped to the public request/result paths (ADR-0008):
+# the seam types a coordinator installs and reads. The wider scientific
+# implementation carries no annotations yet and is outside this gate.
+python_version = "3.12"
+ignore_missing_imports = true
+follow_imports = "silent"
+files = [
+    "src/metabis/analysis_workspace.py",
+    "src/metabis/analysis/activity_analysis.py",
+    "src/metabis/analysis/artifacts.py",
+    "src/metabis/analysis/comparison_artifact.py",
+    "src/metabis/analysis/comparison_membership.py",
+    "src/metabis/analysis/dimensionality_reduction.py",
+    "src/metabis/analysis/experiment_analysis.py",
+    "src/metabis/analysis/group_exports.py",
+    "src/metabis/analysis/reaction_set_enrichment.py",
+    "src/metabis/analysis/set_enrichment.py",
+    "src/metabis/analysis/subsystem_analysis.py",
+    "src/metabis/domain/expression_matrix.py",
+    "src/metabis/managers/color_distributions.py",
+    "src/metabis/managers/color_lookup.py",
+    "src/metabis/viz/metabolic_visualization/artifact.py",
+    "src/metabis/viz/metabolic_visualization/calculation_input.py",
+]
+
+[tool.pytest.ini_options]
+addopts = "-ra --strict-markers"
+testpaths = ["tests"]
+markers = [
+    "benchmark: performance tests excluded from the default suite",
+    "integration: tests spanning multiple public modules",
+    "large_data: tests requiring explicitly provisioned external datasets",
+    "resource: validation of packaged runtime resources",
+]

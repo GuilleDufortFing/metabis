@@ -152,8 +152,6 @@ def generate_subsystems_network_by_categories(
         all_glyphs.extend(glyphs)
 
     # Report final results
-    layout_method = "graph layout"
-    inter_status = "with" if include_inter_category_connections else "without"
 
     return all_glyphs, all_connections
 
@@ -489,7 +487,6 @@ def arrange_category_graphs_with_layout(
         >>> for category, (glyphs, connections, boundary) in arranged.items():
         ...     print(f"{category}: positioned at ({boundary['x']}, {boundary['y']})")
     """
-
     if not category_graphs:
         return {}
 
@@ -514,7 +511,6 @@ def arrange_category_graphs_with_layout(
         # Apply spacing multiplier to increase separation
         center_x = category_glyph["x"] * spacing_multiplier
         center_y = category_glyph["y"] * spacing_multiplier
-        radius = category_glyph["radius"]
 
         # Store the complete positioned category glyph with scaled coordinates
         positioned_glyph = dict(category_glyph)  # Copy the glyph
@@ -530,7 +526,6 @@ def arrange_category_graphs_with_layout(
         positioned_category_glyph = category_glyphs_map[category_name]
         center_x = positioned_category_glyph["x"]
         center_y = positioned_category_glyph["y"]
-        radius = positioned_category_glyph["radius"]
 
         # Calculate offset to move category to target position
         current_center_x = sum(g["x"] for g in original_glyphs) / len(original_glyphs)
@@ -605,7 +600,6 @@ def _extract_inter_category_relationships(
         ...     print(f"{rel['source_category']} → {rel['target_category']}: "
         ...           f"{rel['connection_count']} connections")
     """
-
     # Get category mapping for all subsystems
     subsystems_by_category = model.get_subsystems_by_category()
 
@@ -693,7 +687,6 @@ def _build_category_meta_graph(
         ... )
         >>> # These can then be passed to convert_raw_data_to_domain_objects()
     """
-
     raw_category_glyphs = []
     raw_category_connections = []
 
@@ -803,7 +796,6 @@ def _collect_all_connections(
         ...     include_inter_category_connections=False
         ... )
     """
-
     all_connections = []
 
     # Collect intra-category connections
@@ -864,6 +856,5 @@ def _collect_all_connections(
                     all_connections.append(inter_connection)
                     inter_category_count += 1
 
-    total_connections = intra_category_count + inter_category_count
 
     return all_connections

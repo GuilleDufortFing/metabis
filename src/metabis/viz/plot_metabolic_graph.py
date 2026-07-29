@@ -6,116 +6,81 @@ enrichment, and visualization in a unified pipeline.
 """
 
 from .click_behavior import add_click_behavior
-from .metabolic_visualization.pipeline import (
+from .metabolic_visualization import (
+    EnrichmentConfig,
+    GraphGenerationConfig,
     MetabolicGraphPipeline,
-    build_pipeline_config,
+    PipelineConfig,
+    RenderingConfig,
 )
 
 
 def plot_metabolic_graph(
     element_name,  # Renamed from subsystem_name
     data_manager=None,
+    *,
+    generation_config: GraphGenerationConfig | None = None,
+    enrichment_config: EnrichmentConfig | None = None,
+    rendering_config: RenderingConfig | None = None,
+    graph_type="subsystem",
     output_html=None,
-    width=1000,
-    height=1200,
-    use_human1_map=True,
-    layout_engine="dot",
-    sizing_mode="fixed",
-    aspect_ratio=2,
-    zoom=1,
-    match_aspect=False,
-    fit_view_to_bounds=False,
-    color_metric="log2_fc",
-    delta_options=None,
-    show_hover_plots=None,
-    show_hover_stats=True,
-    show_hover_distribution_plots=None,
-    show_hover_color_reference=True,
-    highlight_significant_reactions=False,
-    highlight_significant_genes=False,
-    highlight_gene_influence=False,
-    graph_type="subsystem",  # New parameter
+    show_plot=True,
+    enable_timing=False,
+    return_metadata=False,
+    add_click_interactions=True,
     enabled_toggle=None,
     subsystem_select=None,
     click_filename_prefix: str = "metabolic_element",
-    enable_timing=False,
-    return_metadata=False,
+    provenance=None,
+    source_fingerprints=None,
 ):
     """Create a Bokeh visualization of a metabolic graph.
 
-    This function now uses the new MetabolicGraphPipeline architecture for improved
-    modularity and maintainability, while maintaining the same interface.
+    Structure, styling, and layout are configured through the three nested
+    config objects the pipeline consumes. Any that is omitted takes its
+    dataclass defaults, so ``plot_metabolic_graph(name, dm)`` renders a default
+    subsystem plot; a caller that wants to tune colouring passes
+    ``enrichment_config=EnrichmentConfig(color_metric=...)`` and so on. The flat
+    per-field keyword surface (``use_human1_map``, ``color_metric``, ``width``,
+    the ``show_hover_plots`` alias, …) was removed in AM7 (see the compatibility
+    register); it duplicated the nested configs and translated between them in a
+    second place.
 
     Args:
-        element_name (str): Name of the subsystem or pathway module ID to visualize
-        data_manager: DataManager object with experimental data
-        output_html (str): Path for HTML output file
-        width (int): Plot width
-        height (int): Plot height
-        use_human1_map (bool): For subsystem plots, prefer packaged curated
-            Human1 layouts before falling back to packaged standard dot
-            layouts or engine-based generation. For compartment plots,
-            packaged Human1 layouts are required.
-        layout_engine (str): GraphViz layout algorithm. For subsystem plots,
-            dot matches the packaged standard layout variant; other engines
-            trigger runtime generation when Human1 is not used. The Bokeh
-            server keeps this at the default and does not expose it in the UI.
-        sizing_mode (str): Bokeh sizing mode
-        aspect_ratio (float): Plot aspect ratio
-        zoom (float): Zoom level
-        match_aspect (bool): Whether to maintain data aspect ratio when resizing
-        fit_view_to_bounds (bool): Whether to derive viewport bounds from graph geometry
-        color_metric (str): Metric for coloring nodes
-        delta_options (dict): Options for subsystem delta calculation
-            - 'metric': Metric to use for delta calculation ['cohens_d', 'log2_fc']
-            - 'transform': Transformation to apply to delta values ['raw', 'abs', 'sign']
-            - 'numerator_filter': Filter for numerator values ['significant', 'all']
-            - 'denominator_filter': Filter for denominator values ['significant', 'all']
-        show_hover_stats (bool): Whether reaction, gene, and subsystem hover
-            panels should include textual statistics.
-        show_hover_distribution_plots (bool): Whether reaction and gene hover
-            panels should include violin/distribution plots during enrichment.
-        show_hover_color_reference (bool): Whether hover panels should include
-            the color-reference explanation block.
-        highlight_significant_reactions (bool): Highlight significant reactions
-        highlight_significant_genes (bool): Highlight significant genes
-        highlight_gene_influence (bool): Highlight gene influence
+        element_name (str): Name of the subsystem or pathway module ID to visualize.
+        data_manager: AnalysisWorkspace object with experimental data.
+        generation_config (GraphGenerationConfig): Structure/layout options
+            (``use_human1_map``, ``layout_engine``, resource paths).
+        enrichment_config (EnrichmentConfig): Colouring, hover, delta, and
+            highlighting options (``color_metric``, ``delta_options``,
+            ``show_hover_*``, ``highlight_*``).
+        rendering_config (RenderingConfig): Geometry options (``width``,
+            ``height``, ``sizing_mode``, ``aspect_ratio``, ``zoom``,
+            ``match_aspect``, ``fit_view_to_bounds``).
         graph_type (str): Type of graph to generate ("subsystem",
             "compartment", or "metabolic_network"). Metabolic-network plots
             keep their existing packaged-resource behavior.
+        output_html (str): Path for HTML output file.
+        show_plot (bool): Whether to call Bokeh `show`; server callers must use False.
         enable_timing (bool): Whether to collect per-phase pipeline timings.
         return_metadata (bool): If True, return a `(plot, metadata)` tuple.
+        provenance: Live workspace freshness token, captured on the document
+            thread from the loaded ``data_manager``. Supplied together with
+            ``source_fingerprints`` to give the graph portable provenance; a
+            structure-only plot with neither carries none. Identity is read from
+            the workspace, never recomputed here (ADR-0007).
+        source_fingerprints: Portable input identity the workspace already paid
+            for at load, passed through to the artifact metadata unchanged.
 
     Returns:
         Bokeh plot object, or `(plot, metadata)` when `return_metadata=True`
     """
-    if show_hover_distribution_plots is None:
-        if show_hover_plots is None:
-            show_hover_distribution_plots = True
-        else:
-            show_hover_distribution_plots = show_hover_plots
-
-    pipeline_config = build_pipeline_config(
-        use_human1_map=use_human1_map,
-        layout_engine=layout_engine,
-        color_metric=color_metric,
-        delta_options=delta_options,
-        show_hover_plots=show_hover_plots,
-        show_hover_stats=show_hover_stats,
-        show_hover_distribution_plots=show_hover_distribution_plots,
-        show_hover_color_reference=show_hover_color_reference,
-        highlight_significant_reactions=highlight_significant_reactions,
-        highlight_significant_genes=highlight_significant_genes,
-        highlight_gene_influence=highlight_gene_influence,
-        width=width,
-        height=height,
-        sizing_mode=sizing_mode,
-        aspect_ratio=aspect_ratio,
-        zoom=zoom,
-        match_aspect=match_aspect,
-        fit_view_to_bounds=fit_view_to_bounds,
+    pipeline_config = PipelineConfig(
+        generation_config=generation_config,
+        enrichment_config=enrichment_config,
+        rendering_config=rendering_config,
         output_html=output_html,
-        show_plot=True,
+        show_plot=show_plot,
         enable_timing=enable_timing,
     )
 
@@ -123,22 +88,22 @@ def plot_metabolic_graph(
     pipeline = MetabolicGraphPipeline(data_manager.metabolic_model, pipeline_config)
 
     plot = pipeline.run_full_pipeline(
-        element_name, graph_type, data_manager=data_manager
+        element_name,
+        graph_type,
+        data_manager=data_manager,
+        provenance=provenance,
+        source_fingerprints=source_fingerprints,
     )
 
-    add_click_behavior(
-        plot,
-        filename_prefix=click_filename_prefix,
-        enabled_toggle=enabled_toggle,
-        subsystem_select=subsystem_select,
-    )
+    if add_click_interactions:
+        add_click_behavior(
+            plot,
+            filename_prefix=click_filename_prefix,
+            enabled_toggle=enabled_toggle,
+            subsystem_select=subsystem_select,
+        )
 
     if return_metadata:
-        run_state = pipeline.get_intermediate_results()
-        metadata = {
-            "timings": pipeline.get_timings(),
-            "resolved_request": run_state.get("resolved_request"),
-        }
-        return plot, metadata
+        return plot, pipeline.get_run_metadata()
 
     return plot

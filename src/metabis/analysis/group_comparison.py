@@ -1,37 +1,134 @@
-import time
-from collections import defaultdict
 from copy import deepcopy
-from typing import Any, Dict, List, Optional, Tuple, Tuple
+from typing import Any, Dict, Iterable, Mapping, Optional, Tuple
 
 import numpy as np
 import pandas as pd
 
+from ..analysis_workspace import WorkspaceProvenance
+from ..managers.workspace_mode import AnalysisWorkspaceMode
+from .artifacts import (
+    AnalysisArtifactMetadata,
+    ArtifactDimension,
+    ArtifactKind,
+    PlainTable,
+)
+from .comparison_artifact import (
+    ComparisonThresholds,
+    GroupComparisonArtifact,
+    MetricSummary,
+)
+from .comparison_membership import ComparisonMembership, GroupComparisonSpec
 from .importance_analysis import (
     ImportanceAnalysis,
 )
 from .statistical_analysis import (
     StatisticalAnalysis,
 )
-from ..managers.data_manager_mode import DataManagerMode
+
+
+def register_comparison_distributions(
+    data_manager, results: pd.DataFrame | None, *, for_genes: bool = False
+) -> None:
+    """Register a comparison's metric distributions into the color manager.
+
+    Shared by the live-producer path and the artifact-install path so a
+    comparison's colouring is registered identically whether it was just
+    computed or read back from an installed :class:`GroupComparisonArtifact`.
+    """
+    if not hasattr(data_manager, "color_manager"):
+        return
+
+    if results is None:
+        element_name = "gene" if for_genes else "reaction"
+        raise ValueError(f"No computed {element_name} results to register")
+    element_type = "gene" if for_genes else "reaction"
+
+    metrics = [
+        "log2_fc",
+        "cohens_d",
+        "mean_difference",
+        "pval",
+        "adjusted_pval",
+        "neg_log_pval",
+        "neg_log_adjusted_pval",
+    ]
+
+    for metric in metrics:
+        if metric not in results.columns:
+            continue
+        data_manager.color_manager.register_distribution(
+            mode=AnalysisWorkspaceMode.GROUP_COMPARISON,
+            element_type=element_type,
+            metric_name=metric,
+            data=results[metric],
+            center_method="zero",
+            spread_method="std",
+        )
+
+
+def _metric_summaries(
+    metrics: Mapping[str, Mapping[str, float]],
+) -> Tuple[MetricSummary, ...]:
+    """Freeze normalization metrics into sorted, immutable summaries."""
+    return tuple(
+        MetricSummary(name, float(values["std"]), float(values["mean"]))
+        for name, values in sorted(metrics.items())
+    )
+
+
+def _display_label_pairs(
+    labels: Mapping[str, str] | None,
+    feature_ids: Iterable[Any],
+) -> Tuple[Tuple[str, str], ...]:
+    """Pair every feature with its display label, defaulting to its canonical ID.
+
+    A missing label is not an error: the canonical ID is a truthful label, and a
+    label is never allowed to replace the ID it labels.
+    """
+    supplied = {str(key): str(value) for key, value in dict(labels or {}).items()}
+    return tuple(
+        sorted(
+            (str(feature_id), supplied.get(str(feature_id), str(feature_id)))
+            for feature_id in feature_ids
+        )
+    )
 
 
 class GroupComparison:
-    def __init__(self, group_id_1: str, group_id_2: str, test: str, correction: str) -> None:
-        """Initialize a group comparison between two groups with a specific statistical test.
+    def __init__(self, *, spec: GroupComparisonSpec | None = None, membership: ComparisonMembership | None = None, test: str = "wilcoxon", correction: str = "fdr_bh") -> None:
+        """Initialize a group comparison from an explicit specification or membership.
 
         Args:
-            group_id_1 (str): ID of the first group
-            group_id_2 (str): ID of the second group
+            spec (GroupComparisonSpec): Explicit comparison selection (mode plus the
+                one or two canonical group IDs).
+            membership (ComparisonMembership): Explicit left/right sample membership.
+                When omitted, `run_test` resolves it from the analysis workspace.
             test (str): Statistical test to use ('wilcoxon' or 'ttest')
+
+        Exactly one of `spec` or `membership` is required; when both are given they
+        must agree.
 
         Returns:
             None
 
         Raises:
-            ValueError: If the test is not supported
+            ValueError: If neither `spec` nor `membership` is given, if they
+                disagree, or if the test is not supported
         """
-        self.group_id_1 = group_id_1
-        self.group_id_2 = group_id_2
+        if membership is not None:
+            if spec is not None and spec != membership.spec:
+                raise ValueError("Comparison membership does not match its specification")
+            spec = membership.spec
+        elif spec is None:
+            raise ValueError("GroupComparison requires an explicit spec or membership")
+        self.spec = spec
+        self.membership = membership
+        self.group_id_1 = " + ".join(spec.target.base_group_ids)
+        self.group_id_2 = (
+            " + ".join(spec.baseline.base_group_ids)
+            if spec.baseline is not None
+            else "All other samples"
+        )
         self.significant_reactions = set()
         self.back_significant_reactions = set()
         self.significant_genes = set()
@@ -53,8 +150,8 @@ class GroupComparison:
         # Store test results as single dataframes
         self._reaction_test_results = None  # Will be a DataFrame
         self._gene_test_results = None  # Will be a DataFrame
-        
-        # Statistics for effect size normalization (kept for backward compatibility)
+
+        # Stable defaults for effect-size normalization before results are computed.
         self._reaction_metrics_stats = {
             "cohens_d": {"std": 1.0, "mean": 0.0},
             "log2_fc": {"std": 1.0, "mean": 0.0},
@@ -65,6 +162,264 @@ class GroupComparison:
             "log2_fc": {"std": 1.0, "mean": 0.0},
             "mean_difference": {"std": 0.5, "mean": 0.0},
         }
+
+    @classmethod
+    def from_computed_results(
+        cls,
+        *,
+        spec: GroupComparisonSpec,
+        test: str,
+        correction: str,
+        membership: ComparisonMembership | None = None,
+        reaction_results: pd.DataFrame,
+        reaction_metrics: Mapping[str, Mapping[str, float]],
+        significant_reactions: Iterable[str],
+        reaction_thresholds: Mapping[str, float | None],
+        gene_results: pd.DataFrame | None = None,
+        gene_metrics: Mapping[str, Mapping[str, float]] | None = None,
+        significant_genes: Iterable[str] = (),
+        gene_thresholds: Mapping[str, float | None] | None = None,
+    ) -> "GroupComparison":
+        """Construct a comparison from an already-computed scientific result.
+
+        This is the public document-thread installation seam for worker results.
+        The comparison owns its result tables and metric mappings after this call;
+        callers do not need to populate implementation fields directly.
+        """
+        significant_gene_ids = tuple(significant_genes)
+        if reaction_results is None:
+            raise ValueError("Computed comparison requires reaction results")
+        if gene_results is None and (
+            gene_metrics is not None
+            or significant_gene_ids
+            or gene_thresholds is not None
+        ):
+            raise ValueError("Gene comparison state requires gene results")
+        if gene_results is not None and (
+            gene_metrics is None or gene_thresholds is None
+        ):
+            raise ValueError(
+                "Computed gene results require metrics and thresholds"
+            )
+
+        comparison = cls(
+            spec=spec,
+            membership=membership,
+            test=test,
+            correction=correction,
+        )
+        comparison._reaction_test_results = reaction_results.copy()
+        comparison._reaction_metrics_stats = deepcopy(dict(reaction_metrics))
+        comparison.significant_reactions = set(significant_reactions)
+        comparison._set_computed_thresholds(
+            reaction_thresholds,
+            for_genes=False,
+        )
+
+        if gene_results is not None:
+            comparison._gene_test_results = gene_results.copy()
+            comparison._gene_metrics_stats = deepcopy(dict(gene_metrics or {}))
+            comparison.significant_genes = set(significant_gene_ids)
+            comparison._set_computed_thresholds(
+                gene_thresholds or {},
+                for_genes=True,
+            )
+        return comparison
+
+    def build_artifact(
+        self,
+        *,
+        provenance: WorkspaceProvenance,
+        source_fingerprints: Mapping[str, str],
+        reaction_display_labels: Mapping[str, str] | None = None,
+        gene_display_labels: Mapping[str, str] | None = None,
+        keep_reversed: bool = False,
+        warnings: Iterable[str] = (),
+    ) -> GroupComparisonArtifact:
+        """Project this computed comparison into its portable artifact.
+
+        `source_fingerprints` is read from the Analysis Workspace, which paid for
+        input identity once at load.  Computing it here instead would put a
+        full-matrix hash on every comparison; see ADR-0007 and MR-10.
+
+        Display labels are supplied by the caller that can see the metabolic
+        model, so an exported row carries its label without the export reaching
+        back into a live manager to look one up.
+        """
+        if self.membership is None:
+            raise ValueError(
+                "A comparison needs a resolved membership before it can become an "
+                "artifact"
+            )
+        reaction_results = self.get_test_results(for_genes=False)
+        if reaction_results is None:
+            raise ValueError("This comparison has no reaction results to export")
+        gene_results = self.get_test_results(for_genes=True)
+
+        correction = self.stats_analyzer.correction_type
+        configuration: Dict[str, Any] = {
+            "correction": correction,
+            "keep_reversed": bool(keep_reversed),
+            "reaction_thresholds": dict(
+                ComparisonThresholds.capture(
+                    self.get_thresholds(for_genes=False)
+                ).as_mapping()
+            ),
+            "gene_thresholds": (
+                dict(
+                    ComparisonThresholds.capture(
+                        self.get_thresholds(for_genes=True)
+                    ).as_mapping()
+                )
+                if gene_results is not None
+                else None
+            ),
+        }
+        metadata = AnalysisArtifactMetadata.from_workspace(
+            kind=ArtifactKind.GROUP_COMPARISON,
+            provenance=provenance,
+            source_fingerprints=source_fingerprints,
+            method=self.statistical_test,
+            configuration=configuration,
+            scientific_identity=self._artifact_identity(),
+            dimensions=(
+                ArtifactDimension("samples", len(self.membership.universe)),
+                ArtifactDimension("target_samples", len(self.membership.target_samples)),
+                ArtifactDimension(
+                    "baseline_samples", len(self.membership.baseline_samples)
+                ),
+                ArtifactDimension("reactions", len(reaction_results)),
+                ArtifactDimension(
+                    "genes", len(gene_results) if gene_results is not None else 0
+                ),
+            ),
+            warnings=tuple(warnings),
+        )
+        return GroupComparisonArtifact(
+            metadata=metadata,
+            membership=self.membership,
+            test=self.statistical_test,
+            correction=correction,
+            reaction_results=PlainTable.capture(reaction_results),
+            gene_results=(
+                PlainTable.capture(gene_results) if gene_results is not None else None
+            ),
+            reaction_metrics=_metric_summaries(self.get_metrics_stats(for_genes=False)),
+            gene_metrics=(
+                _metric_summaries(self.get_metrics_stats(for_genes=True))
+                if gene_results is not None
+                else ()
+            ),
+            significant_reactions=tuple(sorted(map(str, self.significant_reactions))),
+            significant_genes=(
+                tuple(sorted(map(str, self.significant_genes)))
+                if gene_results is not None
+                else ()
+            ),
+            reaction_thresholds=ComparisonThresholds.capture(
+                self.get_thresholds(for_genes=False)
+            ),
+            gene_thresholds=(
+                ComparisonThresholds.capture(self.get_thresholds(for_genes=True))
+                if gene_results is not None
+                else None
+            ),
+            keep_reversed=bool(keep_reversed),
+            reaction_display_labels=_display_label_pairs(
+                reaction_display_labels, reaction_results.index
+            ),
+            gene_display_labels=(
+                _display_label_pairs(gene_display_labels, gene_results.index)
+                if gene_results is not None
+                else ()
+            ),
+        )
+
+    def _artifact_identity(self) -> Dict[str, Any]:
+        """Return the membership coordinates that identify this comparison."""
+        membership = self.membership
+        return {
+            "membership_fingerprint": membership.fingerprint,
+            "mode": membership.mode.value,
+            "target_base_group_ids": membership.target_base_group_ids,
+            "baseline_base_group_ids": membership.baseline_base_group_ids,
+            "target_samples": membership.target_samples,
+            "baseline_samples": membership.baseline_samples,
+            "universe": membership.universe,
+            "excluded_base_group_ids": membership.excluded_base_group_ids,
+        }
+
+    def _set_computed_thresholds(
+        self,
+        thresholds: Mapping[str, float | None],
+        *,
+        for_genes: bool,
+    ) -> None:
+        self.set_thresholds(
+            thresholds.get("pval"),
+            thresholds.get("cohens_d"),
+            thresholds.get("log2_fc"),
+            thresholds.get("mean_difference"),
+            for_genes=for_genes,
+        )
+
+    def replace_threshold_state_from(self, candidate: "GroupComparison") -> None:
+        """Commit prevalidated threshold-dependent state while retaining identity.
+
+        AnalysisWorkspace uses this after it has successfully built the matching
+        immutable artifact, so presentation/provider references to this object do
+        not need to be rewired and a failed pre-commit remains a no-op.
+        """
+        if not isinstance(candidate, GroupComparison):
+            raise TypeError("candidate must be a GroupComparison")
+        if (
+            candidate.spec != self.spec
+            or candidate.membership != self.membership
+            or candidate.statistical_test != self.statistical_test
+            or candidate.stats_analyzer.correction_type
+            != self.stats_analyzer.correction_type
+        ):
+            raise ValueError("Threshold candidate belongs to a different comparison")
+
+        reaction_results = candidate.get_test_results(for_genes=False)
+        if reaction_results is None:
+            raise ValueError("Threshold candidate has no reaction results")
+        current_reactions = self.get_test_results(for_genes=False)
+        if current_reactions is None or not current_reactions.index.equals(
+            reaction_results.index
+        ):
+            raise ValueError("Threshold candidate reaction rows do not match")
+        reaction_significance = reaction_results["is_significant"].copy()
+        gene_results = candidate.get_test_results(for_genes=True)
+        current_genes = self.get_test_results(for_genes=True)
+        if (gene_results is None) != (current_genes is None):
+            raise ValueError("Threshold candidate gene result availability differs")
+        if gene_results is not None and not current_genes.index.equals(
+            gene_results.index
+        ):
+            raise ValueError("Threshold candidate gene rows do not match")
+        gene_significance = (
+            gene_results["is_significant"].copy()
+            if gene_results is not None
+            else None
+        )
+        reaction_thresholds = dict(candidate.get_thresholds(for_genes=False))
+        gene_thresholds = (
+            dict(candidate.get_thresholds(for_genes=True))
+            if gene_results is not None
+            else None
+        )
+        significant_reactions = set(candidate.significant_reactions)
+        significant_genes = set(candidate.significant_genes)
+
+        current_reactions.loc[:, "is_significant"] = reaction_significance
+        if current_genes is not None and gene_significance is not None:
+            current_genes.loc[:, "is_significant"] = gene_significance
+        self.significant_reactions = significant_reactions
+        self.significant_genes = significant_genes
+        self._set_computed_thresholds(reaction_thresholds, for_genes=False)
+        if gene_thresholds is not None:
+            self._set_computed_thresholds(gene_thresholds, for_genes=True)
 
     def _calculate_metrics_stats(
         self, results: pd.DataFrame, for_genes: bool = False
@@ -87,40 +442,18 @@ class GroupComparison:
         else:
             self._reaction_metrics_stats.update(calculated_stats)
 
-    def _register_distributions(
-        self, data_manager, results: pd.DataFrame, element_type: str
-    ) -> None:
-        """Register statistical distributions with the ColorManager.
+    def register_distributions(self, data_manager, *, for_genes: bool = False) -> None:
+        """Register computed metric distributions with a presentation adapter.
 
         Args:
             data_manager: The data manager instance.
-            results: The results DataFrame containing metrics.
-            element_type: The type of element ("reaction" or "gene").
+            for_genes: Register gene distributions instead of reaction distributions.
         """
-        if not hasattr(data_manager, "color_manager"):
-            return
-
-        # Calculate negative log p-values for distribution registration
-        # We use a small epsilon to avoid log(0)
-        epsilon = 1e-300
-        if "pval" in results.columns:
-            results["neg_log_pval"] = -np.log10(results["pval"].replace(0, np.nan).fillna(epsilon))
-        
-        if "adjusted_pval" in results.columns:
-            results["neg_log_adjusted_pval"] = -np.log10(results["adjusted_pval"].replace(0, np.nan).fillna(epsilon))
-
-        metrics = ["log2_fc", "cohens_d", "mean_difference", "pval", "adjusted_pval", "neg_log_pval", "neg_log_adjusted_pval"]
-
-        for metric in metrics:
-            if metric in results.columns:
-                data_manager.color_manager.register_distribution(
-                    mode=DataManagerMode.GROUP_COMPARISON,
-                    element_type=element_type,
-                    metric_name=metric,
-                    data=results[metric],
-                    center_method="zero",
-                    spread_method="std",
-                )
+        register_comparison_distributions(
+            data_manager,
+            self.get_test_results(for_genes=for_genes),
+            for_genes=for_genes,
+        )
 
     def get_metrics_stats(self, for_genes: bool = False) -> Dict[str, Dict[str, float]]:
         """Get the metrics statistics used for normalization.
@@ -144,12 +477,27 @@ class GroupComparison:
         else:
             return self._reaction_metrics_stats
 
+    def resolve_membership(self, data_manager) -> ComparisonMembership:
+        """Resolve and retain this comparison's explicit left/right membership.
+
+        Args:
+            data_manager: The analysis workspace holding canonical group records.
+
+        Returns:
+            ComparisonMembership: The exact samples the comparison will run on.
+        """
+        self.membership = data_manager.group_manager.resolve_comparison_membership(
+            self.spec, data_manager.reaction_data.get_sample_ids()
+        )
+        return self.membership
+
     def run_test(
         self,
         data_manager,
         for_genes: bool = False,
         test: str = "wilcoxon",  # default test type
         correction: str = "fdr_bh",
+        register_distributions: bool = True,
     ) -> None:
         """Run the statistical test on reaction or gene data.
 
@@ -161,15 +509,19 @@ class GroupComparison:
         Returns:
             None
         """
-        group_1_samples = data_manager.get_group_samples(
-            self.group_id_1, exclude_group=self.group_id_2
-        )
-        group_2_samples = data_manager.get_group_samples(
-            self.group_id_2, exclude_group=self.group_id_1
-        )
+        membership = self.membership or self.resolve_membership(data_manager)
+        group_1_samples = list(membership.target_samples)
+        group_2_samples = list(membership.baseline_samples)
 
         if for_genes:
-            data_df = data_manager.expression_data.get_expression_df()
+            # The gene test compares only the two groups' samples, so materialize
+            # just those rows dense through the seam -- a bounded block, never the
+            # whole expression matrix (AM6 slice 4). ``comparison_test`` selects
+            # exactly these samples after transposing, so the bounded frame yields
+            # the identical result the full frame did.
+            data_df = data_manager.expression_data.matrix().select_samples(
+                group_1_samples + group_2_samples
+            )
         else:
             data_df = data_manager.reaction_data.get_reaction_df()
 
@@ -183,8 +535,8 @@ class GroupComparison:
         )
 
         # Add group information
-        results["group_1"] = self.group_id_1
-        results["group_2"] = self.group_id_2
+        results["group_1"] = membership.target_label
+        results["group_2"] = membership.baseline_label
 
         # Add IDs
         if for_genes:
@@ -209,14 +561,14 @@ class GroupComparison:
                 )
             )
             self._reaction_test_results = results
-        
+
         # Default thresholds for all significant
         p_val_threshold = 1
         cohens_d_threshold = 0.0
         log2_fc_threshold = 0.0
         mean_difference_threshold = 0.0
 
-        self.define_significant_elements(for_genes=for_genes, 
+        self.define_significant_elements(for_genes=for_genes,
             pval_threshold=p_val_threshold,
             cohens_d_threshold=cohens_d_threshold,
             log2_fc_threshold=log2_fc_threshold,
@@ -227,10 +579,10 @@ class GroupComparison:
         self._calculate_metrics_stats(results, for_genes=for_genes)
 
         # Register distributions for coloring
-        element_type = "gene" if for_genes else "reaction"
-        self._register_distributions(data_manager, results, element_type)
+        if register_distributions:
+            self.register_distributions(data_manager, for_genes=for_genes)
 
-        
+
 
     def get_test_results(
         self, for_genes: bool = False
@@ -243,7 +595,6 @@ class GroupComparison:
         Returns:
             Optional[pd.DataFrame]: Test results for the requested element type and direction.
         """
-
         if for_genes:
             return self._gene_test_results
         else:
@@ -280,7 +631,7 @@ class GroupComparison:
         else:
             test_results = self._reaction_test_results
 
-        # Check if test results exist 
+        # Check if test results exist
         # (If there are no test results then there shouldn't be rev test results either)
         if test_results is None:
             raise ValueError(
@@ -322,7 +673,7 @@ class GroupComparison:
         )
 
         return set(test_results[significant_mask].index), threshold_info
-    
+
     def is_significant(
         self,
         element_id: str,
@@ -382,7 +733,7 @@ class GroupComparison:
             self.log2_fc_threshold_reaction = log2_fc_threshold
             self.mean_difference_threshold_reaction = mean_difference_threshold
 
-        
+
 
     def get_thresholds(self, for_genes=False):
         """Get threshold values for significance testing.

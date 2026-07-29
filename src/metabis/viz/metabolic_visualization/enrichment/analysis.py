@@ -31,7 +31,7 @@ def identify_significant_subgraph(
     Args:
         glyphs: List of glyph dictionaries
         connections: List of connection dictionaries
-        data_manager: DataManager object with group_comparison
+        data_manager: AnalysisWorkspace object with group_comparison
         highlight_significant_reactions: Whether to highlight significant reactions
         highlight_significant_genes: Whether to highlight significant genes
 
@@ -46,7 +46,8 @@ def identify_significant_subgraph(
     significant_gene_labels = set()
 
     # Get significant reactions from the experiment's group comparison
-    if not data_manager.group_comparison:
+    comparison_artifact = data_manager.get_group_comparison_artifact()
+    if not comparison_artifact:
         return set()
 
     # Get significant reactions if requested
@@ -57,7 +58,7 @@ def identify_significant_subgraph(
 
     # Get significant genes if requested
     if highlight_significant_genes:
-        significant_genes = data_manager.group_comparison.get_significant_elements(
+        significant_genes = comparison_artifact.get_significant_elements(
             for_genes=True
         )
     else:
@@ -188,7 +189,7 @@ def get_active_reactions(glyphs, data_manager):
 
     Args:
         glyphs: List of glyph dictionaries
-        data_manager: DataManager object with experimental data
+        data_manager: AnalysisWorkspace object with experimental data
 
     Returns:
         Set of reaction glyph IDs that have experimental data
@@ -261,7 +262,7 @@ def identify_missing_data_subgraph(glyphs, connections, data_manager):
     Args:
         glyphs: List of glyph dictionaries
         connections: List of connection dictionaries
-        data_manager: DataManager object with experimental data
+        data_manager: AnalysisWorkspace object with experimental data
 
     Returns:
         Dict mapping node IDs to missing reason strings ('no_metadata' or 'no_experimental_data')
@@ -385,7 +386,7 @@ def identify_gene_influence_connections(
     Args:
         glyphs: List of glyph dictionaries
         element_name: Name of the element being analyzed
-        data_manager: DataManager object with group comparison data
+        data_manager: AnalysisWorkspace object with group comparison data
         highlight_gene_influence: Whether gene influence highlighting is enabled
 
     Returns:
@@ -396,12 +397,13 @@ def identify_gene_influence_connections(
     influence_connections_data = defaultdict(list)
     highly_influenced_reaction_colors = {}
 
+    influence_comparison = (
+        data_manager.get_group_comparison_artifact() if data_manager else None
+    )
     if not (
         highlight_gene_influence
-        and data_manager
-        and hasattr(data_manager, "group_comparison")
-        and data_manager.group_comparison
-        and hasattr(data_manager.group_comparison, "all_subsystems_analysis_summary")
+        and influence_comparison
+        and hasattr(influence_comparison, "all_subsystems_analysis_summary")
     ):
         return (
             influential_gene_glyph_ids,
@@ -411,7 +413,7 @@ def identify_gene_influence_connections(
 
     print("Identifying *highly* influential genes and connections...")
     element_results_dict = (
-        data_manager.group_comparison.all_subsystems_analysis_summary.get(
+        influence_comparison.all_subsystems_analysis_summary.get(
             "subsystem_results", {}
         )
     )

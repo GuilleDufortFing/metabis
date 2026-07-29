@@ -76,18 +76,18 @@ def load_subsystem_classification(file_path: str) -> Dict[str, str]:
 
 def check_subsystem_categories_file(file_path: str) -> Dict[str, any]:
     """Validate subsystem categories file syntax and return statistics.
-    
+
     This function checks if a file has valid subsystem categories format
     without building the full classification mapping.
-    
+
     Args:
         file_path: Path to the subsystem category taxonomy file
-        
+
     Returns:
         Dict with keys:
             - "valid": bool - whether file has valid syntax
             - "num_subsystems": int - count of subsystem entries
-            - "num_categories": int - count of unique categories  
+            - "num_categories": int - count of unique categories
             - "categories": List[str] - list of category names
             - "error": Optional[str] - error message if invalid
     """
@@ -98,24 +98,24 @@ def check_subsystem_categories_file(file_path: str) -> Dict[str, any]:
         "categories": [],
         "error": None,
     }
-    
+
     if not os.path.exists(file_path):
         result["error"] = f"File not found: {file_path}"
         return result
-    
+
     categories = set()
     num_subsystems = 0
     current_category = None
-    
+
     try:
         with open(file_path, "r", encoding="utf-8") as file:
             for line_num, line in enumerate(file, 1):
                 line = line.strip()
-                
+
                 # Skip empty lines
                 if not line:
                     continue
-                
+
                 # Category header (starts with ###)
                 if line.startswith("###"):
                     current_category = line[3:].strip()
@@ -124,7 +124,7 @@ def check_subsystem_categories_file(file_path: str) -> Dict[str, any]:
                     else:
                         result["error"] = f"Empty category name at line {line_num}"
                         return result
-                
+
                 # Subsystem entry (starts with -)
                 elif line.startswith("-"):
                     if current_category is None:
@@ -136,29 +136,29 @@ def check_subsystem_categories_file(file_path: str) -> Dict[str, any]:
                     else:
                         result["error"] = f"Empty subsystem name at line {line_num}"
                         return result
-                
+
                 # Invalid line (not empty, not category, not subsystem)
                 else:
                     result["error"] = f"Invalid line format at line {line_num}: '{line[:50]}...'"
                     return result
-        
+
         if num_subsystems == 0:
             result["error"] = "No subsystems found in file"
             return result
-        
+
         if len(categories) == 0:
             result["error"] = "No categories found in file"
             return result
-        
+
         result["valid"] = True
         result["num_subsystems"] = num_subsystems
         result["num_categories"] = len(categories)
         result["categories"] = sorted(list(categories))
-        
+
     except Exception as e:
         result["error"] = f"Error reading file: {e}"
         return result
-    
+
     return result
 
 
@@ -422,9 +422,7 @@ def load_genes_from_file(file_path: str) -> List[Gene]:
     return genes
 
 
-def create_subsystems_from_reactions(
-    reactions: List[Reaction], classification_file_path: Optional[str] = None
-) -> List[Subsystem]:
+def create_subsystems_from_reactions(reactions: List[Reaction]) -> List[Subsystem]:
     """Create subsystem entities from reaction subsystem information.
 
     Note: Categories are NOT assigned during subsystem creation. Categories
@@ -434,15 +432,11 @@ def create_subsystems_from_reactions(
 
     Args:
         reactions: List of loaded reactions
-        classification_file_path: DEPRECATED - ignored, categories loaded by CategoryManager
 
     Returns:
         List of Subsystem entities (all with category="Uncategorized")
     """
     subsystem_data = {}
-
-    # Note: classification_file_path is ignored - categories are loaded separately
-    # by CategoryManager.load_categories() after model initialization
 
     for reaction in reactions:
         if reaction.subsystem_id:

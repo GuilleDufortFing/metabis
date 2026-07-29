@@ -120,7 +120,7 @@ def enrich_single_glyph(
 
     Args:
         glyph: The glyph dictionary to enrich
-        data_manager: DataManager instance for accessing experimental data
+        data_manager: AnalysisWorkspace instance for accessing experimental data
         translations: Dictionary containing translation mappings for
                      different element types
         color_metric: The metric to use for coloring (e.g., 'log2_fold_change')
@@ -243,6 +243,83 @@ def enrich_single_glyph(
 # ============================================================================
 
 
+def _audit_scientific_values(
+    data_manager,
+    element_id,
+    element_type,
+    color_metric,
+    missing_reason,
+    delta_options=None,
+):
+    """Copy already-computed provider values onto an enriched graph node."""
+    values = {
+        "raw_metric": None,
+        "score": None,
+        "significance": None,
+        "missing_reason": missing_reason,
+        "direction": None,
+        "is_missing_data": missing_reason is not None,
+    }
+    if data_manager is None:
+        return values
+    mode = getattr(getattr(data_manager, "mode", None), "value", None)
+    provider = getattr(data_manager, "data_provider", None)
+    if provider is None:
+        return values
+    if mode == "experiment_analysis":
+        stats = provider.get_activity_statistics(element_id, element_type)
+        values["raw_metric"] = stats.get("activity_score")
+        values["score"] = stats.get("activity_score")
+        values["direction"] = stats.get("main_direction")
+        return values
+    if mode != "group_comparison":
+        return values
+    try:
+        if element_type == "reaction":
+            data = provider.get_reaction_group_comparison_data(element_id)
+            try:
+                direction = data_manager.get_display_direction(element_id) or "forward"
+            except (AttributeError, ValueError):
+                direction = "forward"
+            stats = data.get(direction) or data.get("forward") or {}
+            values["direction"] = direction
+        elif element_type == "gene":
+            data = provider.get_gene_group_comparison_data(element_id)
+            stats = data.get("forward") or {}
+        elif element_type in {"subsystem", "subsystem_genes"}:
+            stats = provider.get_subsystem_data(
+                element_id,
+                for_genes=element_type == "subsystem_genes",
+                delta_config=delta_options,
+            )
+            metric = (
+                delta_options.get("metric", color_metric)
+                if delta_options
+                else color_metric
+            )
+            score = stats.get("delta_subsystem_score")
+            values["raw_metric"] = stats.get("total_metric_values", {}).get(metric)
+            values["score"] = score
+            significant_count = stats.get("significant_elements")
+            values["significance"] = (
+                significant_count > 0 if significant_count is not None else None
+            )
+            if score is not None:
+                values["direction"] = (
+                    "positive" if score > 0 else "negative" if score < 0 else "neutral"
+                )
+            return values
+        else:
+            return values
+    except ValueError:
+        # A comparison may legitimately have only reaction or only gene results.
+        return values
+    values["raw_metric"] = stats.get(color_metric)
+    values["score"] = stats.get(color_metric)
+    values["significance"] = stats.get("is_significant")
+    return values
+
+
 def enrich_metabolite_glyph_with_data(
     glyph,
     alpha,
@@ -259,7 +336,7 @@ def enrich_metabolite_glyph_with_data(
         glyph: The metabolite glyph dictionary
         alpha: Alpha transparency value
         metabolite_translations: Dictionary of metabolite label translations
-        data_manager: DataManager instance for accessing experimental data
+        data_manager: AnalysisWorkspace instance for accessing experimental data
         color_metric: The metric to use for coloring
         missing_reason: Reason for the missing data, if any
         focus_instance: object that retrieves the IDs of the elements being visualized
@@ -276,7 +353,7 @@ def enrich_metabolite_glyph_with_data(
     line_dash = "solid"
     hover = f"Metabolite: {metabolite_id}"
 
-    # Build hover via DataManager (HoverManager will adapt based on missing_reason)
+    # Build hover via AnalysisWorkspace (HoverManager will adapt based on missing_reason)
     if data_manager:
         hover = data_manager.get_element_hover(
             metabolite_id,
@@ -327,7 +404,7 @@ def enrich_gene_glyph_with_data(
         glyph: The gene glyph dictionary
         alpha: Alpha transparency value
         gene_translations: Dictionary of gene label translations
-        data_manager: DataManager instance for accessing experimental data
+        data_manager: AnalysisWorkspace instance for accessing experimental data
         color_metric: The metric to use for coloring
         missing_reason: Reason for the missing data, if any
         focus_instance: object that retrieves the IDs of the elements being visualized
@@ -347,7 +424,7 @@ def enrich_gene_glyph_with_data(
     hover = f"Gene: {gene_id}"
     line_dash = "solid"  # Override with missing data styling if needed
 
-    # Build hover via DataManager (HoverManager will adapt based on missing_reason)
+    # Build hover via AnalysisWorkspace (HoverManager will adapt based on missing_reason)
     if data_manager:
         hover = data_manager.get_element_hover(
             gene_id,
@@ -385,6 +462,11 @@ def enrich_gene_glyph_with_data(
         line_dash=line_dash,
     )
     enriched["external_url"] = reference_data["external_url"]
+    enriched.update(
+        _audit_scientific_values(
+            data_manager, gene_id, "gene", color_metric, missing_reason
+        )
+    )
     return enriched
 
 
@@ -407,7 +489,7 @@ def enrich_reaction_glyph_with_data(
         glyph: The reaction glyph dictionary
         alpha: Alpha transparency value
         reaction_translations: Dictionary of reaction label translations
-        data_manager: DataManager instance for accessing experimental data
+        data_manager: AnalysisWorkspace instance for accessing experimental data
         color_metric: The metric to use for coloring
         missing_reason: Reason for the missing data, if any
         focus_instance: object that retrieves the IDs of the elements being visualized
@@ -465,6 +547,11 @@ def enrich_reaction_glyph_with_data(
         line_dash=line_dash,
     )
     enriched["external_url"] = reference_data["external_url"]
+    enriched.update(
+        _audit_scientific_values(
+            data_manager, reaction_id, "reaction", color_metric, missing_reason
+        )
+    )
     return enriched
 
 
@@ -532,7 +619,7 @@ def enrich_subsystem_glyph_with_data(
         glyph: Basic subsystem glyph dictionary
         alpha: Alpha transparency value for the glyph
         subsystem_translations: Translation data for subsystems
-        data_manager: DataManager instance for accessing experimental data
+        data_manager: AnalysisWorkspace instance for accessing experimental data
         color_metric: The metric to use for coloring
         missing_reason: Reason for the missing data, if any
         focus_instance: object that retrieves the IDs of the elements being visualized
@@ -555,8 +642,36 @@ def enrich_subsystem_glyph_with_data(
     # Apply text wrapping to long subsystem names
     wrapped_display_name = _wrap_subsystem_name(display_name)
 
-    # Build hover via DataManager and determine color/line_dash from missing_reason
-    if data_manager:
+    # Set Enrichment summary: paint this subsystem from the installed paired ORA
+    # artifact instead of the delta distribution. The gradient is the same
+    # diverging red/white/blue scale delta uses, applied to signed
+    # log2(enrichment ratio); a non-significant subsystem is gray. Resolving it
+    # first also skips the delta hover/colour work the summary would discard.
+    enrichment_overview = (
+        getattr(data_manager, "set_enrichment_overview", None) if data_manager else None
+    )
+    # The summary owns every measured subsystem while it is active: the ORA
+    # artifact only tested subsystems meeting the minimum measured-feature count,
+    # so one it never tested is not over-representation eligible and must read as
+    # not-significant gray -- never a delta-score colour read (D-59).
+    use_enrichment_overview = enrichment_overview is not None and not is_missing_data
+
+    if use_enrichment_overview:
+        enrichment_color = enrichment_overview.for_subsystem(subsystem_id)
+        if enrichment_color is not None:
+            subsystem_color = enrichment_color.fill_color
+            hover_text = enrichment_overview.hover_for(
+                subsystem_id,
+                show_stats=show_hover_stats,
+                show_color_reference=show_hover_color_reference,
+            )
+        else:
+            subsystem_color = enrichment_overview.not_significant_color
+            hover_text = enrichment_overview.ineligible_hover_for(
+                display_name, show_stats=show_hover_stats
+            )
+    elif data_manager:
+        # Build hover via AnalysisWorkspace; determine colour from missing_reason.
         hover_text = data_manager.get_element_hover(
             subsystem_id,
             "subsystem",
@@ -569,17 +684,17 @@ def enrich_subsystem_glyph_with_data(
         )
         if missing_reason in {"no_experimental_data", "no_metadata"}:
             subsystem_color = VisualizationConstants.MISSING_DATA_COLOR
-            line_dash = VisualizationConstants.MISSING_DATA_LINE_DASH
         else:
             subsystem_color = data_manager.get_element_color(
-                subsystem_id, "subsystem", color_metric, delta_options
+                subsystem_id,
+                "subsystem",
+                color_metric,
+                delta_options=delta_options,
             )
-            line_dash = "solid"
     else:
         # Fallback when no data manager
         hover_text = f"Subsystem: {display_name}"
         subsystem_color = "lightblue"
-        line_dash = "solid"
 
     # Fallback to default color if get_element_color returns None or invalid color
     if not subsystem_color or subsystem_color == "white":
@@ -661,6 +776,16 @@ def enrich_subsystem_glyph_with_data(
             "is_subsystem": True,
             "radius": radius,  # Add calculated radius for dynamic sizing
         }
+    )
+    enriched.update(
+        _audit_scientific_values(
+            data_manager,
+            subsystem_id,
+            "subsystem",
+            color_metric,
+            missing_reason,
+            delta_options,
+        )
     )
 
     return enriched

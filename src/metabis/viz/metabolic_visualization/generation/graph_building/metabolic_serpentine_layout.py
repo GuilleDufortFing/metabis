@@ -7,8 +7,8 @@ angles. The implementation is purposely heuristic but produces coordinates that
 are immediately usable by the existing glyph pipeline.
 """
 
-from collections import deque
 import math
+from collections import deque
 from dataclasses import dataclass, field
 from typing import Dict, Iterable, List, Optional, Tuple
 
@@ -232,7 +232,6 @@ class MetabolicSerpentineLayout:
         placement: Dict[str, Dict[str, object]],
         positions: Dict[str, Tuple[float, float]],
     ) -> None:
-        cfg = self.config
         metabolite_positions: Dict[str, Tuple[float, float]] = {}
 
         for reaction_id, info in placement.items():

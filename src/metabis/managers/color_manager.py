@@ -1,12 +1,19 @@
-from typing import Any, Dict, List, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import pandas as pd
-
 from bokeh.palettes import Greens, Oranges
 
 from ..visual_config import theme
-from ..analysis.distribution_binner import DistributionBinner
-from .data_manager_mode import DataManagerMode
+from .color_distributions import (
+    ColorDistributionRegistry,
+    ensure_rgb,
+    gradient_color,
+    gradient_palette,
+    hex_to_rgb,
+    rgb_to_hex,
+)
+from .color_lookup import GraphColorLookup
+from .workspace_mode import AnalysisWorkspaceMode
 
 
 class ColorManager:
@@ -14,28 +21,35 @@ class ColorManager:
 
     Supports multiple color configurations for different analysis modes and
     group colors.
+
+    The manager is the *Bokeh* half of colour: it generates the influence and
+    categorical group palettes that need ``bokeh.palettes``. The two halves that
+    do not -- reading a registered distribution back
+    (:class:`~metabis.managers.color_lookup.GraphColorLookup`) and registering one
+    (:class:`~metabis.managers.color_distributions.ColorDistributionRegistry`) --
+    live beside it and are delegated to, not duplicated here, so a graph worker
+    can hold them without holding Bokeh (AM10, M-12).
     """
+
+    # Bokeh's continuous palettes (turbo, viridis) cannot return more than 256 colors.
+    MAX_PALETTE_COLORS = 256
 
     def __init__(
         self,
         group_comparison_config: Dict[str, Any] = None,
         experiment_analysis_config: Dict[str, Any] = None,
-        default_mode: DataManagerMode = DataManagerMode.GROUP_COMPARISON
+        default_mode: AnalysisWorkspaceMode = AnalysisWorkspaceMode.GROUP_COMPARISON,
     ):
         """Initialize ColorManager with mode-aware color configurations.
 
         Args:
             group_comparison_config: Configuration for GROUP_COMPARISON mode
             experiment_analysis_config: Configuration for EXPERIMENT_ANALYSIS mode
-            default_mode: Default color mode to use (DataManagerMode enum or legacy string)
+            default_mode: Default color mode to use
         """
-        # Convert string mode to enum for backward compatibility
-        if isinstance(default_mode, str):
-            default_mode = DataManagerMode[default_mode.upper().replace(" ", "_")]
-
         # New multi-configuration mode
-        self.configurations = {
-            DataManagerMode.GROUP_COMPARISON: group_comparison_config
+        configurations = {
+            AnalysisWorkspaceMode.GROUP_COMPARISON: group_comparison_config
             or {
                 "max_z_score": 4,
                 "up_color": theme.UP_REGULATED,
@@ -43,26 +57,67 @@ class ColorManager:
                 "neutral_color": theme.NEUTRAL,
                 "significant_pval_color": theme.SIGNIFICANT_PVAL,
             },
-            DataManagerMode.EXPERIMENT_ANALYSIS: experiment_analysis_config
+            AnalysisWorkspaceMode.EXPERIMENT_ANALYSIS: experiment_analysis_config
             or {
                 "max_z_score": 4,
-                "up_color": theme.ACTIVITY_UP,
-                "down_color": theme.ACTIVITY_DOWN,
-                "neutral_color": theme.NEUTRAL,
+                "up_color": theme.ACTIVITY_HIGH,
+                "down_color": theme.ACTIVITY_LOW,
+                "neutral_color": theme.ACTIVITY_MID,
             },
         }
 
-        # Set current mode and load configuration
-        self.current_mode = default_mode
-        self._group_colors = {}  # Storage for group colors
-        self._distributions = {} # Storage for registered distribution binners and palettes
+        # Set current mode and load configuration. The registry owns the
+        # configurations, the registered distributions, and the already-resolved
+        # palettes; this manager reads them through it so there is exactly one
+        # copy of each. Generating the palettes below is the half that needs
+        # Bokeh, and is the reason this class still exists.
+        self._registry = ColorDistributionRegistry(
+            configurations,
+            default_mode,
+            # Diverging palettes for influence bars: green for positive
+            # correlation, orange for negative, darker first.
+            positive_influence_palette=list(reversed(Greens[9][1:])),
+            negative_influence_palette=list(reversed(Oranges[9][1:])),
+        )
         self._load_current_configuration()
 
-        # Define diverging color palettes for influence bars
-        # Positive correlation (Green gradient) - darker greens first
-        self.pos_influence_palette = list(reversed(Greens[9][1:]))
-        # Negative correlation (Orange gradient) - darker first
-        self.neg_influence_palette = list(reversed(Oranges[9][1:]))
+    @property
+    def configurations(self) -> Dict[AnalysisWorkspaceMode, Dict[str, Any]]:
+        """The per-mode colour configurations, owned by the registry."""
+        return self._registry.configurations
+
+    @property
+    def current_mode(self) -> AnalysisWorkspaceMode:
+        """The mode whose configuration this manager currently paints with."""
+        return self._registry.current_mode
+
+    @current_mode.setter
+    def current_mode(self, mode: AnalysisWorkspaceMode) -> None:
+        self._registry.current_mode = mode
+
+    @property
+    def _distributions(self) -> Dict[Any, Dict[str, Any]]:
+        """The registered distributions, owned by the registry."""
+        return self._registry.distributions
+
+    @property
+    def _group_colors(self) -> Dict[str, str]:
+        """The stored group colours, owned by the registry."""
+        return self._registry.group_colors
+
+    @_group_colors.setter
+    def _group_colors(self, group_colors: Dict[str, str]) -> None:
+        self._registry.group_colors = dict(group_colors)
+
+    @property
+    def pos_influence_palette(self) -> Tuple[str, ...]:
+        """The generated palette for positive gene influence."""
+        return self._registry.positive_influence_palette
+
+    @property
+    def neg_influence_palette(self) -> Tuple[str, ...]:
+        """The generated palette for negative gene influence."""
+        return self._registry.negative_influence_palette
 
     def _load_current_configuration(self):
         """Load the configuration for the current mode into instance variables."""
@@ -88,7 +143,7 @@ class ColorManager:
 
     def register_distribution(
         self,
-        mode: DataManagerMode,
+        mode: AnalysisWorkspaceMode,
         element_type: str,
         data: Union[pd.Series, pd.DataFrame],
         metric_name: str = "default",
@@ -97,6 +152,7 @@ class ColorManager:
         spread_method: str = "std",
         max_z: float = 4.0,
         n_bins: int = 30,
+        saturation_quantile: float = 0.98,
     ) -> None:
         """Register a distribution for color binning.
 
@@ -107,76 +163,31 @@ class ColorManager:
             metric_name: The name of the metric (e.g., "log2_fc", "default").
             value_column: Column name if data is a DataFrame.
             center_method: Method to calculate center ("mean", "median", "zero").
-            spread_method: Method to calculate spread ("std", "mad").
+            spread_method: Method to calculate spread ("std", "mad", "saturating",
+                or "asymmetric_saturating").
             max_z: Max Z-score for binning.
             n_bins: Number of bins per direction.
+            saturation_quantile: Quantile of |value - center| that saturates the
+                palette under the "saturating" spread method.
         """
-        # Create binner
-        binner = DistributionBinner(
+        # Binning and gradient interpolation need no Bokeh, so they live in the
+        # registry a graph worker can hold (AM10 slice 3b).
+        self._registry.register_distribution(
+            mode=mode,
+            element_type=element_type,
             data=data,
+            metric_name=metric_name,
             value_column=value_column,
             center_method=center_method,
             spread_method=spread_method,
             max_z=max_z,
-            n_bins=n_bins
+            n_bins=n_bins,
+            saturation_quantile=saturation_quantile,
         )
-
-        # Get configuration for the specified mode
-        config = self.configurations.get(mode)
-        if not config:
-            # Fallback to current config if mode not found
-            config = self.configurations[self.current_mode]
-
-        up_color = config["up_color"]
-        down_color = config["down_color"]
-        neutral_color = config["neutral_color"]
-        
-        # Handle p-value specific coloring
-        is_pval = "pval" in metric_name.lower() or "p-value" in metric_name.lower()
-        is_neg_log = "neg_log" in metric_name.lower() or "-log" in metric_name.lower()
-        
-        if is_pval:
-            significant_color = config.get("significant_pval_color", theme.SIGNIFICANT_PVAL)
-            if is_neg_log:
-                # For -log(p-value), higher is more significant
-                # Neutral remains neutral (low significance)
-                # Up color becomes significant color (high significance)
-                up_color = significant_color
-            else:
-                # For raw p-value, lower is more significant
-                # Neutral becomes significant color (low p-value = high significance)
-                # Up color becomes neutral (high p-value = low significance)
-                # We swap them because the gradient generator goes from neutral -> up
-                # But here we want significant -> neutral as value increases
-                temp = neutral_color
-                neutral_color = significant_color
-                up_color = temp
-
-        # Generate palettes
-        # We generate n_bins + 1 colors to interpolate from neutral to max intensity
-        # We skip the first one (neutral) for the bins 1..N
-        pos_palette = self._generate_gradient_palette(neutral_color, up_color, n_bins + 1)[1:]
-        neg_palette = self._generate_gradient_palette(neutral_color, down_color, n_bins + 1)[1:]
-        
-        # Create bin_colors map
-        bin_colors = {0: neutral_color}
-        
-        for i in range(n_bins):
-            # 1-based index for bins
-            bin_idx = i + 1
-            bin_colors[bin_idx] = pos_palette[i]
-            bin_colors[-bin_idx] = neg_palette[i]
-
-        # Store
-        key = (mode, element_type, metric_name)
-        self._distributions[key] = {
-            "binner": binner,
-            "bin_colors": bin_colors
-        }
 
     def get_colors_from_distribution(
         self,
-        mode: DataManagerMode,
+        mode: AnalysisWorkspaceMode,
         element_type: str,
         metric_name: str = "default",
         element_ids: Union[List[str], pd.Index] = None
@@ -192,38 +203,13 @@ class ColorManager:
         Returns:
             pd.Series: Series of hex color strings indexed by element_ids.
         """
-        key = (mode, element_type, metric_name)
-        dist_info = self._distributions.get(key)
-        
-        if not dist_info:
-            # Return neutral color for all requested IDs
-            neutral = self.configurations[self.current_mode]["neutral_color"]
-            if element_ids is not None:
-                return pd.Series(neutral, index=element_ids)
-            return pd.Series() # Empty series if no IDs and no distribution
-            
-        binner = dist_info["binner"]
-        bin_colors = dist_info["bin_colors"]
-        
-        if element_ids is None:
-            # Get for all in binner
-            bins = binner.get_all_bins()
-        else:
-            # Get for specific IDs
-            # Reindex to ensure we have all requested IDs, filling missing with 0 (neutral)
-            bins = binner.get_all_bins().reindex(element_ids, fill_value=0).astype(int)
-        
-        # Map bins to colors
-        # bin_colors is a dict {int: str}
-        # We use map. If a bin is not in bin_colors (shouldn't happen if 0 is there), fill with neutral
-        colors = bins.map(bin_colors)
-        colors = colors.fillna(bin_colors[0])
-        
-        return colors
+        return self.color_lookup().get_element_colors_from_distribution(
+            mode, element_type, metric_name, element_ids
+        )
 
     def get_element_color_from_distribution(
         self,
-        mode: DataManagerMode,
+        mode: AnalysisWorkspaceMode,
         element_type: str,
         element_id: str,
         metric_name: str = "default"
@@ -239,27 +225,31 @@ class ColorManager:
         Returns:
             str: Hex color string.
         """
-        key = (mode, element_type, metric_name)
-        dist_info = self._distributions.get(key)
-        
-        if not dist_info:
-            return self.configurations[self.current_mode]["neutral_color"]
-            
-        binner = dist_info["binner"]
-        bin_colors = dist_info["bin_colors"]
-        
-        bin_idx = binner.get_bin(element_id)
-        return bin_colors.get(bin_idx, bin_colors[0])
+        return self.color_lookup().get_element_color_from_distribution(
+            mode, element_type, element_id, metric_name
+        )
+
+    def get_color_limit(
+        self,
+        mode: AnalysisWorkspaceMode,
+        element_type: str,
+        metric_name: str = "default",
+    ) -> Optional[float]:
+        """Distance from the centre at which the registered palette saturates.
+
+        Callers report this so the mapping from value to colour is auditable
+        rather than implicit.
+        """
+        return self.color_lookup().get_color_limit(mode, element_type, metric_name)
 
     def get_distribution_details(
         self,
-        mode: DataManagerMode,
+        mode: AnalysisWorkspaceMode,
         element_type: str,
         element_id: str,
         metric_name: str = "default"
     ) -> Dict[str, Any]:
-        """
-        Get histogram data and colors for an element based on a registered distribution.
+        """Get histogram data and colors for an element based on a registered distribution.
 
         Args:
             mode: The data manager mode.
@@ -274,46 +264,38 @@ class ColorManager:
             - element_color: The color of the element
             - element_value: The original value of the element
         """
-        key = (mode, element_type, metric_name)
-        dist_info = self._distributions.get(key)
-        
-        if not dist_info:
-            # Return empty structure if no distribution found
-            neutral_color = self.configurations[self.current_mode]["neutral_color"]
-            return {
-                "histogram": [],
-                "element_bin": 0,
-                "element_color": neutral_color,
-                "element_value": None
-            }
-            
-        binner = dist_info["binner"]
-        bin_colors = dist_info["bin_colors"]
-        
-        # Get histogram data from binner
-        raw_histogram = binner.get_histogram_data()
-        
-        # Enrich histogram with colors
-        histogram = []
-        for bin_data in raw_histogram:
-            bin_idx = bin_data["bin"]
-            color = bin_colors.get(bin_idx, bin_colors[0])
-            histogram.append({
-                **bin_data,
-                "color": color
-            })
-            
-        # Get element specific data
-        element_bin = binner.get_bin(element_id)
-        element_color = bin_colors.get(element_bin, bin_colors[0])
-        element_value = binner.get_value(element_id)
-        
-        return {
-            "histogram": histogram,
-            "element_bin": element_bin,
-            "element_color": element_color,
-            "element_value": element_value
-        }
+        return self.color_lookup().get_distribution_details(
+            mode, element_type, element_id, metric_name
+        )
+
+    def color_lookup(self) -> GraphColorLookup:
+        """Capture the readable half of this manager as a plain frozen value.
+
+        This is the M-12 (A') seam. The returned value answers every colour
+        question graph enrichment asks, holds no Bokeh, and cannot be mutated by
+        the worker that receives it -- so a graph job needs the colour *data*
+        without needing the colour *manager*, and `bokeh.palettes` stops being
+        reachable from graph calculation.
+
+        Capture is a shallow read of state this manager already holds, so it is
+        cheap enough to run on the document thread per graph render (measured at
+        ~0 ms against the 208 ms run it feeds). The distributions are shared, not
+        copied: they are append-only registrations that the document thread
+        replaces rather than edits, and copying the binners would reintroduce the
+        per-render tax ADR-0007 forbids.
+        """
+        return self._registry.lookup()
+
+    def detached_color_registry(self) -> ColorDistributionRegistry:
+        """Capture this manager's colour state as a registry a worker can own.
+
+        The graph worker needs both halves -- it reads colours and it registers
+        the distributions its own scoring produces -- so it gets a registry, not
+        just a lookup. The copy is what makes that safe: registrations during the
+        job stay in the job, exactly as the per-job ``deepcopy`` of this manager
+        did, without the manager and therefore without Bokeh (AM10, M-12).
+        """
+        return self._registry.detached_copy()
 
     def _generate_gradient_palette(
         self,
@@ -331,42 +313,21 @@ class ColorManager:
         Returns:
             List[str]: List of hex color strings.
         """
-        start_rgb = self._ensure_rgb(start_color)
-        end_rgb = self._ensure_rgb(end_color)
-        
-        palette = []
-        if n_steps <= 1:
-            return [end_color]
-            
-        for i in range(n_steps):
-            fraction = i / (n_steps - 1)
-            color = self.gradient_color(start_rgb, end_rgb, fraction)
-            palette.append(color)
-            
-        return palette
+        return gradient_palette(start_color, end_color, n_steps)
 
     # ============================================================================
     # Mode Management Methods
     # ============================================================================
 
-    def set_mode(self, mode: Union[str, DataManagerMode]) -> None:
+    def set_mode(self, mode: AnalysisWorkspaceMode) -> None:
         """Switch color configuration mode.
 
         Args:
-            mode: Color mode to switch to (DataManagerMode enum or legacy string)
+            mode: Color mode to switch to
 
         Raises:
             ValueError: If the mode is not available
         """
-        # Convert string mode to enum for backward compatibility
-        if isinstance(mode, str):
-            if mode == "group_comparison":
-                mode = DataManagerMode.GROUP_COMPARISON
-            elif mode == "experiment_analysis":
-                mode = DataManagerMode.EXPERIMENT_ANALYSIS
-            else:
-                mode = DataManagerMode.NO_EXPERIMENT
-
         if mode not in self.configurations:
             available_modes = list(self.configurations.keys())
             raise ValueError(
@@ -376,43 +337,34 @@ class ColorManager:
         self.current_mode = mode
         self._load_current_configuration()
 
-    def get_mode(self) -> DataManagerMode:
+    def get_mode(self) -> AnalysisWorkspaceMode:
         """Get current color mode.
 
         Returns:
-            DataManagerMode: Current color mode
+            AnalysisWorkspaceMode: Current color mode
         """
         return self.current_mode
 
-    def get_available_modes(self) -> List[DataManagerMode]:
+    def get_available_modes(self) -> List[AnalysisWorkspaceMode]:
         """Get list of available color modes.
 
         Returns:
-            List[DataManagerMode]: List of available color modes
+            List[AnalysisWorkspaceMode]: List of available color modes
         """
         return list(self.configurations.keys())
 
     def update_mode_configuration(
-        self, mode: Union[str, DataManagerMode], config: Dict[str, Any]
+        self, mode: AnalysisWorkspaceMode, config: Dict[str, Any]
     ) -> None:
         """Update configuration for specific mode.
 
         Args:
-            mode: Mode to update configuration for (enum or legacy string)
+            mode: Mode to update configuration for
             config: New configuration dictionary
 
         Raises:
             ValueError: If the mode is not available
         """
-        # Convert string mode to enum for backward compatibility
-        if isinstance(mode, str):
-            if mode == "group_comparison":
-                mode = DataManagerMode.GROUP_COMPARISON
-            elif mode == "experiment_analysis":
-                mode = DataManagerMode.EXPERIMENT_ANALYSIS
-            else:
-                mode = DataManagerMode.NO_EXPERIMENT
-
         if mode not in self.configurations:
             available_modes = list(self.configurations.keys())
             raise ValueError(
@@ -429,6 +381,10 @@ class ColorManager:
     # ============================================================================
     # Group Color Management Methods
     # ============================================================================
+
+    def clear_distributions(self) -> None:
+        """Clear every registered scientific color distribution."""
+        self._registry.clear()
 
     def set_group_colors(self, group_colors: Dict[str, str]) -> None:
         """Store group colors for violin plot coloring.
@@ -458,9 +414,7 @@ class ColorManager:
         Raises:
             KeyError: If group_id is not found
         """
-        if group_id not in self._group_colors:
-            raise KeyError(f"Group '{group_id}' not found in group colors")
-        return self._group_colors[group_id]
+        return self.color_lookup().get_group_color(group_id)
 
     def has_group_colors(self) -> bool:
         """Check if group colors are available.
@@ -607,11 +561,17 @@ class ColorManager:
             )
 
         try:
-            # Generate color palette
-            palette = get_palette_colors(palette_name, n_colors)
+            # Bokeh's continuous palettes top out at MAX_PALETTE_COLORS entries, so ask
+            # for at most that many and cycle them when there are more groups than colors.
+            # Reusing a color is a legible degradation; raising here is not.
+            palette = list(
+                get_palette_colors(palette_name, min(n_colors, self.MAX_PALETTE_COLORS))
+            )
+            if not palette:
+                raise ValueError(f"Palette '{palette_name}' returned no colors")
 
-            # Create mapping from group IDs to colors
-            return dict(zip(group_ids, palette))
+            colors = [palette[index % len(palette)] for index in range(n_colors)]
+            return dict(zip(group_ids, colors))
 
         except Exception as e:
             # Fallback to turbo if specific palette fails
@@ -666,14 +626,7 @@ class ColorManager:
         Returns:
             Tuple[int, int, int]: RGB color values
         """
-        if isinstance(color, str):
-            return self.hex_to_rgb(color)
-        elif isinstance(color, (tuple, list)) and len(color) == 3:
-            return tuple(int(c) for c in color)
-        else:
-            raise ValueError(
-                f"Invalid color format: {color}. Expected hex string or RGB tuple."
-            )
+        return ensure_rgb(color)
 
     @staticmethod
     def hex_to_rgb(hex_color: str) -> Tuple[int, int, int]:
@@ -685,10 +638,7 @@ class ColorManager:
         Returns:
             Tuple[int, int, int]: RGB color values
         """
-        hex_color = hex_color.lstrip("#")
-        if len(hex_color) != 6:
-            raise ValueError(f"Invalid hex color format: {hex_color}")
-        return tuple(int(hex_color[i : i + 2], 16) for i in (0, 2, 4))
+        return hex_to_rgb(hex_color)
 
     @staticmethod
     def rgb_to_hex(rgb: Tuple[int, int, int]) -> str:
@@ -700,7 +650,7 @@ class ColorManager:
         Returns:
             str: Hex color string
         """
-        return f"#{rgb[0]:02X}{rgb[1]:02X}{rgb[2]:02X}"
+        return rgb_to_hex(rgb)
 
     @staticmethod
     def gradient_color(
@@ -718,13 +668,7 @@ class ColorManager:
         Returns:
             str: Hex color string
         """
-        # Clamp fraction between 0 and 1
-        fraction = max(0.0, min(1.0, fraction))
-        # Linear interpolation in RGB space
-        r = int(base_rgb[0] + fraction * (target_rgb[0] - base_rgb[0]))
-        g = int(base_rgb[1] + fraction * (target_rgb[1] - base_rgb[1]))
-        b = int(base_rgb[2] + fraction * (target_rgb[2] - base_rgb[2]))
-        return f"#{r:02X}{g:02X}{b:02X}"
+        return gradient_color(base_rgb, target_rgb, fraction)
 
     def get_effect_color(
         self,
@@ -796,45 +740,9 @@ class ColorManager:
         Returns:
             str: Hex color code
         """
-        # Handle NaN inputs
-        if pd.isna(correlation):
-            correlation = 0.0
-        if pd.isna(influence):
-            influence = 0.0
-
-        # Clamp influence for intensity mapping
-        clamped_influence = max(0.0, min(influence, max_influence))
-
-        # Normalize influence magnitude (0 to 1) for intensity scaling
-        if max_influence > 0:
-            normalized_influence = clamped_influence / max_influence
-        else:
-            normalized_influence = 0
-
-        # Select palette
-        if use_gray_scale:
-            if gray_palette:
-                palette = gray_palette
-                palette_size = len(gray_palette)
-            else:
-                # Fallback if gray palette not provided but requested
-                return "#BEBEBE"  # Return a medium gray
-        elif correlation >= 0:  # Positive or zero correlation
-            palette = self.pos_influence_palette
-            palette_size = len(self.pos_influence_palette)
-        else:  # Negative correlation
-            palette = self.neg_influence_palette
-            palette_size = len(self.neg_influence_palette)
-
-        if not palette:  # Handle empty palette case
-            return "#000000"  # Return black if palette is empty
-
-        # Calculate index based on normalized influence magnitude
-        # Higher influence maps to higher index (typically darker color
-        # in reversed palettes)
-        color_index = min(int(normalized_influence * palette_size), palette_size - 1)
-
-        return palette[color_index]
+        return self.color_lookup().get_influence_color(
+            correlation, influence, max_influence, use_gray_scale, gray_palette
+        )
 
     def update_settings(
         self,
@@ -842,7 +750,7 @@ class ColorManager:
         up_color: Union[str, Tuple[int, int, int]] = None,
         down_color: Union[str, Tuple[int, int, int]] = None,
         neutral_color: Union[str, Tuple[int, int, int]] = None,
-        mode: Union[str, DataManagerMode] = None,
+        mode: AnalysisWorkspaceMode | None = None,
     ):
         """Update color settings for current or specified mode.
 

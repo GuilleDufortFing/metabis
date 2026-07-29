@@ -1,16 +1,21 @@
-"""Graph rendering class for metabolic visualization.
+"""Bokeh rendering adapter for metabolic graphs.
 
-This module provides a class-based interface for rendering metabolic graphs
-using Bokeh, handling plot creation, styling, and element drawing.
+Rendering translates an artifact into Bokeh models. It performs no scientific
+calculation: colour, alpha, label, and hover content were all decided during
+enrichment and recorded on the artifact. This module is the only place in a graph
+run that may construct a Bokeh model, and it may only run on the document thread.
 """
 
 from dataclasses import dataclass
+from time import perf_counter
 from typing import Any, Optional
 
+from ..artifact import GraphArtifact, GraphRunMetadata, PipelinePhaseMetric
+from ..errors import GraphPipelineError
 from .bokeh_plotting import create_bokeh_plot, draw_graph_elements
 
 
-@dataclass
+@dataclass(frozen=True)
 class RenderingConfig:
     """Configuration for graph rendering operations."""
 
@@ -158,3 +163,64 @@ class GraphRenderer:
             Current RenderingConfig instance
         """
         return self.config
+
+
+@dataclass(frozen=True)
+class RenderedGraph:
+    """A Bokeh plot and the telemetry of the run that produced it."""
+
+    plot: Any
+    metadata: GraphRunMetadata
+
+
+def render_graph_artifact(
+    artifact: GraphArtifact,
+    config: Optional[RenderingConfig] = None,
+) -> RenderedGraph:
+    """Build Bokeh models from a graph artifact, on the document thread.
+
+    Bokeh will not accept the artifact's read-only payload, so it is copied into
+    the mutable containers Bokeh requires here, at the adapter boundary, rather
+    than by weakening the artifact everybody else shares.
+    """
+    started = perf_counter()
+    try:
+        plot = GraphRenderer(config or RenderingConfig()).render(
+            enriched_glyphs=list(artifact.nodes),
+            enriched_connections=list(artifact.edges),
+            auxiliary_data={
+                key: dict(value) for key, value in artifact.auxiliary.items()
+            },
+            display_title=artifact.display_title,
+        )
+    except Exception as exc:
+        raise GraphPipelineError(
+            f"Graph rendering failed: {exc}",
+            phase="render",
+            resource_path=artifact.resource_path,
+            element_id=artifact.element_id,
+        ) from exc
+
+    render_phase = PipelinePhaseMetric(
+        "render_graph",
+        perf_counter() - started,
+        item_count=artifact.node_count + artifact.edge_count,
+    )
+    total_phase = PipelinePhaseMetric(
+        "total_pipeline",
+        sum(phase.elapsed_seconds for phase in artifact.phases)
+        + render_phase.elapsed_seconds,
+    )
+    try:
+        model_count = len(plot.references())
+    except Exception:
+        model_count = None
+
+    return RenderedGraph(
+        plot=plot,
+        metadata=GraphRunMetadata.from_artifact(
+            artifact,
+            bokeh_model_count=model_count,
+            extra_phases=(render_phase, total_phase),
+        ),
+    )

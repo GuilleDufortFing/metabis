@@ -5,7 +5,6 @@ where reactions are grouped by cellular compartments and arranged in a structure
 layout with proper spacing and positioning.
 """
 
-import uuid
 from typing import Any, Dict, List, Tuple
 
 from ..data_structures.basic_factories import create_compartment_glyph
@@ -13,10 +12,10 @@ from ..data_structures.constants import (
     DefaultDimensions,
     DefaultEnzymeGroupLayout,
     DefaultLayout,
+    DefaultOptimization,
 )
 from ..data_structures.core_types import Connection, ConnectionClass, Glyph, GlyphClass
-from .graph_conversion_utils import convert_raw_data_to_domain_objects
-
+from .graph_conversion_utils import convert_compartment_raw_data_to_domain_objects
 
 COMPARTMENT_DISPLAY_ORDER = [
     "Cytosol",
@@ -103,7 +102,7 @@ def create_compartmentalized_graph_from_model(
     compartment_graphs = {}
     for compartment, reactions in compartment_reactions.items():
         glyphs, connections, width, height = _create_single_compartment_graph(
-            model, reactions, layout_engine
+            model, reactions, layout_engine, compartment=compartment
         )
         compartment_graphs[compartment] = {
             "glyphs": glyphs,
@@ -181,10 +180,8 @@ def _arrange_compartments_in_layout(
     current_y = 0  # Starting Y Position
     row_max_height = 0  # Track the tallest compartment in the current row
     row_start_x = 0  # X position to start each row
-    # Maximum number of compartments per row
-    max_rows = DefaultLayout.MAX_COMPARTMENTS_PER_ROW
 
-    # Calculate width threshold for row wrapping
+    # Compartments are placed in biological reading order, wrapping into rows.
     remaining_compartments = [
         compartment for compartment in COMPARTMENT_DISPLAY_ORDER if compartment in compartment_graphs
     ]
@@ -195,9 +192,30 @@ def _arrange_compartments_in_layout(
             if compartment not in COMPARTMENT_DISPLAY_ORDER
         )
     )
-    total_width = sum(compartment_graphs[c]["width"] for c in remaining_compartments)
+
+    # Wrap on a shelf width chosen for a target aspect ratio rather than on
+    # total_width / N. The old divisor made one oversized compartment set the
+    # threshold for everyone: a subsystem whose widest compartment exceeded a
+    # third of the total put every compartment on its own row and stacked the
+    # drawing into a tall strip. Sizing the shelf from the area each compartment
+    # occupies — extent plus one padding on each axis — targets the same aspect
+    # the component packing one level down uses.
+    occupied_area = sum(
+        (compartment_graphs[c]["width"] + padding)
+        * (compartment_graphs[c]["height"] + padding)
+        for c in remaining_compartments
+    )
+    widest = max(
+        (compartment_graphs[c]["width"] for c in remaining_compartments),
+        default=0.0,
+    )
     width_threshold = (
-        total_width / max_rows if max_rows > 0 and total_width > 0 else float("inf")
+        max(
+            (occupied_area * DefaultOptimization.COMPONENT_TARGET_ASPECT) ** 0.5,
+            widest,
+        )
+        if occupied_area > 0
+        else float("inf")
     )
 
     # Position each compartment according to the defined order
@@ -237,7 +255,9 @@ def _arrange_compartments_in_layout(
     return final_glyphs, final_connections
 
 
-def _create_single_compartment_graph(model, reactions, layout_engine="dot"):
+def _create_single_compartment_graph(
+    model, reactions, layout_engine="dot", compartment=""
+):
     """Create a graph for reactions within a single compartment.
 
     This function follows the new pipeline: raw data → layout → domain objects
@@ -246,25 +266,32 @@ def _create_single_compartment_graph(model, reactions, layout_engine="dot"):
         model: MetabolicModel instance containing reaction metadata
         reactions: List of reaction IDs in the compartment
         layout_engine: GraphViz layout algorithm to use
+        compartment: Display name of the compartment, used to give its boundary
+            glyph a stable ID
 
     Returns:
         tuple: (glyphs, connections, width, height) where width and height
                 represent the bounding box of the compartment contents
     """
     # Step 1: Generate raw data structures
-    raw_glyphs, raw_connections = _create_raw_reactions_data(model, reactions)
+    raw_glyphs, raw_connections = _create_raw_reactions_data(
+        model, reactions, compartment
+    )
 
     if not raw_glyphs:
         return [], [], 0, 0
 
-    # Step 2-4: Convert raw data to domain objects through layout calculation
-    glyphs, connections = convert_raw_data_to_domain_objects(
+    # Step 2-4: Convert raw data to domain objects through the compartment layout
+    # (hub splitting, per-component layout, 2D packing, satellite reattachment).
+    glyphs, connections = convert_compartment_raw_data_to_domain_objects(
         raw_glyphs, raw_connections, layout_engine
     )
 
     # Step 5: Calculate bounding box and add compartment boundary
     if glyphs:
-        compartment_glyph = create_compartment_boundary(glyphs)
+        compartment_glyph = create_compartment_boundary(
+            glyphs, boundary_id=_compartment_boundary_id(compartment)
+        )
         glyphs.insert(0, compartment_glyph)
         width = compartment_glyph["width"]
         height = compartment_glyph["height"]
@@ -274,18 +301,35 @@ def _create_single_compartment_graph(model, reactions, layout_engine="dot"):
     return glyphs, connections, width, height
 
 
-def create_compartment_boundary(glyphs: List[Glyph]) -> Glyph:
+def _compartment_boundary_id(compartment: str) -> str:
+    """Return a stable boundary-glyph ID for one compartment of one graph.
+
+    A compartment appears at most once per generated graph, so its display name
+    identifies its boundary uniquely without a random component.
+    """
+    normalized = "_".join(str(compartment or "unknown").lower().split())
+    return f"compartment_{normalized}"
+
+
+def create_compartment_boundary(
+    glyphs: List[Glyph], boundary_id: str = "compartment_unknown"
+) -> Glyph:
     """Calculate bounding box and create compartment glyph.
+
+    The box is taken from each glyph's drawn extent, not its centre. Measuring
+    centres left out half of every edge glyph, so a boundary clipped its own
+    contents by as much as the widest glyph in the compartment.
 
     Args:
         glyphs: List of glyphs to calculate bounding box for
+        boundary_id: Stable ID for the boundary glyph
 
     Returns:
         Compartment glyph dictionary with bounding box information
     """
     if not glyphs:
         return create_compartment_glyph(
-            id=f"compartment_{uuid.uuid4().hex[:8]}",
+            id=boundary_id,
             label="",
             x=0.0,
             y=0.0,
@@ -293,14 +337,11 @@ def create_compartment_boundary(glyphs: List[Glyph]) -> Glyph:
             height=0.0,
         )
 
-    # Calculate bounding box
-    all_x = [g["x"] for g in glyphs]
-    all_y = [g["y"] for g in glyphs]
-
-    min_x = min(all_x)
-    max_x = max(all_x)
-    min_y = min(all_y)
-    max_y = max(all_y)
+    # Calculate bounding box over drawn extents
+    min_x = min(g["x"] - g.get("width", 0.0) / 2 for g in glyphs)
+    max_x = max(g["x"] + g.get("width", 0.0) / 2 for g in glyphs)
+    min_y = min(g["y"] - g.get("height", 0.0) / 2 for g in glyphs)
+    max_y = max(g["y"] + g.get("height", 0.0) / 2 for g in glyphs)
     # Add padding
     width = max_x - min_x + DefaultLayout.COMPARTMENT_BOUNDARY_WIDTH_PADDING
     # Add padding
@@ -310,7 +351,7 @@ def create_compartment_boundary(glyphs: List[Glyph]) -> Glyph:
     # Additional padding for the compartment
     compartment_padding = DefaultLayout.COMPARTMENT_BOUNDARY_PADDING
     compartment_glyph = create_compartment_glyph(
-        id=f"compartment_{uuid.uuid4().hex[:8]}",
+        id=boundary_id,
         label="",  # Will be set by the calling function
         x=(min_x + max_x) / 2,  # Center point
         y=(min_y + max_y) / 2,
@@ -325,7 +366,7 @@ def create_compartment_boundary(glyphs: List[Glyph]) -> Glyph:
 # Raw data generation functions (new pipeline approach)
 # ============================================================================
 def _create_raw_reactions_data(
-    model, reactions: List[str]
+    model, reactions: List[str], compartment: str = ""
 ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
     """Create raw reactions data using a clear separation of concerns.
 
@@ -336,6 +377,8 @@ def _create_raw_reactions_data(
     Args:
         model: MetabolicModel instance containing reaction metadata
         reactions: List of reaction IDs
+        compartment: Display name of the compartment these reactions belong to,
+            used to scope shared metabolite node IDs to this graph
 
     Returns:
         Tuple of (raw_glyphs, raw_connections) where:
@@ -343,7 +386,7 @@ def _create_raw_reactions_data(
             - raw_connections: List of raw connection dictionaries
     """
     # Phase 1: Extract all data from reactions
-    extracted_data = _extract_reaction_data(model, reactions)
+    extracted_data = _extract_reaction_data(model, reactions, compartment)
 
     # Phase 2: Create glyphs by type
     raw_glyphs = []
@@ -367,7 +410,9 @@ def _create_raw_reactions_data(
 # ============================================================================
 # Generalized pipeline functions
 # ============================================================================
-def _extract_reaction_data(model, reactions: List[str]) -> Dict[str, Any]:
+def _extract_reaction_data(
+    model, reactions: List[str], compartment: str = ""
+) -> Dict[str, Any]:
     """Extract all data from reactions using modern entity-based approach.
 
     This function leverages pre-calculated relationships in the modern MetabolicModel
@@ -376,6 +421,8 @@ def _extract_reaction_data(model, reactions: List[str]) -> Dict[str, Any]:
     Args:
         model: MetabolicModel instance with structured entities
         reactions: List of reaction IDs to process
+        compartment: Display name of the compartment being built, used to scope
+            shared metabolite node IDs
 
     Returns:
         Dictionary containing:
@@ -388,6 +435,7 @@ def _extract_reaction_data(model, reactions: List[str]) -> Dict[str, Any]:
     gene_data = {}
     metabolite_data = {}
     node_ids = {}
+    compartment_token = "_".join(str(compartment or "unknown").lower().split())
 
     for reaction_id in reactions:
         # Try to get reaction entity first (Modern approach)
@@ -438,9 +486,17 @@ def _extract_reaction_data(model, reactions: List[str]) -> Dict[str, Any]:
                     # Intermediate metabolites are reaction-specific
                     metabolite_node_id = f"m_{reaction_id}_{metabolite_id}"
                 else:
-                    # Main metabolites are shared
+                    # Main metabolites are shared within one compartment graph.
+                    # The ID is derived from the compartment and the metabolite
+                    # so the same graph regenerates identically, and so a
+                    # metabolite touched by reactions in two compartments still
+                    # gets one node per compartment, as it did when these IDs
+                    # were random. Disjointness from the intermediate form above
+                    # is asserted, not assumed.
                     if metabolite_id not in node_ids:
-                        node_ids[metabolite_id] = f"m_{uuid.uuid4().hex[:8]}"
+                        node_ids[metabolite_id] = (
+                            f"m_{compartment_token}_{metabolite_id}"
+                        )
                     metabolite_node_id = node_ids[metabolite_id]
 
                 # Store metabolite data

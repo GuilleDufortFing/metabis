@@ -1,9 +1,26 @@
+import gzip
 import os
 import warnings
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
+
+
+def _open_text_stream(path: str):
+    """Open ``path`` as a UTF-8 text stream, transparently decompressing gzip.
+
+    The compression is detected by the gzip magic number rather than the file
+    name, so a ``.csv.gz``/``.tsv.gz`` upload (or any gzipped text file) is read
+    identically to a plain one. ``pandas.read_csv`` already infers gzip from the
+    ``.gz`` suffix; this covers the one place that reads the raw text itself.
+    Use the returned handle as a context manager.
+    """
+    with open(path, "rb") as probe:
+        is_gzip = probe.read(2) == b"\x1f\x8b"
+    if is_gzip:
+        return gzip.open(path, "rt", encoding="utf-8", errors="ignore")
+    return open(path, "r", encoding="utf-8", errors="ignore")
 
 
 def _strip_compass_suffixes(name: str) -> str:
@@ -22,7 +39,7 @@ def _detect_csv_separator(path: str, n_lines: int = 10) -> Optional[str]:
 
     separators = {",": 0, "\t": 0, ";": 0}
     try:
-        with open(path, "r", encoding="utf-8", errors="ignore") as f:
+        with _open_text_stream(path) as f:
             line_counts = []
             for i, line in enumerate(f):
                 if i >= n_lines:
@@ -145,30 +162,30 @@ def _detect_data_mode(
     n_check: int = 100,
 ) -> Optional[str]:
     """Detects if the file is in 'single' or 'dual' data mode.
-    
+
     Single mode: Values can be negative (indicating reverse flow), reactions are not repeated.
     Dual mode: Reversible reactions have paired _pos/_neg columns, all values are positive.
-    
+
     Args:
         path: Path to the CSV file.
         separator: The CSV separator to use.
         n_check: Number of rows to check for detection.
-    
-    Returns: 
+
+    Returns:
         "single", "dual", or None if detection is inconclusive.
     """
     if not separator or not os.path.exists(path):
         return None
-    
+
     try:
         df = pd.read_csv(path, sep=separator, nrows=n_check, index_col=0)
         if df.empty:
             return None
-        
+
         # Collect all potential reaction IDs (from both headers and index)
         header_ids = [str(col) for col in df.columns]
         index_ids = [str(idx) for idx in df.index]
-        
+
         # Analyze both orientations
         for reaction_ids, numeric_axis in [(header_ids, 0), (index_ids, 1)]:
             # Count _pos/_neg pairs
@@ -180,25 +197,25 @@ def _detect_data_mode(
                 elif rid.endswith("_neg"):
                     base = rid[:-4]
                     base_reactions.setdefault(base, {"pos": False, "neg": False})["neg"] = True
-            
+
             # Count paired reactions (have both _pos and _neg)
             paired_count = sum(1 for r in base_reactions.values() if r["pos"] and r["neg"])
             total_with_suffix = len(base_reactions)
-            
+
             # Check for dual mode: significant proportion of paired _pos/_neg reactions
             # At least 30% paired and at least 5 pairs
             if total_with_suffix > 0:
                 paired_ratio = paired_count / total_with_suffix
                 if paired_ratio >= 0.3 and paired_count >= 5:
                     return "dual"
-            
+
             # Check for single mode: presence of negative values
             try:
                 if numeric_axis == 0:  # Numeric data in columns (after index)
                     numeric_data = df.select_dtypes(include=[np.number])
                 else:  # Numeric data in rows
                     numeric_data = df.T.select_dtypes(include=[np.number])
-                
+
                 if not numeric_data.empty:
                     # If any negative values exist and no paired suffixes → single mode
                     has_negative = (numeric_data < 0).any().any()
@@ -206,16 +223,16 @@ def _detect_data_mode(
                         return "single"
             except Exception:
                 pass
-        
+
         # Fallback: if we found _pos/_neg suffixes but not enough pairs, still likely dual
         all_ids = header_ids + index_ids
         has_any_suffix = any(rid.endswith("_pos") or rid.endswith("_neg") for rid in all_ids)
-        
+
         if has_any_suffix:
             return "dual"  # Has suffixes, assume dual even if detection was weak
-        
+
         return None  # Inconclusive
-        
+
     except Exception as e:
         warnings.warn(f"Error during data mode detection for {path}: {e}")
         return None
@@ -455,15 +472,15 @@ def detect_reaction_csv_params(data_manager, path: str) -> Dict[str, Optional[st
 
     # Detect data mode (single vs dual)
     detected_data_mode = _detect_data_mode(path, separator)
-    
+
     # Use compass detection for orientation hints when in dual mode
     compass_info = _detect_compass_software_and_orientation(path, separator)
-    
+
     detected_orientation = None
     detected_format = None
 
     is_dual_mode = detected_data_mode == "dual" or compass_info["is_compass"]
-    
+
     # If data_mode detection was inconclusive, use compass detection as fallback
     if detected_data_mode is None:
         detected_data_mode = "dual" if compass_info["is_compass"] else "single"

@@ -1,7 +1,7 @@
-from typing import Any, Dict
+from ...workspace_mode import AnalysisWorkspaceMode
 from ..interfaces import HoverSection
 from ..models import HoverContext, HoverData
-from ...data_manager_mode import DataManagerMode
+
 
 class NoExperimentSection(HoverSection):
     """Section for basic metadata when no experimental data is available."""
@@ -13,7 +13,7 @@ class NoExperimentSection(HoverSection):
         has_stats = data.get("comparison_stats", {}).get("has_comparison_data", False)
         has_exp_stats = data.get("experiment_stats", {}).get("has_experiment_data", False)
 
-        return mode == DataManagerMode.NO_EXPERIMENT and (has_stats or has_exp_stats)
+        return mode == AnalysisWorkspaceMode.NO_EXPERIMENT and (has_stats or has_exp_stats)
 
     def build(self, data: HoverData, context: HoverContext) -> str:
         """Build no-experiment section with basic metadata only."""
