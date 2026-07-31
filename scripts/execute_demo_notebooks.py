@@ -82,6 +82,9 @@ def require_example_data() -> None:
         "Th17_Compass_reactions.tsv",
         "Th17_Compass_expression.tsv",
         "Th17_Compass_metadata.tsv",
+        "smillie_clusters_pool_reactions.tsv",
+        "smillie_clusters_pool_expression_cpm.tsv",
+        "smillie_metadata.tsv",
     )
     missing = [
         name for name in required if not (REPOSITORY_ROOT / "data" / name).is_file()
@@ -89,8 +92,8 @@ def require_example_data() -> None:
     if missing:
         names = ", ".join(missing)
         raise FileNotFoundError(
-            f"Missing generated demo data: {names}. Run "
-            "`python data/download_and_process_compass.py` first."
+            f"Missing demo data: {names}. Run "
+            "`python data/download_datasets.py` first."
         )
 
 

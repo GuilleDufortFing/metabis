@@ -15,9 +15,8 @@ deployed application read byte-identical inputs:
       smillie_clusters_pool_expression_cpm.tsv, smillie_metadata.tsv
       (the Smillie multi-group notebook)
 
-The Th17 files can alternatively be rebuilt from their public sources with
-``python data/download_and_process_compass.py``. The Smillie subset has no such
-generator, so this archive is the only way to obtain it.
+The archive is the single source for these files, so the notebooks and the
+deployed application read byte-identical inputs.
 
 The public share page itself returns HTML. ``DOWNLOAD_URL`` therefore uses the
 Nextcloud ``/download`` endpoint, which currently serves ``MetabisDatasets.zip``.

@@ -18,6 +18,13 @@ and releases follow [Semantic Versioning](https://semver.org/).
 - Attribution and upstream terms for the Smillie example data in the README and
   in `THIRD_PARTY_NOTICES.md`.
 
+### Removed
+
+- `data/download_and_process_compass.py` and its `data/add_celltype_to_samples.py`
+  helper. `data/download_datasets.py` is now the single documented route to the
+  example data, so the notebooks and the deployed server cannot diverge on how
+  the Th17 files were built.
+
 ## [1.0.0] - 2026-07-27
 
 This is the first stable release of the supported public interface.

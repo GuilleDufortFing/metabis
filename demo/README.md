@@ -71,14 +71,8 @@ That script downloads the author-maintained archive the Metabis server deploys,
 verifies its recorded SHA-256 digest, and extracts the files into `metabis/data`,
 so the notebooks and the application read byte-identical inputs.
 
-The Th17 files can alternatively be rebuilt from their public Compass sources:
-
-```bash
-python data/download_and_process_compass.py
-```
-
-The Smillie subset has no such generator, so the archive is the only way to
-obtain it. The notebooks load these files only from `metabis/data`.
+The archive is the single source for the example data, and the notebooks load
+these files only from `metabis/data`.
 
 The Smillie expression subset and metadata are derived from the processed data
 that [Smillie et al.](https://doi.org/10.1016/j.cell.2019.06.029) deposited as

@@ -66,13 +66,7 @@ python data/download_datasets.py
 
 That downloads the author-maintained archive the Metabis server deploys, verifies its recorded SHA-256 digest, and writes the Th17 Compass files (`data/Th17_Compass_reactions.tsv`, `data/Th17_Compass_expression.tsv`, and the `data/Th17_Compass_metadata.tsv` sample sheet) together with the Smillie files notebook `05` loads (`data/smillie_clusters_pool_reactions.tsv`, `data/smillie_clusters_pool_expression_cpm.tsv`, and `data/smillie_metadata.tsv`). All are tab-delimited, as their `.tsv` suffix says.
 
-The Th17 files can alternatively be rebuilt from the public Compass dataset:
-
-```bash
-python data/download_and_process_compass.py
-```
-
-The Smillie subset has no such generator, so the archive is the only way to obtain it.
+The archive is the single source for the example data, so the notebooks and the deployed Metabis server read byte-identical inputs.
 
 Execute all six maintained notebooks without modifying their source files:
 

@@ -53,7 +53,6 @@ Compass repository:
 
 - `data/Th17_Compass_reactions.tsv`
 - `data/Th17_Compass_expression.tsv`
-- `data/download_and_process_compass.py`
 
 - Upstream project: Compass
 - Source: https://github.com/wagnerlab-berkeley/Compass
