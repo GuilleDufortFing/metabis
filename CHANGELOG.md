@@ -18,6 +18,13 @@ and releases follow [Semantic Versioning](https://semver.org/).
 - Attribution and upstream terms for the Smillie example data in the README and
   in `THIRD_PARTY_NOTICES.md`.
 
+### Changed
+
+- The supported-interface definition, compatibility policy, and maintainer
+  checks moved from the README into `CONTRIBUTING.md`. The README now covers
+  installation, the demo notebooks, and the example data, and points at the
+  contract from one short section.
+
 ### Removed
 
 - `data/download_and_process_compass.py` and its `data/add_celltype_to_samples.py`
