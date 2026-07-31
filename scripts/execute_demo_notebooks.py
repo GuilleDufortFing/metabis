@@ -22,6 +22,7 @@ MAINTAINED_NOTEBOOKS = (
     "02_groups_and_dimensionality_reduction.ipynb",
     "03_group_statistical_comparison.ipynb",
     "04_metabolic_graphs_and_subsystems.ipynb",
+    "05_multi_group_comparisons_smillie.ipynb",
     "case_study.ipynb",
 )
 RUNTIME_DIRECTORY = Path(tempfile.gettempdir()) / "metabis-notebook-runtime"

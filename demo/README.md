@@ -23,6 +23,12 @@ All notebooks are self-contained. You can run them independently, but notebooks 
    Uses subsystem ranking, renderer-independent Graph Artifacts, and the Bokeh
    rendering adapter to move from global results to pathway-level interpretation.
 
+5. `05_multi_group_comparisons_smillie.ipynb`
+   Moves to the multi-group Smillie colon atlas: Sample Groups over eight cell
+   types with an expression UMAP, a Target composed of several base groups
+   against a single-group Baseline, and base groups built from the intersection
+   of two metadata columns.
+
 ## Case Study
 
 `case_study.ipynb`
@@ -41,20 +47,45 @@ The notebooks automatically add the local `src/` directory when they are run fro
 
 ## Example Data
 
-All notebooks in this folder load generated files from `metabis/data`:
+All notebooks in this folder load their example files from `metabis/data`.
+
+Notebooks `01` to `04` and the case study use the Th17 Compass example:
 
 - `Th17_Compass_reactions.tsv`
 - `Th17_Compass_expression.tsv`
 - `Th17_Compass_metadata.tsv`
 
-To regenerate these files from the public Compass dataset, run:
+Notebook `05` uses the Smillie colon atlas subset:
+
+- `smillie_clusters_pool_reactions.tsv`
+- `smillie_clusters_pool_expression_cpm.tsv`
+- `smillie_metadata.tsv`
+
+Install every example file with:
+
+```bash
+python data/download_datasets.py
+```
+
+That script downloads the author-maintained archive the Metabis server deploys,
+verifies its recorded SHA-256 digest, and extracts the files into `metabis/data`,
+so the notebooks and the application read byte-identical inputs.
+
+The Th17 files can alternatively be rebuilt from their public Compass sources:
 
 ```bash
 python data/download_and_process_compass.py
 ```
 
-The generator downloads the public Compass inputs and writes all three
-tab-delimited files. The notebooks load them only from `metabis/data`.
+The Smillie subset has no such generator, so the archive is the only way to
+obtain it. The notebooks load these files only from `metabis/data`.
+
+The Smillie expression subset and metadata are derived from the processed data
+that [Smillie et al.](https://doi.org/10.1016/j.cell.2019.06.029) deposited as
+the public [Single Cell Portal study SCP259](https://singlecell.broadinstitute.org/single_cell/study/SCP259/intra-and-inter-cellular-rewiring-);
+the reaction matrix is Compass output computed from that subset. The Single Cell
+Portal terms permit public-study data to be redistributed and reused, and limit
+it to research use: not for medical, clinical, or diagnostic decisions.
 
 ## Execution gate
 

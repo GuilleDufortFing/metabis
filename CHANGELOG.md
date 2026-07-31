@@ -5,6 +5,17 @@ All notable changes to Metabis are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and releases follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- Demo notebook `05_multi_group_comparisons_smillie.ipynb`: multi-group Sample
+  Groups on the Smillie colon atlas, expression and reaction UMAPs, a Target
+  composed of several base groups, and base groups built from the intersection
+  of two metadata columns. The notebook execution gate now covers six notebooks.
+- `data/download_datasets.py` installs every bundled example matrix from the
+  author-maintained archive, verifying its recorded SHA-256 digest.
+
 ## [1.0.0] - 2026-07-27
 
 This is the first stable release of the supported public interface.
