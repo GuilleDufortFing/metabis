@@ -15,6 +15,8 @@ and releases follow [Semantic Versioning](https://semver.org/).
   of two metadata columns. The notebook execution gate now covers six notebooks.
 - `data/download_datasets.py` installs every bundled example matrix from the
   author-maintained archive, verifying its recorded SHA-256 digest.
+- Attribution and upstream terms for the Smillie example data in the README and
+  in `THIRD_PARTY_NOTICES.md`.
 
 ## [1.0.0] - 2026-07-27
 
