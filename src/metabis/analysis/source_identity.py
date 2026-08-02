@@ -14,9 +14,11 @@ identity is free.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import math
 from collections.abc import Mapping
-from dataclasses import fields, is_dataclass
+from dataclasses import dataclass, fields, is_dataclass
 from enum import Enum
 from types import MappingProxyType
 from typing import Any, Callable
@@ -40,6 +42,97 @@ _MODEL_COLLECTIONS = (
     "subsystems",
     "compartments",
 )
+
+
+@dataclass(frozen=True)
+class PreparedComponentFingerprint:
+    """A content fingerprint bound to the exact object that was hashed."""
+
+    source: Any
+    value: str
+
+    def __post_init__(self) -> None:
+        if not _is_sha256_fingerprint(self.value):
+            raise ValueError("prepared source fingerprints must be canonical SHA-256 values")
+
+
+@dataclass(frozen=True)
+class PreparedDatasetFingerprints:
+    """Worker-paid dataset identities that installation may accept in O(1).
+
+    Each value retains the exact source object it describes. The Analysis
+    Workspace validates those identities before changing installed state, so a
+    stale or accidentally mismatched worker result cannot attach a fingerprint
+    to different content merely to avoid recomputing it.
+    """
+
+    model: PreparedComponentFingerprint | None = None
+    reactions: PreparedComponentFingerprint | None = None
+    expression: PreparedComponentFingerprint | None = None
+    embeddings: PreparedComponentFingerprint | None = None
+
+    def validate_sources(
+        self,
+        *,
+        metabolic_model: Any,
+        reaction_data: Any,
+        expression_data: Any,
+    ) -> None:
+        expected = {
+            "model": metabolic_model,
+            "reactions": reaction_data,
+            "expression": expression_data,
+            "embeddings": (
+                getattr(expression_data, "embedding_input", None)
+                if expression_data is not None
+                else None
+            ),
+        }
+        for name, prepared in self.components():
+            if prepared.source is not expected[name]:
+                label = "model" if name == "model" else name.rstrip("s")
+                raise ValueError(
+                    f"The prepared {label} fingerprint must describe the exact "
+                    f"{label} object being installed"
+                )
+
+    def components(self) -> tuple[tuple[str, PreparedComponentFingerprint], ...]:
+        return tuple(
+            (name, prepared)
+            for name in _DATASET_COMPONENTS
+            if (prepared := getattr(self, name)) is not None
+        )
+
+
+def _is_sha256_fingerprint(value: Any) -> bool:
+    if not isinstance(value, str) or len(value) != len("sha256:") + 64:
+        return False
+    if not value.startswith("sha256:"):
+        return False
+    try:
+        int(value.removeprefix("sha256:"), 16)
+    except ValueError:
+        return False
+    return True
+
+
+def _fingerprint_normalized_json(value: Any) -> str:
+    """Hash a value already normalized by ``_normalize_model_value``.
+
+    ``fingerprint_json`` must defensively freeze and validate arbitrary public
+    inputs. Model identity has already recursively converted its content to
+    finite JSON scalars, lists, and dictionaries, so repeating that traversal for
+    every entity and set member is pure overhead. Encoding with the exact same
+    JSON options preserves the existing digest byte for byte.
+    """
+    encoded = json.dumps(
+        value,
+        allow_nan=False,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("utf-8")
+    return f"sha256:{hashlib.sha256(encoded).hexdigest()}"
 
 
 def _fingerprint_expression(data: Any) -> str:
@@ -72,13 +165,13 @@ def model_identity(model: Any) -> dict[str, Any]:
             continue
         identity[name] = sorted(
             (_normalize_model_value(value) for value in values),
-            key=fingerprint_json,
+            key=_fingerprint_normalized_json,
         )
     relationships = getattr(model, "subsystem_neighbor_relationships", None)
     if relationships is not None:
         identity["subsystem_neighbor_relationships"] = sorted(
             (_normalize_model_value(value) for value in relationships),
-            key=fingerprint_json,
+            key=_fingerprint_normalized_json,
         )
     if "subsystems" not in identity:
         try:
@@ -105,6 +198,11 @@ def model_identity(model: Any) -> dict[str, Any]:
     return identity
 
 
+def fingerprint_model(model: Any) -> str:
+    """Return the canonical full-content model fingerprint efficiently."""
+    return _fingerprint_normalized_json(model_identity(model))
+
+
 def _normalize_model_value(value: Any) -> Any:
     """Normalize entity content to order-canonical JSON values."""
     if isinstance(value, float) and not math.isfinite(value):
@@ -125,7 +223,8 @@ def _normalize_model_value(value: Any) -> Any:
         }
     if isinstance(value, (set, frozenset)):
         return sorted(
-            (_normalize_model_value(item) for item in value), key=fingerprint_json
+            (_normalize_model_value(item) for item in value),
+            key=_fingerprint_normalized_json,
         )
     if isinstance(value, (list, tuple)):
         return [_normalize_model_value(item) for item in value]
@@ -136,6 +235,23 @@ def _normalize_model_value(value: Any) -> Any:
             if not str(key).startswith("_")
         }
     return str(value)
+
+
+def prepare_reaction_fingerprints(
+    metabolic_model: Any,
+    reaction_data: Any,
+) -> PreparedDatasetFingerprints:
+    """Pay reaction-load identity on the worker that prepared the inputs."""
+    return PreparedDatasetFingerprints(
+        model=PreparedComponentFingerprint(
+            source=metabolic_model,
+            value=fingerprint_model(metabolic_model),
+        ),
+        reactions=PreparedComponentFingerprint(
+            source=reaction_data,
+            value=fingerprint_frame(reaction_data.get_reaction_df()),
+        ),
+    )
 
 
 class SourceIdentityCache:
@@ -185,7 +301,7 @@ class SourceIdentityCache:
         self._record(
             "model",
             metabolic_model,
-            lambda model: fingerprint_json(model_identity(model)),
+            fingerprint_model,
         )
         self._record(
             "reactions",
@@ -222,17 +338,27 @@ class SourceIdentityCache:
         metabolic_model: Any,
         reaction_data: Any,
         expression_data: Any,
+        prepared_fingerprints: PreparedDatasetFingerprints | None = None,
     ) -> None:
         """Record the measured inputs and pay for their identity now.
 
         This is the dataset load seam, so the cost lands on the load that created
         the new identity rather than on the next analysis or render.
         """
+        if prepared_fingerprints is not None:
+            prepared_fingerprints.validate_sources(
+                metabolic_model=metabolic_model,
+                reaction_data=reaction_data,
+                expression_data=expression_data,
+            )
         self.record_dataset(
             metabolic_model=metabolic_model,
             reaction_data=reaction_data,
             expression_data=expression_data,
         )
+        if prepared_fingerprints is not None:
+            for name, prepared in prepared_fingerprints.components():
+                self._computed[name] = (prepared.source, prepared.value)
         self._warm(_DATASET_COMPONENTS)
 
     def identify_metadata(self, sample_metadata: Any) -> None:
@@ -271,4 +397,11 @@ class SourceIdentityCache:
         return fingerprint
 
 
-__all__ = ["SourceIdentityCache", "model_identity"]
+__all__ = [
+    "PreparedComponentFingerprint",
+    "PreparedDatasetFingerprints",
+    "SourceIdentityCache",
+    "fingerprint_model",
+    "model_identity",
+    "prepare_reaction_fingerprints",
+]

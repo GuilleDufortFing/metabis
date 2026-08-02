@@ -16,7 +16,13 @@ import pytest
 
 from metabis import AnalysisWorkspace
 from metabis.analysis import source_identity
-from metabis.analysis.source_identity import SourceIdentityCache, model_identity
+from metabis.analysis.artifacts import fingerprint_json
+from metabis.analysis.source_identity import (
+    SourceIdentityCache,
+    fingerprint_model,
+    model_identity,
+    prepare_reaction_fingerprints,
+)
 from metabis.analysis_workspace import RevisionKind
 from metabis.domain.h5ad_embedding_input import (
     H5adEmbeddingCoordinates,
@@ -237,6 +243,56 @@ def test_reinstalling_the_same_input_object_keeps_its_fingerprint(monkeypatch):
     assert manager.source_fingerprints["dataset"] == before["dataset"]
 
 
+def test_prepared_reaction_identity_installs_without_document_thread_hashing(
+    monkeypatch,
+):
+    """A worker may pay reaction identity before the document installs it."""
+    model = _Model(reactions=("R1", "R2", "R3"))
+    reaction_data = _reaction_data()
+    prepared = prepare_reaction_fingerprints(model, reaction_data)
+    manager = AnalysisWorkspace(metabolic_model=_Model(reactions=("old",)))
+
+    def forbidden(_value):
+        raise AssertionError("prepared input identity was recomputed during install")
+
+    monkeypatch.setattr(source_identity, "fingerprint_model", forbidden)
+    monkeypatch.setattr(source_identity, "fingerprint_frame", forbidden)
+
+    manager.replace_reaction_data(
+        reaction_data,
+        metabolic_model=model,
+        prepared_fingerprints=prepared,
+    )
+
+    assert manager.source_fingerprints["model"] == prepared.model.value
+    assert manager.source_fingerprints["reactions"] == prepared.reactions.value
+
+
+def test_mismatched_prepared_reaction_identity_is_rejected_transactionally():
+    old_model = _Model(reactions=("old",))
+    old_reaction = _reaction_data(value=7.0)
+    manager = AnalysisWorkspace(
+        metabolic_model=old_model,
+        reaction_data=old_reaction,
+    )
+    prepared_model = _Model(reactions=("prepared",))
+    prepared_reaction = _reaction_data(value=8.0)
+    prepared = prepare_reaction_fingerprints(prepared_model, prepared_reaction)
+    other_model = _Model(reactions=("other",))
+    revisions_before = manager.get_workspace_revisions()
+
+    with pytest.raises(ValueError, match="exact model object"):
+        manager.replace_reaction_data(
+            prepared_reaction,
+            metabolic_model=other_model,
+            prepared_fingerprints=prepared,
+        )
+
+    assert manager.metabolic_model is old_model
+    assert manager.reaction_data is old_reaction
+    assert manager.get_workspace_revisions() == revisions_before
+
+
 def test_dataset_identity_reflects_content_not_object_identity():
     first = AnalysisWorkspace(metabolic_model=_Model(), reaction_data=_reaction_data())
     same_content = AnalysisWorkspace(metabolic_model=_Model(), reaction_data=_reaction_data())
@@ -361,6 +417,18 @@ def test_model_identity_is_canonical_across_entity_order():
     reversed_order = model_identity(_Model(reactions=("R3", "R2", "R1")))
 
     assert forward == reversed_order
+
+
+def test_optimized_model_fingerprint_preserves_the_canonical_identity(monkeypatch):
+    model = _Model(reactions=("R3", "R1", "R2"))
+    expected = fingerprint_json(model_identity(model))
+
+    def forbidden(_value):
+        raise AssertionError("model fingerprint used the general recursive JSON path")
+
+    monkeypatch.setattr(source_identity, "fingerprint_json", forbidden)
+
+    assert fingerprint_model(model) == expected
 
 
 def test_the_cache_recomputes_only_when_the_object_behind_a_component_changes():

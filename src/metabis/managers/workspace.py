@@ -41,7 +41,11 @@ from ..analysis.set_enrichment import (
     SetEnrichmentArtifact,
     SetEnrichmentFeatureType,
 )
-from ..analysis.source_identity import SourceIdentityCache
+from ..analysis.source_identity import (
+    PreparedDatasetFingerprints,
+    SourceIdentityCache,
+    prepare_reaction_fingerprints,
+)
 from ..analysis.statistical_analysis import StatisticalAnalysis
 from ..analysis.subsystem_analysis import SubsystemAnalysis, SubsystemDeltaArtifact
 from ..analysis_workspace import (
@@ -225,6 +229,14 @@ class AnalysisWorkspace:
         input themselves, which would put a full-matrix hash on every run.
         """
         return self._source_identity.fingerprints
+
+    @staticmethod
+    def prepare_reaction_fingerprints(
+        metabolic_model,
+        reaction_data,
+    ) -> PreparedDatasetFingerprints:
+        """Build an exact-object-bound identity for a reaction-load worker."""
+        return prepare_reaction_fingerprints(metabolic_model, reaction_data)
 
     def mark_dataset_changed(self) -> int:
         """Advance the cheap revision token used by derived-result caches."""
@@ -430,6 +442,7 @@ class AnalysisWorkspace:
         output_reaction_format: str | None = None,
         output_gene_format: str | None = None,
         reset_output_formats: bool = False,
+        prepared_fingerprints: PreparedDatasetFingerprints | None = None,
     ) -> None:
         """Commit one prepared input transition through the workspace seam."""
         next_model = (
@@ -445,6 +458,16 @@ class AnalysisWorkspace:
             if expression_data is _UNCHANGED
             else expression_data
         )
+
+        # A worker-paid identity is trusted only for the exact objects it hashed.
+        # Validate before changing any workspace or provider reference so a stale
+        # result is rejected transactionally.
+        if prepared_fingerprints is not None:
+            prepared_fingerprints.validate_sources(
+                metabolic_model=next_model,
+                reaction_data=next_reaction,
+                expression_data=next_expression,
+            )
 
         # Prepared inputs are authoritative only from this point onward. Provider
         # references are derived collaborator views, updated in the same operation.
@@ -472,6 +495,7 @@ class AnalysisWorkspace:
             metabolic_model=next_model,
             reaction_data=next_reaction,
             expression_data=next_expression,
+            prepared_fingerprints=prepared_fingerprints,
         )
 
         if reset_output_formats:
@@ -553,6 +577,7 @@ class AnalysisWorkspace:
         metabolic_model=_UNCHANGED,
         output_reaction_format: str | None = None,
         preprocessing_changed: bool = True,
+        prepared_fingerprints: PreparedDatasetFingerprints | None = None,
     ) -> None:
         """Atomically install prepared Reaction Data and, optionally, its model."""
         if reaction_data is None:
@@ -565,6 +590,7 @@ class AnalysisWorkspace:
             preprocessing_changed=preprocessing_changed,
             clear_metadata=True,
             output_reaction_format=output_reaction_format,
+            prepared_fingerprints=prepared_fingerprints,
         )
 
     def replace_expression_data(
