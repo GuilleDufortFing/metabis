@@ -1,15 +1,14 @@
-"""The comparison subsystem ranking carries its gradient colour reference (R-09).
+"""The comparison subsystem ranking hovers with its element statistics only.
 
-Supplementary Section 1.5 claims a colour reference for every gradient plot. The
-ranking dot plot paints each element from the registered comparison distribution
-of the selected metric, and until WP9 primitive #4 it showed no reference at all:
-a reader could see that a dot was dark red without any way to learn how red the
-rest of the distribution was.
+The ranking dot plot paints each element from the registered comparison
+distribution of the selected metric, and for a while its hover appended that
+distribution as a gradient colour reference. The panel restated what the plot's
+own x-axis already shows -- where a dot sits in the distribution -- while
+carrying a static histogram SVG on the ``HoverTool`` of one of the heaviest
+plots in the document, so it was removed.
 
 The plot is driven through a stub workspace rather than a full analysis run,
-because what is under test is the wiring -- the panel must come from *the same*
-distribution the glyphs were coloured from, and must mark *each element's own*
-value -- not the statistics, which their own suites cover.
+because what is under test is the hover wiring, not the statistics.
 """
 
 from __future__ import annotations
@@ -107,37 +106,25 @@ def ranking():
     return plot, plot.renderers[0].data_source.data
 
 
-def test_every_ranked_dot_carries_the_gradient_color_reference(ranking):
+def test_every_ranked_dot_hovers_with_its_own_statistics(ranking):
     plot, source = ranking
     hover = plot.select_one(HoverTool)
 
+    assert hover.tooltips == "@desc{safe}"
     assert len(source["desc"]) == len(EFFECTS)
-    assert "<strong>Color Reference:</strong>" in hover.tooltips
-    assert f"{METRIC} Distribution" in hover.tooltips
 
 
-def test_each_dot_marks_its_own_position_in_that_distribution(ranking):
-    _plot, source = ranking
-    assert list(source["color_reference_value"]) == [
-        EFFECTS[element_id] for element_id in source["element_id"]
-    ]
-
-    marker_positions = list(source["color_reference_marker_x"])
-    assert len(set(marker_positions)) == len(EFFECTS)
-
-
-def test_the_reference_shows_the_significance_threshold_that_grays_a_dot(ranking):
-    plot, _source = ranking
-    hover = plot.select_one(HoverTool)
-
-    # `_Comparison.get_thresholds` reports 0.5, and a dot below it is drawn gray;
-    # the reference draws that boundary so the gray has a stated cause.
-    assert "stroke-dasharray" in hover.tooltips
-
-
-def test_the_distribution_svg_is_not_duplicated_in_every_point_payload(ranking):
+def test_the_hover_carries_no_gradient_color_reference(ranking):
     plot, source = ranking
     hover = plot.select_one(HoverTool)
 
-    assert hover.tooltips.count("<svg") == 1
+    assert "Color Reference:" not in hover.tooltips
+    assert "<svg" not in hover.tooltips
     assert all("<svg" not in description for description in source["desc"])
+
+
+def test_no_color_reference_payload_is_shipped_per_point(ranking):
+    _plot, source = ranking
+
+    assert "color_reference_value" not in source
+    assert "color_reference_marker_x" not in source

@@ -208,25 +208,6 @@ def plot_subsystem_comparison(
         print("No data points found for the selected subsystems.")
         return None
 
-    # The dots are painted from the comparison distribution of `metric`, so the
-    # plot carries that distribution as a reference. A non-significant dot is
-    # overpainted gray, which the threshold drawn on the reference explains.
-    thresholds = data_manager.get_group_comparison_artifact().get_thresholds(
-        for_genes=for_genes
-    )
-    hover_tooltip = _attach_color_reference(
-        all_data,
-        build_reference_from_distribution(
-            getattr(data_manager, "color_manager", None),
-            mode=AnalysisWorkspaceMode.GROUP_COMPARISON,
-            element_type=element_type,
-            element_id=all_data["element_id"][0],
-            metric_name=metric,
-            metric_label=metric,
-            threshold=(thresholds or {}).get(metric),
-        ),
-    )
-
     # Calculate x-range with padding
     x_min, x_max = min(all_metric_values), max(all_metric_values)
     padding = (x_max - x_min) * 0.1 if x_max != x_min else 1.0
@@ -316,9 +297,12 @@ def plot_subsystem_comparison(
         data_manager=data_manager,
     )
 
-    # Configure Hover
+    # Configure Hover. The hover carries the element description only: the
+    # gradient color reference repeated the same static distribution on every
+    # ranked plot and dominated its weight, for a plot whose x-axis already
+    # shows where each dot sits in that distribution.
     hover = p.select(dict(type=HoverTool))
-    hover.tooltips = hover_tooltip
+    hover.tooltips = "@desc{safe}"
 
     add_click_behavior(
         p,
