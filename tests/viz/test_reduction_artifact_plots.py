@@ -235,6 +235,45 @@ def test_biplot_uses_canonical_samples_and_limits_feature_arrows():
     assert plot.yaxis[0].axis_label == "PC2 (30.0%)"
 
 
+def sample_label_renderers(plot):
+    """Label renderers naming samples, not the feature arrows they sit among.
+
+    Both label families draw the ``display_label`` field, so the sample ones are
+    identified by the source they share with the scatter they annotate.
+    """
+    return [
+        renderer
+        for renderer in plot.renderers
+        if getattr(getattr(renderer, "glyph", None), "text", None) == "display_label"
+        and "sample_id" in renderer.data_source.data
+    ]
+
+
+def test_biplot_labels_samples_only_when_the_shared_toggle_is_active():
+    labelled = plot_pca_biplot_artifact(artifact(), presentation())
+    unlabelled = plot_pca_biplot_artifact(
+        artifact(), presentation(show_sample_labels=False)
+    )
+
+    renderers = sample_label_renderers(labelled)
+    assert sorted(
+        label
+        for renderer in renderers
+        for label in renderer.data_source.data["display_label"]
+    ) == ["Label s1", "Label s2", "Label s3", "Label s4"]
+    # One source per group serves both its points and their labels.
+    assert {id(renderer.data_source) for renderer in renderers} == {
+        id(source) for source in sources(labelled) if "sample_id" in source.data
+    }
+    assert sample_label_renderers(unlabelled) == []
+    # The arrow tips keep their own labels either way.
+    assert [
+        renderer.data_source
+        for renderer in unlabelled.renderers
+        if getattr(getattr(renderer, "glyph", None), "text", None) == "display_label"
+    ] == [source_with(unlabelled, "magnitude")]
+
+
 def test_presentation_is_frozen_and_must_exactly_align_with_artifact():
     snapshot = presentation()
     with pytest.raises(FrozenInstanceError):

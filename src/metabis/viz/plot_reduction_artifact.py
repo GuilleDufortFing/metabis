@@ -735,15 +735,27 @@ def plot_pca_biplot_artifact(
     sample_renderers = []
     for group_name in dict.fromkeys(scores["group"].tolist()):
         group_rows = scores[scores["group"] == group_name]
+        # The labels draw off the same source as the points they name, so the
+        # biplot carries one copy of each group's coordinates.
+        source = ColumnDataSource(group_rows)
         renderer = plot.scatter(
             x="x",
             y="y",
-            source=ColumnDataSource(group_rows),
+            source=source,
             legend_label=str(group_name),
             color=group_rows["color"].iloc[0],
             name="sample_points",
         )
         sample_renderers.append(renderer)
+        if presentation.show_sample_labels:
+            plot.text(
+                "x",
+                "y",
+                text="display_label",
+                source=source,
+                text_font_size="7pt",
+                x_offset=4,
+            )
     if presentation.highlight_group_id:
         highlighted = scores[scores["group_id"] == presentation.highlight_group_id]
         if not highlighted.empty:
