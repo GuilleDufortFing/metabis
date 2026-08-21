@@ -39,3 +39,27 @@ def test_alignment_accepts_pandas_index_sequences():
 def test_blank_and_duplicate_ids_are_rejected(ids):
     with pytest.raises(ValueError, match="Sample IDs must be"):
         SampleMetadata(pd.DataFrame({"kind": ["A", "B"]}, index=ids))
+
+
+def test_the_sample_id_column_may_be_named_as_its_own_display_label(fixture_dir):
+    """It is the index by the time labels resolve, so it means the canonical ID.
+
+    Rejecting it made a column the sheet plainly contains look like a typo.
+    """
+    metadata = SampleMetadata.from_table(
+        fixture_dir / "metadata.tsv",
+        sample_id_column="sample_id",
+        display_label_column="sample_id",
+    )
+
+    assert metadata.display_label_column is None
+    assert metadata.get_display_label("B_cell_ctrl_1") == "B_cell_ctrl_1"
+
+
+def test_a_display_label_column_that_is_absent_is_still_rejected(fixture_dir):
+    with pytest.raises(ValueError, match="Display label column 'absent' was not found"):
+        SampleMetadata.from_table(
+            fixture_dir / "metadata.tsv",
+            sample_id_column="sample_id",
+            display_label_column="absent",
+        )

@@ -72,6 +72,12 @@ class SampleMetadata:
         id_column = sample_id_column or str(frame.columns[0])
         if id_column not in frame.columns:
             raise ValueError(f"Sample ID column '{id_column}' was not found")
+        if display_label_column == id_column:
+            # The ID column becomes the index on the next line, so it is not a
+            # column any more by the time the label is resolved. Asking to be
+            # labelled by the sample ID is what ``None`` already means, so honour
+            # it rather than rejecting the sheet over a column that is present.
+            display_label_column = None
         frame = frame.set_index(id_column, drop=True)
         return cls(frame, display_label_column=display_label_column)
 
