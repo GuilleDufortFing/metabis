@@ -5,11 +5,18 @@ using Bokeh plotting library.
 """
 
 from .bokeh_plotting import create_bokeh_plot, draw_graph_elements
-from .renderer import GraphRenderer, RenderingConfig
+from .renderer import (
+    GraphRenderer,
+    RenderedGraph,
+    RenderingConfig,
+    render_graph_artifact,
+)
 
 __all__ = [
     "create_bokeh_plot",
     "draw_graph_elements",
     "GraphRenderer",
+    "RenderedGraph",
     "RenderingConfig",
+    "render_graph_artifact",
 ]

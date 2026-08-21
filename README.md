@@ -46,20 +46,38 @@ The recommended starting point is the staged demo notebook series under `demo/`:
 - `demo/02_groups_and_dimensionality_reduction.ipynb`
 - `demo/03_group_statistical_comparison.ipynb`
 - `demo/04_metabolic_graphs_and_subsystems.ipynb`
+- `demo/05_multi_group_comparisons_smillie.ipynb`
 
 Each notebook is self-contained, but the series is ordered from basic object loading to pathway-level interpretation. Together, notebooks `01` to `04` guide you through the main Metabis workflow step by step.
 
+Notebook `05` then moves from the two-group Th17 example to the multi-group Smillie colon atlas, where the groups must be composed rather than simply named: Sample Groups over eight cell types with expression and reaction UMAPs, a Target built from several base groups, and base groups built from the intersection of two metadata columns.
+
 When the notebooks are opened from this repository, they automatically add the local `src/` directory before importing `metabis`, so they can run directly from the checkout as long as the Python dependencies are installed.
 
-If you prefer a single end-to-end case study, use [demo/case_study.ipynb](demo/case_study.ipynb). It applies the same ordered workflow directly to the Th17 example used in the publication and in the Metabis server tutorial that reproduces the Compass paper result.
+If you prefer a single end-to-end case study, use
+[demo/case_study.ipynb](demo/case_study.ipynb). It applies the same ordered,
+artifact-first workflow to the Th17 example used in the Metabis server tutorial.
 
-This repository already includes the Th17 example files used in the demo notebooks and case study under `data/`. To regenerate them from the public Compass dataset, run:
+The example files the demo notebooks load are installed rather than tracked: they are large, and `data/*.csv`, `data/*.tsv`, and `data/*.h5ad` are gitignored. Install the complete set with:
 
 ```bash
-python data/download_and_process_compass.py
+python data/download_datasets.py
 ```
 
-The generated files are `data/Th17_Compass_reactions.csv` and `data/Th17_Compass_expression.csv`. They are tab-delimited even though they use the `.csv` suffix.
+That downloads the author-maintained archive the Metabis server deploys, verifies its recorded SHA-256 digest, and writes the Th17 Compass files (`data/Th17_Compass_reactions.tsv`, `data/Th17_Compass_expression.tsv`, and the `data/Th17_Compass_metadata.tsv` sample sheet) together with the Smillie files notebook `05` loads (`data/smillie_clusters_pool_reactions.tsv`, `data/smillie_clusters_pool_expression_cpm.tsv`, and `data/smillie_metadata.tsv`). All are tab-delimited, as their `.tsv` suffix says.
+
+The archive is the single source for the example data, so the notebooks and the deployed Metabis server read byte-identical inputs.
+
+## Public interface and versioning
+
+Metabis follows [semantic versioning](https://semver.org/), and the first
+stable public-interface release is `1.0.0`. Stability is promised for the
+supported namespaces only; everything else is implementation that may change
+without notice.
+
+[CONTRIBUTING.md](CONTRIBUTING.md) lists those namespaces and states the
+compatibility policy, and [CHANGELOG.md](CHANGELOG.md) carries the
+release-level summary.
 
 ## Included Resources
 
@@ -79,4 +97,5 @@ For support or questions, please contact [gdufort@fing.edu.uy](mailto:gdufort@fi
 - The Human1 reference model used by Metabis was obtained from [Human-GEM](https://github.com/SysBioChalmers/Human-GEM) and is distributed there under the [CC BY 4.0 license](https://github.com/SysBioChalmers/Human-GEM?tab=CC-BY-4.0-1-ov-file#readme).
 - The Human1 maps used by Metabis were obtained from [Human-maps](https://github.com/SysBioChalmers/Human-maps) and are distributed there under the [CC BY 4.0 license](https://github.com/SysBioChalmers/Human-maps?tab=CC-BY-4.0-1-ov-file#readme).
 - The Compass reaction-flux example data and study context are based on [Compass](https://github.com/wagnerlab-berkeley/Compass), which is distributed under the [BSD-3-Clause license](https://github.com/wagnerlab-berkeley/Compass?tab=BSD-3-Clause-1-ov-file#readme). The associated publication is [Wagner et al., Cell 2021](https://doi.org/10.1016/j.cell.2021.05.045).
+- The Smillie example expression subset and sample metadata are derived from the processed data deposited as the public Single Cell Portal study [SCP259](https://singlecell.broadinstitute.org/single_cell/study/SCP259/intra-and-inter-cellular-rewiring-); its reaction matrix is Compass output computed from that subset. The [Single Cell Portal terms](https://singlecell.zendesk.com/hc/en-us/articles/360060798672-Terms-of-service) permit public-study data to be redistributed and reused, and limit it to research use rather than medical, clinical, or diagnostic decisions. The associated publication is [Smillie et al., Cell 2019](https://doi.org/10.1016/j.cell.2019.06.029).
 - See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for the bundled notice text carried with the public package.

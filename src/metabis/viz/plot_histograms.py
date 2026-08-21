@@ -1,5 +1,4 @@
-"""
-Histogram plotting module for hover tooltips.
+"""Histogram plotting module for hover tooltips.
 
 This module provides simplified histogram generation logic that works directly
 with pre-calculated histogram data from ColorManager. It generates lightweight
@@ -7,9 +6,11 @@ SVG visualizations suitable for hover tooltips.
 """
 
 from typing import Any, Dict, List, Optional
+
 import numpy as np
-from bokeh.plotting import figure
 from bokeh.models import Label
+from bokeh.plotting import figure
+
 from ..visual_config import theme
 
 
@@ -81,13 +82,12 @@ def create_histogram_background(
     log_scale_y: bool = False,
 ) -> Optional[Dict[str, Any]]:
     """Create the static background SVG for a histogram (bars, axes, grid).
-    
+
     Args:
         histogram_data: List of dicts containing 'bin', 'count', 'color'.
         current_value: Optional value to ensure is included in the x-range.
                       This ensures the current value marker will be visible.
     """
-    
     if not histogram_data:
         return None
 
@@ -96,60 +96,60 @@ def create_histogram_background(
 
     # Sort by bin index to ensure correct order
     sorted_data = sorted(histogram_data, key=lambda x: x['bin'])
-    
+
     # Check if we have value-based data
     use_values = 'value_center' in sorted_data[0] if sorted_data else False
-    
+
     if use_values:
         bin_centers = [d['value_center'] for d in sorted_data]
         x_min = min(d['value_start'] for d in sorted_data)
         x_max = max(d['value_end'] for d in sorted_data)
-        
+
         if not symmetric_threshold:
             x_min = max(x_min, 0)
-        
+
         # If range is 0 (single point), add padding
         if x_min == x_max:
             x_min -= 0.5
             x_max += 0.5
-            
+
         bin_width = None
     else:
         bin_centers = [d['bin'] for d in sorted_data]
         x_min = min(bin_centers)
         x_max = max(bin_centers)
-        
+
         if not symmetric_threshold:
             x_min = max(x_min, 0)
 
         bin_width = 1.0
-    
+
     # Extend range to include current_value if provided (ensures marker is visible)
     if current_value is not None and not np.isnan(current_value):
         if current_value < x_min:
             x_min = current_value
         if current_value > x_max:
             x_max = current_value
-    
+
     hist = [d['count'] for d in sorted_data]
     bin_colors = [d['color'] for d in sorted_data]
-    
+
     # Apply log scale to counts if requested
     if log_scale_y:
         hist = np.log1p(hist)
 
     # Calculate plot range with padding
     x_range = x_max - x_min
-    
+
     if use_values:
         x_padding = x_range * 0.05 if x_range > 0 else 0.5
     else:
         x_padding = 0.5  # Half bin width padding
-    
+
     plot_x_min = x_min - x_padding
     plot_x_max = x_max + x_padding
     plot_x_range = plot_x_max - plot_x_min
-    
+
     # Avoid division by zero
     if plot_x_range == 0:
         plot_x_range = 1.0
@@ -196,7 +196,7 @@ def create_histogram_background(
                 bar_start = d['value_start']
                 bar_end = d['value_end']
                 bar_w_val = bar_end - bar_start
-                
+
                 if bar_w_val <= 0:
                     # Handle zero width bin (e.g. bin 0)
                     bar_x = scale_x(bar_start)
@@ -208,14 +208,14 @@ def create_histogram_background(
             else:
                 bar_x = scale_x(center - bin_width / 2)
                 bar_width = scale_width(bin_width)
-                
+
             bar_y = scale_y(bar_count)
             bar_height = plot_area_height - (bar_y - margin_top)
 
             # Determine fill and stroke based on significance
             fill_color = color
             stroke_color = "#999595"  # Visible border for light colors
-            
+
             # Apply threshold logic if provided
             if threshold is not None:
                 # Check if bin center is within threshold (not significant)
@@ -237,7 +237,7 @@ def create_histogram_background(
             if plot_x_min <= t_val <= plot_x_max:
                 t_x = scale_x(t_val)
                 threshold_lines += f'''
-                <line x1="{t_x}" y1="{margin_top}" x2="{t_x}" 
+                <line x1="{t_x}" y1="{margin_top}" x2="{t_x}"
                       y2="{margin_top + plot_area_height}"
                       stroke="{theme.THRESHOLD_LINE_COLOR}" stroke-width="{theme.THRESHOLD_LINE_WIDTH}" stroke-dasharray="{theme.THRESHOLD_SVG_DASH}"/>
                 '''
@@ -248,7 +248,7 @@ def create_histogram_background(
         x_tick_indices = np.linspace(0, len(bin_centers) - 1, n_x_ticks, dtype=int)
     else:
         x_tick_indices = [0] if len(bin_centers) > 0 else []
-        
+
     x_ticks = ""
     for idx in x_tick_indices:
         if idx < len(bin_centers):
@@ -336,7 +336,7 @@ def create_histogram_background(
             <!-- CURRENT_VALUE_LABEL_PLACEHOLDER -->
         </svg>
     '''
-    
+
     return {
         "svg_content": svg_content,
         "scaling_params": {
@@ -360,20 +360,20 @@ def render_histogram_with_marker(
     """Render the final histogram HTML by adding the marker to the background."""
     if not background_data:
         return '<div style="font-size:10px;color:red;">Histogram error</div>'
-        
+
     svg_content = background_data["svg_content"]
     params = background_data["scaling_params"]
-    
+
     # Calculate marker position
     def scale_x(val):
         return params["margin_left"] + ((val - params["plot_x_min"]) / params["plot_x_range"] * params["plot_area_width"])
-        
+
     # Handle case where current_value might be None or NaN
     if current_value is None or np.isnan(current_value):
         current_value = 0.0
-        
+
     current_x = scale_x(current_value)
-    
+
     marker_line = f'''
     <line x1="{current_x}" y1="{params["margin_top"]}" x2="{current_x}"
           y2="{params["margin_top"] + params["plot_area_height"]}"
@@ -382,16 +382,16 @@ def render_histogram_with_marker(
                      {current_x},{params["margin_top"] + 8}"
              fill="{marker_color}" opacity="0.9"/>
     '''
-    
+
     current_value_label = f'''
     <text x="{current_x}" y="{params["margin_top"] - 5}" text-anchor="middle"
           font-size="9" fill="{marker_color}" font-weight="bold">
           Current: {current_value:.3f}</text>
     '''
-    
+
     final_svg = svg_content.replace("<!-- MARKER_PLACEHOLDER -->", marker_line)
     final_svg = final_svg.replace("<!-- CURRENT_VALUE_LABEL_PLACEHOLDER -->", current_value_label)
-    
+
     return f'''
     <div style="width:{background_data["width"]}px;height:{background_data["height"]}px;font-family:Arial,sans-serif;
                 font-size:11px;background:white;border:1px solid #ddd;
@@ -451,7 +451,7 @@ def create_bokeh_histogram(
 
     # Sort by bin index
     sorted_data = sorted(histogram_data, key=lambda x: x['bin'])
-    
+
     # Check if we have value-based data
     use_values = 'value_center' in sorted_data[0] if sorted_data else False
 
@@ -465,10 +465,10 @@ def create_bokeh_histogram(
              sorted_data = [d for d in sorted_data if d['value_end'] > 0]
         else:
              sorted_data = [d for d in sorted_data if d['bin'] >= 0]
-             
+
     if not sorted_data:
         return hist_fig
-    
+
     if use_values:
         bin_centers = [d['value_center'] for d in sorted_data]
         left_edges = [d['value_start'] for d in sorted_data]
@@ -505,7 +505,7 @@ def create_bokeh_histogram(
         line_width=0.5,
         alpha=0.8,
     )
-    
+
     if hist_counts:
         hist_fig.y_range.end = max(hist_counts) * 1.1
 
@@ -514,7 +514,7 @@ def create_bokeh_histogram(
         t_vals = [threshold]
         if is_symmetric:
              t_vals = [threshold, -threshold]
-             
+
         for t_val in t_vals:
              hist_fig.line(
                 [t_val, t_val],
@@ -523,17 +523,17 @@ def create_bokeh_histogram(
                 line_dash=theme.THRESHOLD_LINE_DASH,
                 line_width=theme.THRESHOLD_LINE_WIDTH,
             )
-            
+
         if show_threshold_annotation and threshold_counts:
             count, percent = threshold_counts
-            
+
             if is_symmetric:
                  annotation_text = f"|{x_label}| > {threshold:.2f}: {count} ({percent:.1f}%)"
                  x_pos = 0
             else:
                  annotation_text = f"> {threshold:.2f}: {count} ({percent:.1f}%)"
                  x_pos = threshold / 2
-                 
+
             annotation = Label(
                 x=x_pos,
                 y=hist_fig.y_range.end * 0.9,

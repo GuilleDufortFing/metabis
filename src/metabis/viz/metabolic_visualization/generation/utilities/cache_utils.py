@@ -3,6 +3,8 @@
 import hashlib
 import json
 import os
+from copy import deepcopy
+from functools import lru_cache
 from typing import Dict, List, Optional, Tuple
 
 from ..data_structures.core_types import Connection, Glyph
@@ -10,7 +12,6 @@ from .compartment_resources import (
     COMPARTMENT_GRAPH_VARIANT,
     normalize_compartment_resource_id,
 )
-
 
 SUBSYSTEM_HUMAN1_VARIANT = "human1"
 SUBSYSTEM_STANDARD_VARIANT = "standard"
@@ -210,13 +211,6 @@ def load_graph_resource(
     return None, None
 
 
-def load_from_cache(
-    cache_file: str,
-) -> Tuple[Optional[List[Glyph]], Optional[List[Connection]]]:
-    """Backward-compatible alias for packaged graph-resource loading."""
-    return load_graph_resource(cache_file)
-
-
 def save_to_cache(
     cache_file: str, glyphs: List[Glyph], connections: List[Connection]
 ) -> None:
@@ -256,6 +250,22 @@ def save_visualization_cache(cache_file, glyphs, connections):
     with open(cache_file, "w") as f:
         json.dump(cache_data, f, indent=2)
 
+@lru_cache(maxsize=256)
+def _load_visualization_cache_cached(cache_file: str, mtime_ns: int, size: int):
+    """Parse one immutable packaged resource version exactly once."""
+    with open(cache_file, "r", encoding="utf-8") as handle:
+        cache_data = json.load(handle)
+    return cache_data.get("glyphs", []), cache_data.get("connections", [])
+
+
+def clear_graph_resource_cache() -> None:
+    _load_visualization_cache_cached.cache_clear()
+
+
+def get_graph_resource_cache_info():
+    return _load_visualization_cache_cached.cache_info()
+
+
 def load_visualization_cache(cache_file):
     """Load graph visualization data from a JSON file.
 
@@ -269,13 +279,12 @@ def load_visualization_cache(cache_file):
         return None, None
 
     try:
-        with open(cache_file, "r") as f:
-            cache_data = json.load(f)
-
-        glyphs = cache_data.get("glyphs", [])
-        connections = cache_data.get("connections", [])
-
-        return glyphs, connections
+        stat = os.stat(cache_file)
+        glyphs, connections = _load_visualization_cache_cached(
+            os.path.abspath(cache_file), stat.st_mtime_ns, stat.st_size
+        )
+        # Enrichment mutates nested dictionaries. Never expose cached objects.
+        return deepcopy(glyphs), deepcopy(connections)
     except Exception as e:
         print(f"Error loading graph visualization resource: {e}")
         return None, None

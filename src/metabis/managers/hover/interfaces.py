@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
-from typing import Any, Dict
 
 from .models import HoverContext, HoverData
+
 
 class HoverSection(ABC):
     """Abstract base class for hover text sections."""

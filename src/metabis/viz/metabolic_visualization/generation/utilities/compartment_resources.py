@@ -2,7 +2,6 @@
 
 from typing import Dict, List
 
-
 COMPARTMENT_GRAPH_VARIANT = "human1"
 
 

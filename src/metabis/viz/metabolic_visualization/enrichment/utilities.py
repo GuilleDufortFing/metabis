@@ -115,22 +115,20 @@ def calculate_influence_arrow_coords(reaction_glyph, gene_glyph):
 # ============================================================================
 
 
-def prepare_translations(glyphs, data_manager, color_metric="log2_fc"):
-    """Pre-compute translations and reaction colors for batch operations.
+def prepare_translations(glyphs, data_manager):
+    """Pre-compute identifier translations for batch operations.
 
     Args:
         glyphs: List of glyph dictionaries
-        data_manager: DataManager instance with experimental data
-        color_metric: Metric to use for reaction color calculation
+        data_manager: AnalysisWorkspace instance with experimental data
 
     Returns:
-        Dict containing translations and reaction colors
+        Dict containing metabolite, gene, and reaction translations
     """
     translations = {
         "metabolites": {},
         "genes": {},
         "reactions": {},
-        "reaction_colors": {},  # New: pre-computed reaction colors
     }
 
     # Batch translate metabolites
@@ -182,19 +180,6 @@ def prepare_translations(glyphs, data_manager, color_metric="log2_fc"):
         else:
             # Fallback: use original ID when no data manager
             translations["reactions"][reaction_id] = reaction_id
-
-    # Pre-compute reaction colors using DataManager API
-    for reaction_id in reaction_ids:
-        if data_manager:
-            color = data_manager.get_element_color(
-                reaction_id, GlyphClass.REACTION, color_metric,use_main_direction=True
-            )
-            # Fallback to default color if None or invalid color returned
-            if not color or color == "white":
-                color = VisualizationConstants.DEFAULT_REACTION_COLOR
-        else:
-            color = VisualizationConstants.DEFAULT_REACTION_COLOR
-        translations["reaction_colors"][reaction_id] = color
 
     return translations
 
@@ -293,12 +278,12 @@ def get_edge_alpha(
 def get_connection_color(
     source_node, target_node, data_manager, color_metric, is_missing_connection=False
 ):
-    """Determine the color for a connection using DataManager API.
+    """Determine the color for a connection using AnalysisWorkspace API.
 
     Args:
         source_node: Source glyph dictionary
         target_node: Target glyph dictionary
-        data_manager: DataManager instance for accessing experimental data
+        data_manager: AnalysisWorkspace instance for accessing experimental data
         color_metric: The metric to use for coloring (e.g., 'log2_fc')
 
     Returns:
@@ -324,7 +309,7 @@ def get_connection_color(
         # Not a metabolic connection (metabolite ↔ reaction)
         return "gray"
 
-    # Use DataManager API for consistent coloring
+    # Use AnalysisWorkspace API for consistent coloring
     if data_manager:
         color = data_manager.get_element_color(
             reaction_id, GlyphClass.REACTION, color_metric, use_main_direction=True
@@ -337,18 +322,40 @@ def get_connection_color(
         return VisualizationConstants.DEFAULT_REACTION_COLOR
 
 
-def should_reverse_direction(source_node, target_node, reaction_activities):
-    """Determine if a connection's direction should be reversed.
+def should_reverse_direction(source_node, target_node, display_direction):
+    """Whether a metabolite/reaction edge is drawn against model stoichiometry.
+
+    A reversible reaction is drawn in one direction only, and this decides which:
+    the backward direction runs the model's arrows the other way, so the
+    stoichiometric alignment is inverted.
+
+    ``display_direction`` is resolved once per reaction by
+    :func:`~metabis.managers.element_presentation.resolve_display_direction`, the
+    same answer the node colour and the hover are built from. It used to be
+    re-derived here from the group's raw activity averages, and that private copy
+    of the rule disagreed with the rest of the graph two ways (WP10/D-69):
+
+    * It was keyed on the *forward* column, so a reaction Compass measured only in
+      reverse -- its forward direction blocked, and dropped in preprocessing --
+      fell through to "no reversal" and drew its arrows forward while its own
+      hover read "Reverse (more active direction)". 210 base reactions across 25
+      subsystems on the bundled Th17 data alone.
+    * It ignored the Target/Baseline criterion, always reading the first compared
+      group.
 
     Args:
         source_node: Source glyph dictionary
         target_node: Target glyph dictionary
-        reaction_activities: Dictionary mapping reaction IDs to activity values
+        display_direction: "forward", "backward", or None when unresolved
 
     Returns:
         bool: True if direction should be reversed
     """
-    # Check if this is a connection between a metabolite and a reaction
+    if display_direction != "backward":
+        return False
+
+    # Only metabolite/reaction edges carry stoichiometric direction; enzyme and
+    # subsystem edges are undirected and must never be flipped.
     is_metabolite_to_reaction = (
         source_node.get("glyph_class") == GlyphClass.METABOLITE
         and target_node.get("glyph_class") == GlyphClass.REACTION
@@ -357,20 +364,4 @@ def should_reverse_direction(source_node, target_node, reaction_activities):
         source_node.get("glyph_class") == GlyphClass.REACTION
         and target_node.get("glyph_class") == GlyphClass.METABOLITE
     )
-    
-    if is_metabolite_to_reaction or is_reaction_to_metabolite:
-        reaction_node = target_node if is_metabolite_to_reaction else source_node
-        reaction_id = reaction_node["label"]
-
-        # Check if activity is negative
-        if (
-            reaction_id in reaction_activities
-        ):
-            if reaction_activities[reaction_id] < 0:
-                return True
-            elif reaction_id + "_back" in reaction_activities and abs(reaction_activities[reaction_id]) < abs(
-                reaction_activities[reaction_id + "_back"]
-            ):
-                return True
-
-    return False
+    return is_metabolite_to_reaction or is_reaction_to_metabolite

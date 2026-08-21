@@ -20,8 +20,6 @@ from typing import Dict, List, Optional, Tuple, TypedDict
 
 import pandas as pd
 
-# Note: Factory imports kept only for backward compatibility functions
-
 
 # Raw data structures for SBGN parsing output
 class RawGlyphData(TypedDict):

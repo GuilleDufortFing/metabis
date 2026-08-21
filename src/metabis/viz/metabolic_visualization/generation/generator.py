@@ -1,7 +1,9 @@
 """Metabolic graph generation utilities."""
 
-from dataclasses import dataclass
-from typing import Optional
+import os
+from dataclasses import dataclass, field
+from types import MappingProxyType
+from typing import Mapping, Optional
 
 from metabis.resource_registry import ResourceRegistry
 
@@ -16,28 +18,42 @@ from .utilities.cache_utils import (
 )
 
 
-@dataclass
+@dataclass(frozen=True)
 class GraphGenerationConfig:
     """Configuration for graph generation options."""
 
     use_human1_map: bool = True
     layout_engine: str = "dot"
-    base_paths: Optional[dict] = None
+    base_paths: Optional[Mapping[str, str]] = None
     resources_path: Optional[str] = None
-    resource_registry: Optional[ResourceRegistry] = None
+    resource_registry: Optional[ResourceRegistry] = field(
+        default=None,
+        compare=False,
+        repr=False,
+    )
 
     def __post_init__(self):
         """Set default paths if not provided."""
-        if self.resource_registry is None:
-            self.resource_registry = ResourceRegistry(resources_root=self.resources_path)
+        registry = self.resource_registry
+        if registry is None:
+            registry = ResourceRegistry(resources_root=self.resources_path)
+            object.__setattr__(self, "resource_registry", registry)
 
         if self.base_paths is None:
-            self.base_paths = self.resource_registry.get_graph_base_paths(
-                required=False
+            object.__setattr__(
+                self,
+                "base_paths",
+                MappingProxyType(registry.get_graph_base_paths(required=False)),
+            )
+        else:
+            object.__setattr__(
+                self,
+                "base_paths",
+                MappingProxyType(dict(self.base_paths)),
             )
 
         if self.resources_path is None:
-            self.resources_path = self.resource_registry.resources_root
+            object.__setattr__(self, "resources_path", registry.resources_root)
 
 
 class MetabolicGraphGenerator:
@@ -55,6 +71,9 @@ class MetabolicGraphGenerator:
         self.config = config or GraphGenerationConfig(
             resource_registry=getattr(metabolic_model, "resource_registry", None)
         )
+        self.last_resource_path: str | None = None
+        self.last_resource_variant = "runtime"
+        self.used_runtime_layout = False
 
     def create_graph(self, element_id, graph_type):
         """Create a metabolic graph with full configuration support.
@@ -76,6 +95,9 @@ class MetabolicGraphGenerator:
             ValueError: If graph_type is invalid or required parameters are missing
         """
         # Step 1: Validate input parameters
+        self.last_resource_path = None
+        self.last_resource_variant = "runtime"
+        self.used_runtime_layout = False
         valid_graph_types = ["subsystem", "compartment", "metabolic_network"]
         if graph_type not in valid_graph_types:
             raise ValueError(
@@ -109,6 +131,7 @@ class MetabolicGraphGenerator:
                     self.model,
                     layout_engine,
                 )
+                self.used_runtime_layout = True
         else:
             glyphs, connections, graph_resource_file = self._load_packaged_graph(
                 config,
@@ -145,6 +168,10 @@ class MetabolicGraphGenerator:
                 last_resource_file = graph_resource_file
                 glyphs, connections = load_graph_resource(graph_resource_file)
                 if glyphs is not None and connections is not None:
+                    self.last_resource_path = graph_resource_file
+                    self.last_resource_variant = os.path.basename(
+                        os.path.dirname(graph_resource_file)
+                    )
                     if return_resource_file:
                         return glyphs, connections, graph_resource_file
                     return glyphs, connections
@@ -162,6 +189,9 @@ class MetabolicGraphGenerator:
             subsystem_filter=config.get("subsystem_filter"),
         )
         glyphs, connections = load_graph_resource(graph_resource_file)
+        if glyphs is not None and connections is not None:
+            self.last_resource_path = graph_resource_file
+            self.last_resource_variant = "packaged"
         if return_resource_file:
             return glyphs, connections, graph_resource_file
         return glyphs, connections

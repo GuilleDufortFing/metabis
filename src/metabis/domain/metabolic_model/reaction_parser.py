@@ -25,8 +25,8 @@ def parse_reaction_equation(equation: str) -> Tuple[List[str], List[str], bool]:
                  "glucose-6-phosphate[c] + ADP[c]")
 
     Returns:
-        Tuple of (reactants, products, is_reversible) where reactants and products 
-        are lists of metabolite names, and is_reversible is a boolean indicating 
+        Tuple of (reactants, products, is_reversible) where reactants and products
+        are lists of metabolite names, and is_reversible is a boolean indicating
         if the reaction is reversible (uses <=> arrow)
 
     Example:

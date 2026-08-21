@@ -5,7 +5,8 @@ with experimental data, styling, and highlighting features.
 """
 
 from dataclasses import dataclass
-from typing import Any, Dict, Optional, Tuple
+from types import MappingProxyType
+from typing import Any, Dict, Mapping, Optional, Tuple
 
 from .analysis import (
     identify_gene_influence_connections,
@@ -18,18 +19,26 @@ from .glyph_enrichment import enrich_single_glyph
 from .utilities import prepare_translations
 
 
-@dataclass
+@dataclass(frozen=True)
 class EnrichmentConfig:
     """Configuration for graph enrichment operations."""
 
     color_metric: str = "log2_fc"
-    delta_options: Dict[str, Any] = None
+    delta_options: Optional[Mapping[str, Any]] = None
     show_hover_stats: bool = True
     show_hover_distribution_plots: bool = True
     show_hover_color_reference: bool = True
     highlight_significant_reactions: bool = False
     highlight_significant_genes: bool = False
     highlight_gene_influence: bool = False
+
+    def __post_init__(self) -> None:
+        if self.delta_options is not None:
+            object.__setattr__(
+                self,
+                "delta_options",
+                MappingProxyType(dict(self.delta_options)),
+            )
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert config to dictionary for function calls."""
@@ -81,7 +90,7 @@ class GraphEnricher:
             glyphs: Basic graph glyphs from generation phase
             connections: Basic graph connections from generation phase
             focus_instance: object that retrieves the IDs of the elements being visualized
-            data_manager: DataManager object with experimental data
+            data_manager: AnalysisWorkspace object with experimental data
             config_override: Optional config to override instance config
             style_missing_data: Whether to apply special styling to missing
                                data elements
@@ -127,10 +136,8 @@ class GraphEnricher:
             missing_data_elements = identify_missing_data_subgraph(
                 glyphs, connections, data_manager
             )
-        # Pre-compute translations and reaction colors for batch operations
-        translations = prepare_translations(
-            glyphs, data_manager, config_dict["color_metric"]
-        )
+        # Pre-compute identifier translations for batch operations.
+        translations = prepare_translations(glyphs, data_manager)
 
         # Enrich all glyphs
         enriched_glyphs = []
@@ -161,7 +168,6 @@ class GraphEnricher:
         enriched_connections = enrich_connections(
             connections,
             enriched_glyphs,
-            translations["reaction_colors"],
             (
                 config_dict["highlight_significant_reactions"]
                 or config_dict["highlight_significant_genes"]

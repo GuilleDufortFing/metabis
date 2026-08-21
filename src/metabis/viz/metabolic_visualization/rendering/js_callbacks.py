@@ -124,18 +124,18 @@ def add_zoom_based_alpha_callback(
             zoom_max=zoom_max,
         ),
         code="""
-        
+
         // Get current zoom level from the plot range
         const x_range = plot.x_range;
         const y_range = plot.y_range;
-        
+
         // Calculate zoom level based on the range span
         // Smaller range = more zoomed in, larger range = more zoomed out
         const x_span = x_range.end - x_range.start;
         const y_span = y_range.end - y_range.start;
         const zoom_level = Math.min(1.0, Math.max(0.1,
             1000.0 / Math.max(x_span, y_span, 1e-9)));
-    
+
         // Calculate alpha based on zoom level
         let alpha;
         if (zoom_level <= zoom_min) {
@@ -147,12 +147,12 @@ def add_zoom_based_alpha_callback(
             const t = (zoom_level - zoom_min) / (zoom_max - zoom_min);
             alpha = alpha_min + t * (alpha_max - alpha_min);
         }
-        
+
         // Update all label alphas, factoring in base_alpha if provided
         const data = source.data;
         const n = data.x.length;
         const base = data.base_alpha || Array(n).fill(1.0);
-        
+
         for (let i = 0; i < n; i++) {
             const base_alpha = base[i] != null ? base[i] : 1.0;
             data.text_alpha[i] = alpha * base_alpha;

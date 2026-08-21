@@ -2,20 +2,22 @@
 
 This module provides a dedicated HoverManager class to handle all hover text
 generation, caching, and mode-aware builder management. It consolidates hover
-functionality that was previously scattered across DataManager.
+functionality that was previously scattered across AnalysisWorkspace.
 """
 
+import logging
 from typing import Any, Dict, Optional
 
-from metabis.managers import data_manager
-
-from .data_provider import DataProvider
-
-from ..viz.metabolic_visualization.generation.data_structures.constants import VisualizationConstants
-
-from .data_manager_mode import DataManagerMode
+from .element_presentation import (
+    comparison_direction_criterion,
+    comparison_display_direction,
+)
 from .hover import presets
 from .hover.models import HoverContext
+from .workspace_mode import AnalysisWorkspaceMode
+
+logger = logging.getLogger(__name__)
+
 
 class HoverManager:
     """Manages hover text generation and caching for metabolic visualizations.
@@ -37,7 +39,7 @@ class HoverManager:
         data_provider,
         cache_manager,
         color_manager,
-        mode: DataManagerMode = DataManagerMode.NO_EXPERIMENT,
+        mode: AnalysisWorkspaceMode = AnalysisWorkspaceMode.NO_EXPERIMENT,
     ):
         """Initialize the HoverManager.
 
@@ -51,18 +53,18 @@ class HoverManager:
         self.data_provider = data_provider
         self.cache_manager = cache_manager
         self.color_manager = color_manager
-        self.group_comparison = data_provider.group_comparison
+        self.group_comparison_artifact = data_provider.group_comparison_artifact
 
         # Store mode and initialize builders
         self._mode = mode
         self._setup_hover_builders()
 
     @property
-    def mode(self) -> DataManagerMode:
+    def mode(self) -> AnalysisWorkspaceMode:
         return self._mode
 
     @mode.setter
-    def mode(self, new_mode: DataManagerMode):
+    def mode(self, new_mode: AnalysisWorkspaceMode):
         if self._mode != new_mode:
             self._mode = new_mode
             self._setup_hover_builders()
@@ -78,7 +80,7 @@ class HoverManager:
         self.metabolite_hover_builder = presets.create_metabolite_builder_for_mode(self._mode)
         self.subsystem_hover_builder = presets.create_subsystem_builder_for_mode(self._mode)
 
-        if self._mode == DataManagerMode.GROUP_COMPARISON:
+        if self._mode == AnalysisWorkspaceMode.GROUP_COMPARISON:
             # Group Comparison styling
             style = (
                 "font-family: Arial, sans-serif; font-size:12px; padding:10px; "
@@ -90,7 +92,7 @@ class HoverManager:
             self.metabolite_hover_builder.set_container_style(style)
             self.subsystem_hover_builder.set_container_style(style)
 
-        elif self._mode == DataManagerMode.EXPERIMENT_ANALYSIS:
+        elif self._mode == AnalysisWorkspaceMode.EXPERIMENT_ANALYSIS:
             # Experiment Analysis styling
             style = (
                 "font-family: Arial, sans-serif; font-size:12px; padding:10px; "
@@ -113,7 +115,7 @@ class HoverManager:
             self.metabolite_hover_builder.set_container_style(style)
             self.subsystem_hover_builder.set_container_style(style)
 
-    def refresh_builders(self, new_mode: Optional[DataManagerMode] = None) -> None:
+    def refresh_builders(self, new_mode: Optional[AnalysisWorkspaceMode] = None) -> None:
         """Refresh hover builders when mode changes.
 
         Args:
@@ -190,19 +192,22 @@ class HoverManager:
             show_color_reference=show_color_reference,
             current_subsystem=current_subsystem,
             current_category=current_category,
+            direction_criterion=comparison_direction_criterion(
+                getattr(self.data_provider, "subsystem_analysis", None)
+            ),
             data_provider=self.data_provider,
             color_manager=self.color_manager,
         )
 
         # Add mode-specific context
-        if self._mode == DataManagerMode.GROUP_COMPARISON:
-            context.group_comparison = self.group_comparison
+        if self._mode == AnalysisWorkspaceMode.GROUP_COMPARISON:
+            context.group_comparison = self.group_comparison_artifact
             if show_stats:
                 context.show_comparison = True
             else:
                 context.show_comparison = False
 
-        elif self._mode == DataManagerMode.EXPERIMENT_ANALYSIS:
+        elif self._mode == AnalysisWorkspaceMode.EXPERIMENT_ANALYSIS:
             context.show_comparison = False
             context.analysis_type = "within_group"
 
@@ -212,13 +217,52 @@ class HoverManager:
 
         return context
 
-    def update_group_comparison(self, group_comparison):
-        """Update the group comparison object.
+    def update_group_comparison(self, artifact):
+        """Update the installed comparison artifact used for hover.
 
         Args:
-            group_comparison: New GroupComparison object
+            artifact: New GroupComparisonArtifact, or None outside comparison mode.
         """
-        self.group_comparison = group_comparison
+        self.group_comparison_artifact = artifact
+
+    def _resolve_main_direction(self, reaction_id: str) -> Optional[str]:
+        """Direction shown for a reversible reaction under the current mode.
+
+        In comparison mode this is the shared reaction-direction map's selection,
+        so the hover names the direction the arrowhead and the node colour were
+        drawn from; in activity mode it follows the selected group's own summary.
+        Previously the activity branch computed a direction and discarded it, so
+        `use_main_direction` never took effect outside comparison mode.
+        """
+        experiment_analysis = getattr(self.data_provider, "experiment_analysis", None)
+        if experiment_analysis is None:
+            return None
+
+        try:
+            if self._mode == AnalysisWorkspaceMode.GROUP_COMPARISON and self.group_comparison_artifact:
+                base_id = (
+                    reaction_id[:-5]
+                    if reaction_id.endswith("_back")
+                    else reaction_id
+                )
+                return comparison_display_direction(
+                    getattr(self.data_provider, "subsystem_analysis", None),
+                    experiment_analysis,
+                    self.group_comparison_artifact,
+                    base_id,
+                )
+            activity_artifact = getattr(self.data_provider, "activity_artifact", None)
+            if (
+                self._mode == AnalysisWorkspaceMode.EXPERIMENT_ANALYSIS
+                and activity_artifact is not None
+            ):
+                return experiment_analysis.get_activity_direction(
+                    activity_artifact, reaction_id
+                )
+        except Exception:
+            return None
+
+        return None
 
     # ============================================================================
     # Gene Hover Methods
@@ -296,7 +340,7 @@ class HoverManager:
             include_influence=show_influence,
             include_distributions=show_plot,
         )
-        
+
         # Create context for hover building
         context = self._create_context(
             element_type="reaction",
@@ -323,16 +367,7 @@ class HoverManager:
         show_color_reference: bool = False,
     ) -> str:
         """Get cached hover text for a reaction, or build and cache if not exists."""
-        
-        main_direction = None
-        if self._mode == DataManagerMode.GROUP_COMPARISON:
-            main_direction = self.data_provider.experiment_analysis.get_main_direction(
-                self.group_comparison.group_id_1, reaction_id
-            )
-        else:
-            direction = self.data_provider.experiment_analysis.get_main_direction(
-                self.data_provider.group_manager.get_active_group(), reaction_id
-            )
+        main_direction = self._resolve_main_direction(reaction_id)
 
         if use_main_direction and main_direction is not None:
             if main_direction == "backward":
@@ -373,9 +408,9 @@ class HoverManager:
         metabolite_data = self.data_provider.get_metabolite_data(
             metabolite_id
         )
-        
+
         # Create context for hover building
-        context = self._create_context(            
+        context = self._create_context(
             element_type="metabolite",
             color_metric=color_metric,
             show_color_reference=show_color_reference,
@@ -410,6 +445,42 @@ class HoverManager:
     # Subsystem Hover Methods
     # ============================================================================
 
+    def _build_activity_subsystem_hover(
+        self,
+        subsystem_name: str,
+        show_stats: bool,
+        show_color_reference: bool,
+    ) -> str:
+        """Build a subsystem hover from the activity context.
+
+        Activity mode must not reach into SubsystemAnalysis: its statistics are
+        delta scores over significant elements, which require a GroupComparison
+        that does not exist here.
+        """
+        metabolic_model = self.data_provider.metabolic_model
+        model_subsystem = (
+            metabolic_model.get_subsystem(subsystem_name) if metabolic_model else None
+        )
+        if model_subsystem is None:
+            return ""
+
+        subsystem_data = {
+            "is_in_model": True,
+            "subsystem_name": subsystem_name,
+            "subsystem_display_name": model_subsystem.name,
+            "experiment_stats": self.data_provider.get_activity_statistics(
+                subsystem_name, "subsystem"
+            ),
+        }
+
+        context = self._create_context(
+            hover_type="subsystem",
+            element_id=subsystem_name,
+            show_stats=show_stats,
+            show_color_reference=show_color_reference,
+        )
+        return self.subsystem_hover_builder.build(subsystem_data, context)
+
     def build_subsystem_hover(
         self,
         subsystem_name: str,
@@ -420,7 +491,14 @@ class HoverManager:
         delta_options: Dict[str, Any] = None,
     ) -> str:
         """Build hover text for subsystem/pathway bars in group comparison plots."""
-        # Get full subsystem data (includes totals and regulation dicts)
+        if self._mode == AnalysisWorkspaceMode.EXPERIMENT_ANALYSIS:
+            return self._build_activity_subsystem_hover(
+                subsystem_name,
+                show_stats=show_stats,
+                show_color_reference=show_color_reference,
+            )
+
+        # Get full subsystem data (includes totals and net-direction dicts)
         subsystem_data = self.data_provider.get_subsystem_data(
             subsystem_name, for_genes, delta_options
         )
@@ -436,14 +514,16 @@ class HoverManager:
 
         # Add/normalize fields expected by SubsystemSection without dropping dicts
         total_metric_values = subsystem_data.get("total_metric_values", {})
-        regulation_scores = subsystem_data.get("regulation_scores", {})
+        net_direction_scores = subsystem_data.get("net_direction_scores", {})
         subsystem_data["subsystem_name"] = subsystem_name
         subsystem_data["impact_score"] = subsystem_data.get("impact_score", 0.0)
         subsystem_data["n_significant"] = subsystem_data.get(
             "significant_elements", 0
         )
         subsystem_data["n_total"] = subsystem_data.get("total_elements", 0)
-        subsystem_data["regulation_score"] = regulation_scores.get(subsystem_metric, 0.0)
+        subsystem_data["net_direction_score"] = net_direction_scores.get(
+            subsystem_metric, 0.0
+        )
         subsystem_data["total_metric_value"] = total_metric_values.get(subsystem_metric, 0.0)
 
         # Create context for hover building
@@ -455,19 +535,6 @@ class HoverManager:
             show_stats=show_stats,
             show_color_reference=show_color_reference,
         )
-
-        # If Experiment Analysis mode, attach EA stats and group_id for consistency
-        from .data_manager_mode import DataManagerMode
-        if context.get("mode") == DataManagerMode.EXPERIMENT_ANALYSIS:
-            try:
-                subsystem_data["experiment_stats"] = self.data_provider.get_experiment_analysis_statistics(
-                    subsystem_name, "subsystem", None
-                )
-            except Exception:
-                pass
-            active_group = getattr(self.data_provider.group_manager, "active_group", None)
-            if active_group:
-                context["group_id"] = active_group
 
         # Build hover text
         return self.subsystem_hover_builder.build(subsystem_data, context)
@@ -548,7 +615,6 @@ class HoverManager:
         Returns:
             str: Formatted hover text built by modern hover builders
         """
-
         try:
 
             # Use modern hover builders based on element type
@@ -602,7 +668,14 @@ class HoverManager:
                 return self.gene_hover_builder.build(basic_data, context)
 
         except Exception as e:
-            # Fallback for any errors
+            # A hover must never break a render, but swallowing the failure silently
+            # is how a broken data path reaches the user as card text while the
+            # server log, the deterministic suites, and the mounted smokes stay green.
+            logger.exception(
+                "Hover build failed for %s '%s'; rendering an error card",
+                element_type,
+                element_id,
+            )
             return f"{element_type.title()}: {element_id} (Error: {str(e)})"
 
     def _get_cached_result(self, hover_key: str, build_callback) -> str:
@@ -615,7 +688,17 @@ class HoverManager:
         Returns:
             str: The hover text (either from cache or newly built)
         """
-        cache_key = self.cache_manager.get_cache_key(self.group_comparison)
+        active_group = None
+        group_manager = getattr(self.data_provider, "group_manager", None)
+        if group_manager is not None:
+            active_group = group_manager.get_active_group()
+        activity_artifact = getattr(self.data_provider, "activity_artifact", None)
+        cache_key = self.cache_manager.get_cache_key(
+            self.group_comparison_artifact,
+            mode=getattr(self.mode, "value", str(self.mode)),
+            active_group=active_group,
+            activity_key=activity_artifact.metric_key if activity_artifact else None,
+        )
 
         # If no cache key (no group comparison), build directly
         if cache_key is None:

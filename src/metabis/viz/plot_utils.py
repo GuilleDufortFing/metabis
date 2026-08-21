@@ -4,7 +4,6 @@ import numpy as np
 from bokeh.models import ColumnDataSource
 from bokeh.plotting import figure
 from bokeh.themes import Theme
-from ..visual_config import theme
 
 # --- Academic Theme Definition and Helper ---
 

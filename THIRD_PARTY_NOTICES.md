@@ -51,9 +51,8 @@ Human-GEM or Human-maps authors or maintainers.
 The public example files below are based on the Th17 example distributed in the
 Compass repository:
 
-- `data/Th17_Compass_reactions.csv`
-- `data/Th17_Compass_expression.csv`
-- `data/download_and_process_compass.py`
+- `data/Th17_Compass_reactions.tsv`
+- `data/Th17_Compass_expression.tsv`
 
 - Upstream project: Compass
 - Source: https://github.com/wagnerlab-berkeley/Compass
@@ -68,3 +67,31 @@ Compass repository:
 
 Use of these example materials does not imply endorsement by the Compass
 authors, contributors, or copyright holders.
+
+## Smillie-based example data
+
+The public example files below are derived from the processed colon single-cell
+data deposited as Single Cell Portal study SCP259:
+
+- `data/smillie_clusters_pool_expression_cpm.tsv`
+- `data/smillie_metadata.tsv`
+- `data/smillie_clusters_pool_reactions.tsv`
+
+- Upstream study: Smillie et al., intra- and inter-cellular rewiring of the
+  human colon during ulcerative colitis
+- Source: https://singlecell.broadinstitute.org/single_cell/study/SCP259/intra-and-inter-cellular-rewiring-
+- Upstream terms: Broad Single Cell Portal terms of service,
+  https://singlecell.zendesk.com/hc/en-us/articles/360060798672-Terms-of-service,
+  which state that data submitted under a public study are available for
+  unrestricted public view, redistribution, and reuse, and which limit portal
+  content to research use rather than medical, clinical, or diagnostic use.
+- Metabis use: an example expression subset and sample sheet for the multi-group
+  demo notebook, plus a reaction matrix computed from that subset with Compass.
+- Change notice: Metabis pools selected clusters, subsets cells, normalizes the
+  expression matrix to CPM, and writes project-specific output filenames. The
+  controlled-access raw sequencing data are not part of this material.
+- Associated publication: Smillie et al., Cell 2019,
+  https://doi.org/10.1016/j.cell.2019.06.029
+
+Use of these example materials does not imply endorsement by the study authors,
+contributors, or the Broad Institute.

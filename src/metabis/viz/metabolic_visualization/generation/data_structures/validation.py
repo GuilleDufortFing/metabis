@@ -44,6 +44,8 @@ def validate_glyph_structure(glyph: Dict[str, Any]) -> bool:
         GlyphClass.GENE,
         GlyphClass.ENZYME_GROUP,
         GlyphClass.COMPARTMENT,
+        GlyphClass.SUBSYSTEM,
+        GlyphClass.SUBSYSTEM_CATEGORY,
     ]
     if glyph["glyph_class"] not in valid_classes:
         return False
@@ -86,6 +88,7 @@ def validate_connection_structure(connection: Dict[str, Any]) -> bool:
         ConnectionClass.METABOLIC,
         ConnectionClass.REGULATORY,
         ConnectionClass.GENERIC,
+        ConnectionClass.SUBSYSTEM,
     ]
     if connection["connection_class"] not in valid_classes:
         return False

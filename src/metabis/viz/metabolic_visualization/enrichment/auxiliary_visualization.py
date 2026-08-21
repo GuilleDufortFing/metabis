@@ -38,7 +38,7 @@ def create_auxiliary_visualization_data(
         highly_influenced_reaction_colors: Dictionary mapping reaction IDs to colors
         highlight_significant_subgraph: Whether significant subgraph highlighting is enabled
         significant_nodes_set: Set of significant node IDs
-        data_manager: DataManager instance for accessing experimental data
+        data_manager: AnalysisWorkspace instance for accessing experimental data
 
     Returns:
         dict: Dictionary containing auxiliary visualization data

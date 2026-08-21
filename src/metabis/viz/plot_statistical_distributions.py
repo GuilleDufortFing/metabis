@@ -13,7 +13,7 @@ from bokeh.models import (
 )
 from bokeh.plotting import figure, show
 
-from ..managers.data_manager_mode import DataManagerMode
+from ..managers.workspace_mode import AnalysisWorkspaceMode
 from ..visual_config import theme
 from .click_behavior import add_click_behavior, get_external_reference_data
 from .plot_histograms import create_bokeh_histogram
@@ -23,23 +23,27 @@ from .table_formatting import (
     format_statistical_value,
 )
 
-
 _STATISTICAL_METRIC_SPECS = [
     {"field": "adjusted_pval", "title": "adjusted_pval", "width": 110},
     {"field": "pval", "title": "pval", "width": 95},
-    {"field": "cohens_d", "title": "cohens d", "width": 95},
-    {"field": "log2_fc", "title": "log fc", "width": 85},
-    {"field": "mean_difference", "title": "mean difference", "width": 120},
+    {"field": "cohens_d", "title": "Cohen's d (T − B)", "width": 125},
+    {"field": "log2_fc", "title": "log2 FC (T − B sign)", "width": 145},
+    {"field": "mean_difference", "title": "mean Δ (T − B)", "width": 130},
 ]
 
 
 def _get_statistical_results_column_specs(
     element_type: str,
-    for_genes: bool = False,
-) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    """Return the fixed display and export schemas for statistical results."""
+) -> list[dict[str, Any]]:
+    """Return the fixed display schema for the on-screen statistical results table.
+
+    Exports are not built from this schema. A downloaded table is derived from
+    `GroupComparisonArtifact.export_frame`, which carries full-precision values
+    and the calculation's own provenance rather than the display formatting a
+    widget happened to apply.
+    """
     element_title = element_type.capitalize()
-    display_specs = [
+    return [
         {"field": "display_id", "title": element_title, "width": 180, "kind": "link"},
         *[
             {**metric_spec, "kind": "numeric"}
@@ -47,24 +51,6 @@ def _get_statistical_results_column_specs(
         ],
         {"field": "subsystems", "title": "subsystems", "width": 220, "kind": "text"},
     ]
-
-    export_specs = [
-        {"field": "display_id", "title": element_title, "kind": "text"},
-    ]
-    if for_genes:
-        export_specs.append(
-            {"field": "ensembl_id", "title": "ensembl_id", "kind": "text"}
-        )
-    export_specs.extend(
-        [
-            {**metric_spec, "kind": "numeric"}
-            for metric_spec in _STATISTICAL_METRIC_SPECS
-        ]
-    )
-    export_specs.append(
-        {"field": "subsystems", "title": "subsystems", "kind": "text"}
-    )
-    return display_specs, export_specs
 
 
 def _normalize_subsystems(subsystems: Any) -> str:
@@ -180,25 +166,6 @@ def _rows_to_column_data(
         for field in fields:
             column_data[field].append(row_data.get(field))
     return column_data
-
-
-def _build_export_data(
-    rows: list[dict[str, Any]],
-    export_specs: list[dict[str, Any]],
-) -> dict[str, list[str]]:
-    """Build formatted export data using the same schema as the webpage table."""
-    export_data = {spec["field"]: [] for spec in export_specs}
-    for row_data in rows:
-        for spec in export_specs:
-            value = row_data.get(spec["field"])
-            if spec["kind"] == "numeric":
-                export_value = format_statistical_value(value)
-            elif value is None:
-                export_value = ""
-            else:
-                export_value = str(value)
-            export_data[spec["field"]].append(export_value)
-    return export_data
 
 
 def _sort_statistical_results(results_df: pd.DataFrame) -> pd.DataFrame:
@@ -397,7 +364,7 @@ def plot_statistical_histograms(
     """Create a row of histogram plots for statistical parameters.
 
     Args:
-        data_manager: The DataManager object containing dm and group_comparison
+        data_manager: The AnalysisWorkspace object containing dm and group_comparison
         parameters_to_plot: List of parameters to plot ('pval', 'cohens_d', 'log2_fc', 'mean_difference')
         return_plot: Whether to return the plot (True) or show it (False)
         show_thresholds: Whether to show threshold lines on the plots
@@ -407,7 +374,7 @@ def plot_statistical_histograms(
         Optional[gridplot]: The row of histogram plots if return_plot is True, otherwise None
     """
     # Get necessary components from the data_manager
-    group_comparison = data_manager.group_comparison
+    group_comparison = data_manager.get_group_comparison_artifact()
     color_manager = data_manager.color_manager
 
     if not group_comparison:
@@ -459,7 +426,7 @@ def plot_statistical_histograms(
         # We only care about the 'histogram' part
         first_id = test_results.index[0] if not test_results.empty else "dummy"
         details = color_manager.get_distribution_details(
-            mode=DataManagerMode.GROUP_COMPARISON,
+            mode=AnalysisWorkspaceMode.GROUP_COMPARISON,
             element_type=element_type,
             element_id=first_id,
             metric_name=metric_name,
@@ -658,7 +625,7 @@ def _prepare_scatter_source(
     for metric in metrics_to_color:
         if metric in test_results.columns:
             colors = color_manager.get_colors_from_distribution(
-                mode=DataManagerMode.GROUP_COMPARISON,
+                mode=AnalysisWorkspaceMode.GROUP_COMPARISON,
                 element_type=element_type,
                 metric_name=metric,
                 element_ids=test_results.index,
@@ -704,7 +671,7 @@ def _prepare_scatter_source(
                 <span style="color: #666;">Mean Diff:</span> {mean_diff_val}
             </div>
             """
-            
+
         hover_texts.append(hover_text)
     data["desc"] = hover_texts
 
@@ -731,7 +698,7 @@ def plot_statistical_scatterplots(
     """Create a row of scatter plots for statistical parameters.
 
     Args:
-        data_manager: The DataManager object containing dm and group_comparison
+        data_manager: The AnalysisWorkspace object containing dm and group_comparison
         parameters_to_plot: List of parameters to plot ('pval', 'cohens_d', 'log2_fc', 'mean_difference')
         return_plot: Whether to return the plot (True) or show it (False)
         show_thresholds: Whether to show threshold lines on the plots
@@ -741,7 +708,7 @@ def plot_statistical_scatterplots(
         Optional[gridplot]: The row of scatter plots if return_plot is True, otherwise None
     """
     # Get necessary components from the data_manager
-    group_comparison = data_manager.group_comparison
+    group_comparison = data_manager.get_group_comparison_artifact()
 
     if not group_comparison:
         raise ValueError("No group comparison set in the data_manager")
@@ -905,10 +872,15 @@ def create_statistical_results_table(
     css_classes=None,
     stylesheets=None,
 ):
-    """Create a data table for statistical results with download button.
+    """Create the on-screen data table for statistical results.
+
+    This builds what a user *reads*: display labels, links, and rounded values.
+    It does not build what a user *downloads* -- that is derived from
+    `GroupComparisonArtifact.export_frame`, at full precision and with the
+    calculation's own provenance.
 
     Args:
-        data_manager: The DataManager object containing group_comparison
+        data_manager: The AnalysisWorkspace object containing group_comparison
         element_type: Either "reaction" or "gene" (default: "reaction")
         for_genes: Whether to use gene data (True) or reaction data (False)
         table_height: Height of the table in pixels (default: 300)
@@ -919,20 +891,15 @@ def create_statistical_results_table(
             - 'table': The DataTable component
             - 'source': The ColumnDataSource for the table
             - 'title': The title Div element
-            - 'export_data': Curated string data for CSV download
-            - 'export_fields': Ordered source fields for CSV download
-            - 'export_headers': Ordered CSV headers matching the webpage table
     """
     css_classes = list(css_classes or [])
     stylesheets = list(stylesheets or [])
 
-    display_specs, export_specs = _get_statistical_results_column_specs(
-        element_type,
-        for_genes=for_genes,
-    )
+    display_specs = _get_statistical_results_column_specs(element_type)
 
     # Get the appropriate test results
-    results_df = data_manager.group_comparison.get_test_results(for_genes=for_genes)
+    artifact = data_manager.get_group_comparison_artifact()
+    results_df = artifact.get_test_results(for_genes=for_genes)
 
     if results_df is None or len(results_df) == 0:
         # Return empty components if no data
@@ -956,9 +923,6 @@ def create_statistical_results_table(
             "table": empty_table,
             "source": empty_source,
             "title": title,
-            "export_data": None,
-            "export_fields": [spec["field"] for spec in export_specs],
-            "export_headers": [spec["title"] for spec in export_specs],
         }
 
     sorted_results_df = _sort_statistical_results(results_df)
@@ -1021,43 +985,6 @@ def create_statistical_results_table(
         "table": results_table,
         "source": table_source,
         "title": title,
-        "export_data": None,
-        "export_fields": [spec["field"] for spec in export_specs],
-        "export_headers": [spec["title"] for spec in export_specs],
-    }
-
-
-def create_statistical_results_export_bundle(
-    data_manager,
-    element_type="reaction",
-    for_genes=False,
-):
-    """Build full CSV export payload without creating a Bokeh table model."""
-    _, export_specs = _get_statistical_results_column_specs(
-        element_type,
-        for_genes=for_genes,
-    )
-
-    results_df = data_manager.group_comparison.get_test_results(for_genes=for_genes)
-
-    if results_df is None or len(results_df) == 0:
-        return {
-            "export_data": None,
-            "export_fields": [spec["field"] for spec in export_specs],
-            "export_headers": [spec["title"] for spec in export_specs],
-        }
-
-    sorted_results_df = _sort_statistical_results(results_df)
-    export_rows = _build_statistical_table_rows(
-        data_manager,
-        sorted_results_df,
-        for_genes=for_genes,
-    )
-
-    return {
-        "export_data": _build_export_data(export_rows, export_specs),
-        "export_fields": [spec["field"] for spec in export_specs],
-        "export_headers": [spec["title"] for spec in export_specs],
     }
 
 

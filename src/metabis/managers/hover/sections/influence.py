@@ -1,6 +1,8 @@
 from typing import Any, Dict, List
+
 from ..interfaces import HoverSection
 from ..models import HoverContext, HoverData
+
 
 class InfluenceSection(HoverSection):
     """Section for gene influence information on reactions."""
