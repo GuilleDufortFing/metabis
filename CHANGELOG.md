@@ -17,6 +17,14 @@ and releases follow [Semantic Versioning](https://semver.org/).
   author-maintained archive, verifying its recorded SHA-256 digest.
 - Attribution and upstream terms for the Smillie example data in the README and
   in `THIRD_PARTY_NOTICES.md`.
+- `add_click_behavior` accepts keyword-only `navigation_event` and
+  `download_flag` for figures embedded without a Bokeh server
+  (`bokeh.embed.json_item`). A subsystem tap dispatches the named `CustomEvent`
+  on `window` with `detail = {element_id, label}`, and hover-panel downloads
+  follow the named `window` flag, instead of driving a `Select` and a `Toggle`
+  that such a figure would only carry as detached copies. Each replaces its
+  widget argument; passing both raises `ValueError`. Existing calls are
+  unchanged.
 
 ### Changed
 
