@@ -117,6 +117,8 @@ _MODULE_EXPORTS: dict[str, tuple[str, ...]] = {
         "create_statistical_results_table",
         "plot_statistical_histograms",
         "plot_statistical_scatterplots",
+        "statistical_results_columns",
+        "statistical_results_rows",
     ),
     ".viz.plot_subsystem_artifact_ranking": (
         "RankingFeaturePresentation",
@@ -250,6 +252,8 @@ if TYPE_CHECKING:
         create_statistical_results_table,
         plot_statistical_histograms,
         plot_statistical_scatterplots,
+        statistical_results_columns,
+        statistical_results_rows,
     )
     from .viz.plot_subsystem_artifact_ranking import (
         RankingFeaturePresentation,
@@ -353,6 +357,8 @@ __all__ = [
     "plot_reduction_artifact",
     "plot_statistical_histograms",
     "plot_statistical_scatterplots",
+    "statistical_results_columns",
+    "statistical_results_rows",
     "plot_subsystem_activity_ranking",
     "plot_subsystem_comparison",
     "plot_subsystem_influence_summary",

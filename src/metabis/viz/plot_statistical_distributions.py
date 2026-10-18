@@ -180,6 +180,43 @@ def _sort_statistical_results(results_df: pd.DataFrame) -> pd.DataFrame:
     return results_df
 
 
+def statistical_results_columns(element_type: str = "reaction") -> list[dict[str, Any]]:
+    """Return the on-screen results table's columns, as the Bokeh table shows them.
+
+    Each column has a ``field``, ``title``, ``width`` and ``kind``: ``"link"`` for
+    the element column (linked through the row's ``external_url``), ``"numeric"``
+    for a metric, and ``"text"`` otherwise. A caller drawing its own table reads
+    the schema :func:`create_statistical_results_table` is built from.
+    """
+    return [dict(spec) for spec in _get_statistical_results_column_specs(element_type)]
+
+
+def statistical_results_rows(
+    data_manager,
+    for_genes: bool = False,
+    max_rows: Optional[int] = None,
+) -> list[dict[str, Any]]:
+    """Return the installed comparison's on-screen result rows, smallest adjusted p first.
+
+    Each row carries the fields of :func:`statistical_results_columns` plus
+    ``external_url`` and ``ensembl_id`` (empty for reactions). These are display
+    values, for reading: a download is built from
+    ``GroupComparisonArtifact.export_frame``, at full precision.
+    """
+    artifact = data_manager.get_group_comparison_artifact()
+    if artifact is None:
+        raise ValueError("No group comparison set in the data_manager")
+    results_df = artifact.get_test_results(for_genes=for_genes)
+    if results_df is None or len(results_df) == 0:
+        return []
+    sorted_results_df = _sort_statistical_results(results_df)
+    if max_rows is not None:
+        sorted_results_df = sorted_results_df.head(max_rows)
+    return _build_statistical_table_rows(
+        data_manager, sorted_results_df, for_genes=for_genes
+    )
+
+
 def _create_scatter_figure(
     dm,
     source: ColumnDataSource,
@@ -196,6 +233,7 @@ def _create_scatter_figure(
     element_type: str = "reaction",
     enabled_toggle=None,
     filename_prefix: str = "statistical_element",
+    download_flag: Optional[str] = None,
 ):
     """Create a scatter figure comparing two parameters.
 
@@ -300,6 +338,7 @@ def _create_scatter_figure(
         scatter_fig,
         filename_prefix=filename_prefix,
         enabled_toggle=enabled_toggle,
+        download_flag=download_flag,
     )
 
     return scatter_fig
@@ -693,6 +732,8 @@ def plot_statistical_scatterplots(
     background_fill_color="#ffffff",
     enabled_toggle=None,
     click_filename_prefix: str = "statistical_element",
+    *,
+    download_flag: Optional[str] = None,
     **kwargs,
 ) -> Optional[Any]:
     """Create a row of scatter plots for statistical parameters.
@@ -703,6 +744,11 @@ def plot_statistical_scatterplots(
         return_plot: Whether to return the plot (True) or show it (False)
         show_thresholds: Whether to show threshold lines on the plots
         for_genes: Whether to plot gene data (True) or reaction data (False)
+        enabled_toggle: A Bokeh ``Toggle`` enabling hover-panel downloads on tap,
+            for a figure shown in a Bokeh server document.
+        download_flag: The ``window`` property enabling hover-panel downloads on
+            tap, for a figure embedded without a Bokeh server; see
+            :func:`metabis.viz.click_behavior.add_click_behavior`.
 
     Returns:
         Optional[gridplot]: The row of scatter plots if return_plot is True, otherwise None
@@ -851,6 +897,7 @@ def plot_statistical_scatterplots(
                 element_type="gene" if for_genes else "reaction",
                 enabled_toggle=enabled_toggle,
                 filename_prefix=click_filename_prefix,
+                download_flag=download_flag,
             )
             scatter_plots.append(plot)
 

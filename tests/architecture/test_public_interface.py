@@ -95,6 +95,8 @@ EXPECTED_ROOT_ALL = frozenset(
         "plot_reduction_artifact",
         "plot_statistical_histograms",
         "plot_statistical_scatterplots",
+        "statistical_results_columns",
+        "statistical_results_rows",
         "plot_subsystem_activity_ranking",
         "plot_subsystem_comparison",
         "plot_subsystem_influence_summary",
