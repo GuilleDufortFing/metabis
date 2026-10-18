@@ -25,9 +25,10 @@ and releases follow [Semantic Versioning](https://semver.org/).
   that such a figure would only carry as detached copies. Each replaces its
   widget argument; passing both raises `ValueError`. Existing calls are
   unchanged.
-- `plot_statistical_scatterplots` accepts keyword-only `download_flag`, passed
-  to `add_click_behavior`, so statistical scatter figures embedded without a
-  Bokeh server can download hover panels on tap.
+- `plot_statistical_scatterplots`, `plot_subsystem_comparison` and
+  `plot_subsystem_activity_ranking` accept keyword-only `download_flag`, passed
+  to `add_click_behavior`, so these figures embedded without a Bokeh server can
+  download hover panels on tap.
 - `statistical_results_columns` and `statistical_results_rows` return the
   columns and rows of the on-screen statistical results table, smallest adjusted
   p-value first, for callers that draw their own table instead of the Bokeh

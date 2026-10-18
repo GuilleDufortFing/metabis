@@ -74,6 +74,8 @@ def plot_subsystem_comparison(
     sizing_mode: str = "stretch_width",
     enabled_toggle=None,
     click_filename_prefix: str = "subsystem_element",
+    *,
+    download_flag: str | None = None,
 ):
     """Create a category-grouped dot plot comparison of subsystems.
 
@@ -94,6 +96,9 @@ def plot_subsystem_comparison(
         title: Optional title for the plot.
         background_fill_color: Background color for the plot.
         sizing_mode: Optional sizing mode (e.g., "stretch_width").
+        download_flag: The ``window`` property enabling hover-panel downloads on
+            tap, for a figure embedded without a Bokeh server; see
+            :func:`metabis.viz.click_behavior.add_click_behavior`.
 
     Returns:
         Bokeh figure if return_plot is True, else None.
@@ -308,6 +313,7 @@ def plot_subsystem_comparison(
         p,
         filename_prefix=click_filename_prefix,
         enabled_toggle=enabled_toggle,
+        download_flag=download_flag,
     )
 
     if return_plot:
@@ -358,6 +364,8 @@ def plot_subsystem_activity_ranking(
     sizing_mode: str = "stretch_width",
     enabled_toggle=None,
     click_filename_prefix: str = "subsystem_element",
+    *,
+    download_flag: str | None = None,
 ):
     """Rank subsystems by single-group activity, grouped by metabolic category.
 
@@ -372,6 +380,8 @@ def plot_subsystem_activity_ranking(
         activity_artifact: The installed ActivityArtifact.
         max_points_per_subsystem: Cap on plotted member points per subsystem.
         return_plot: Whether to return the figure or show it.
+        download_flag: The ``window`` property enabling hover-panel downloads on
+            tap, for a figure embedded without a Bokeh server.
 
     Returns:
         Bokeh figure if return_plot is True, else None.
@@ -601,6 +611,7 @@ def plot_subsystem_activity_ranking(
         p,
         filename_prefix=click_filename_prefix,
         enabled_toggle=enabled_toggle,
+        download_flag=download_flag,
     )
 
     if return_plot:

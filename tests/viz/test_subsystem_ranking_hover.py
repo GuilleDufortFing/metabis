@@ -128,3 +128,20 @@ def test_no_color_reference_payload_is_shipped_per_point(ranking):
 
     assert "color_reference_value" not in source
     assert "color_reference_marker_x" not in source
+
+
+def test_a_server_free_ranking_reads_hover_downloads_from_a_page_flag():
+    stats = pd.DataFrame({"subsystem": [SUBSYSTEM], "delta_score": [1.4]})
+    plot = plot_subsystem_comparison(
+        data_manager=_Workspace(),
+        subsystem_stats=stats,
+        metric=METRIC,
+        return_plot=True,
+        download_flag="metabisDownloadHoverOnClick",
+    )
+
+    (callback,) = plot.renderers[0].data_source.selected.js_property_callbacks[
+        "change:indices"
+    ]
+    assert callback.args["download_flag"] == "metabisDownloadHoverOnClick"
+    assert "enabled_toggle" not in callback.args

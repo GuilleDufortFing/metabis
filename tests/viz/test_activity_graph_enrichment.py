@@ -160,6 +160,25 @@ def test_activity_ranking_plots_measured_members_without_a_significance_filter(
 
 
 @pytest.mark.integration
+def test_a_server_free_activity_ranking_reads_hover_downloads_from_a_page_flag(
+    data_manager,
+):
+    data_manager.activate_activity_mode(activity_config())
+
+    plot = plot_subsystem_activity_ranking(
+        data_manager=data_manager,
+        activity_artifact=data_manager.get_activity_artifact(),
+        return_plot=True,
+        download_flag="metabisDownloadHoverOnClick",
+    )
+
+    (callback,) = plot.renderers[0].data_source.selected.js_property_callbacks[
+        "change:indices"
+    ]
+    assert callback.args["download_flag"] == "metabisDownloadHoverOnClick"
+
+
+@pytest.mark.integration
 def test_the_activity_ranking_carries_its_gradient_color_reference(data_manager):
     """R-09. Supp. 1.5 claims this panel for every gradient plot.
 
