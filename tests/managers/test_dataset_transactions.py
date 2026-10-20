@@ -143,6 +143,22 @@ def test_reaction_and_model_replacement_is_one_atomic_workspace_transition():
     _assert_derived_state_was_invalidated(manager)
 
 
+def test_reaction_replacement_can_clear_the_expression_in_the_same_transition():
+    manager, _old_model, _old_reaction, _expression = _manager_with_installed_state()
+    new_model = _Model("new")
+    new_reaction = _ReactionData("R_new")
+    revisions_before = manager.get_workspace_revisions()
+
+    manager.replace_reaction_data(new_reaction, metabolic_model=new_model, clear_expression=True)
+
+    assert manager.reaction_data is new_reaction
+    assert manager.expression_data is None
+    assert manager.data_provider.expression_data is None
+    assert manager.sample_metadata is None
+    assert manager.dataset_revision == revisions_before.dataset + 1
+    _assert_derived_state_was_invalidated(manager)
+
+
 def test_expression_replacement_preserves_other_inputs_and_bumps_once():
     manager, model, reaction, _old_expression = _manager_with_installed_state()
     new_expression = _ExpressionData("G_new")

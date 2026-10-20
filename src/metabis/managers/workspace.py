@@ -578,8 +578,14 @@ class AnalysisWorkspace:
         output_reaction_format: str | None = None,
         preprocessing_changed: bool = True,
         prepared_fingerprints: PreparedDatasetFingerprints | None = None,
+        clear_expression: bool = False,
     ) -> None:
-        """Atomically install prepared Reaction Data and, optionally, its model."""
+        """Atomically install prepared Reaction Data and, optionally, its model.
+
+        The sample metadata is always cleared, since it was aligned to the old
+        samples. ``clear_expression`` clears the Expression Data in the same
+        transition, for a caller that treats new reaction data as a new dataset.
+        """
         if reaction_data is None:
             raise ValueError("Reaction Data is required; use reset_dataset() to clear it")
         if metabolic_model is None:
@@ -587,6 +593,7 @@ class AnalysisWorkspace:
         self._replace_dataset_inputs(
             metabolic_model=metabolic_model,
             reaction_data=reaction_data,
+            expression_data=None if clear_expression else _UNCHANGED,
             preprocessing_changed=preprocessing_changed,
             clear_metadata=True,
             output_reaction_format=output_reaction_format,
