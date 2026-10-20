@@ -6,7 +6,6 @@ import numpy as np
 import pandas as pd
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
-from umap import UMAP
 
 from ..analysis_workspace import WorkspaceProvenance
 from ..domain.expression_matrix import ExpressionMatrix
@@ -726,6 +725,10 @@ class DimensionalityReduction:
             return cached
 
         try:
+            # UMAP and its nearest-neighbour index cost about 250 MiB to import, so
+            # a process pays for them only once a UMAP is computed.
+            from umap import UMAP
+
             umap_model = UMAP(
                 n_components=n_components,
                 n_neighbors=n_neighbors,

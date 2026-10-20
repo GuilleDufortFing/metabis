@@ -2,7 +2,6 @@ import base64
 import io
 from typing import Optional, Tuple
 
-import matplotlib.pyplot as plt
 import numpy as np
 from bokeh.layouts import gridplot
 from bokeh.models import ColumnDataSource, HoverTool
@@ -775,6 +774,9 @@ def create_matplotlib_violin_for_hover(
     Returns:
         str: HTML img tag containing the plot as a base64-encoded SVG
     """
+    # Matplotlib is needed only for these violins, drawn at full hover detail.
+    import matplotlib.pyplot as plt
+
     plt.style.use("seaborn-v0_8-whitegrid")
     fig, ax = plt.subplots(figsize=(3, 2.5), dpi=800)
 

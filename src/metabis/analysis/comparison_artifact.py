@@ -276,9 +276,14 @@ class GroupComparisonArtifact:
         frame = self._gene_frame if for_genes else self._reaction_frame
         return frame.copy() if frame is not None else None
 
-    def get_significant_elements(self, for_genes: bool = False) -> set:
-        """The set of significant feature IDs for one family."""
-        return set(self._significant_gene_set if for_genes else self._significant_reaction_set)
+    def get_significant_elements(self, for_genes: bool = False) -> frozenset[str]:
+        """The set of significant feature IDs for one family.
+
+        The artifact's own frozen set, shared rather than copied: every subsystem
+        summary holds it, and a copy each would cost a whole family's IDs per
+        subsystem.
+        """
+        return self._significant_gene_set if for_genes else self._significant_reaction_set
 
     def is_significant(self, element_id: str, for_genes: bool = False) -> bool:
         """Whether one feature is significant under the installed thresholds."""

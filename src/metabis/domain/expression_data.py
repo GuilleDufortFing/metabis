@@ -1,9 +1,9 @@
 import warnings
 from typing import Any, Dict, List, Optional
 
+import anndata as ad
 import numpy as np
 import pandas as pd
-import scanpy as sc
 
 from .expression_matrix import (
     DenseExpressionMatrix,
@@ -231,7 +231,7 @@ class ExpressionData:
         try:
             # --- Load Data ---
             if data_format == "h5ad":
-                adata_raw = sc.read_h5ad(path)
+                adata_raw = ad.read_h5ad(path)
                 # AnnData standard: samples (obs) x genes (var)
                 # Check for duplicate var_names (genes)
                 if adata_raw.var_names.duplicated().any():
@@ -260,7 +260,7 @@ class ExpressionData:
                     else:
                         df = df_raw
                     # Create AnnData object
-                    self.adata = sc.AnnData(
+                    self.adata = ad.AnnData(
                         X=df.values,
                         obs=pd.DataFrame(index=df.index),  # Samples are in index
                         var=pd.DataFrame(index=df.columns),  # Genes are in columns
@@ -275,7 +275,7 @@ class ExpressionData:
                     else:
                         df = df_raw
                     # Create AnnData object (transpose needed)
-                    self.adata = sc.AnnData(
+                    self.adata = ad.AnnData(
                         X=df.T.values,  # Transpose data matrix
                         obs=pd.DataFrame(index=df.columns),  # Samples are in columns
                         var=pd.DataFrame(index=df.index),  # Genes are in index
@@ -502,6 +502,10 @@ class ExpressionData:
 
     def _apply_preprocessing(self, config: ExpressionPreprocessingConfig) -> None:
         """Apply a typed expression preprocessing configuration in order."""
+        # Scanpy costs about 200 MiB to import, so a process pays for it only once
+        # some expression is actually normalized.
+        import scanpy as sc
+
         if config.normalize_total:
             sc.pp.normalize_total(self.adata, target_sum=config.target_sum, inplace=True)
         if config.log1p:
