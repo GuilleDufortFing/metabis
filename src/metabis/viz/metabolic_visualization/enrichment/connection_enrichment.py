@@ -104,7 +104,9 @@ def enrich_connections(
                 "y0": y0,
                 "x1": x1,
                 "y1": y1,
-                "color": color,
+                # A shared metabolite is a link, not a measurement: one neutral
+                # grey, stronger for more shared metabolites.
+                "color": VisualizationConstants.GLOBAL_BORDER_COLOR,
                 "line_alpha": alpha,
                 "line_width": VisualizationConstants.SUBSYSTEM_CONNECTION_WIDTH,
                 "line_dash": "solid",

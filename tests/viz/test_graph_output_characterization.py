@@ -54,7 +54,10 @@ HUMAN1_STRUCTURE = "97aa9426b748b16100ebfdf9e7ea2bcdc7738d3628b16c271b7fad57ba54
 # connectivity-preserving split, which redraws glycolysis as 10 components with
 # 124 nodes in the largest instead of 23 components with 34.
 STANDARD_STRUCTURE = "4233e408abb355939b0372d16f2a7f32657abedf48860333edb0158054894725"
-OVERVIEW_STRUCTURE = "83d72a62d7ae47fbe24182d8f067ce902076e960cbf602f8a1fddeff0e7831ed"
+# OVERVIEW_STRUCTURE is re-recorded on 2026-10-21 for the spaced overview: the
+# packaged positions now seed a layout per category (spaced_network), so every
+# node moved, while the nodes, edges and their order stayed.
+OVERVIEW_STRUCTURE = "83b7a02add59723ea547b30afd031038748593dd97a44b358dd73360f2c4832d"
 
 
 def prepare_graph(

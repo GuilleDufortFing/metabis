@@ -78,7 +78,8 @@ PLOT_THEME_JSON = {
             "bar_line_color": None,
         },
         "Label": {"text_font": _FONT, "text_color": visual_theme.INK},
-        "LabelSet": {"text_font": _FONT, "text_color": visual_theme.INK},
+        # A label set's font is a vectorized property: a bare string would name a column.
+        "LabelSet": {"text_font": {"value": _FONT}, "text_color": visual_theme.INK},
     }
 }
 

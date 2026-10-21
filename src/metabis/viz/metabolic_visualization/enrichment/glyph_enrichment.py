@@ -683,7 +683,7 @@ def enrich_subsystem_glyph_with_data(
             show_color_reference=show_hover_color_reference,
         )
         if missing_reason in {"no_experimental_data", "no_metadata"}:
-            subsystem_color = VisualizationConstants.MISSING_DATA_COLOR
+            subsystem_color = VisualizationConstants.SUBSYSTEM_NO_DATA_COLOR
         else:
             subsystem_color = data_manager.get_element_color(
                 subsystem_id,
@@ -700,7 +700,9 @@ def enrich_subsystem_glyph_with_data(
     if not subsystem_color or subsystem_color == "white":
         subsystem_color = "lightblue"
 
-    # Calculate dynamic radius based on reaction and metabolite counts
+    # The overview's layout sizes each node by its reactions (spaced_network) and
+    # places it by that size, so its radius is kept. Otherwise the radius grows
+    # with the reaction and metabolite counts.
     reaction_count = glyph.get("reaction_count", 0)
     metabolite_count = glyph.get("metabolite_count", 0)
 
@@ -708,7 +710,9 @@ def enrich_subsystem_glyph_with_data(
     total_elements = reaction_count + metabolite_count
 
     # Calculate radius with configurable scaling
-    if total_elements > 0:
+    if glyph.get("radius"):
+        radius = float(glyph["radius"])
+    elif total_elements > 0:
         # Apply scaling based on the configured method
         scaling_method = VisualizationConstants.SUBSYSTEM_SCALING_METHOD
 
@@ -823,8 +827,9 @@ def enrich_subsystem_category_glyph_with_data(
         line_dash = VisualizationConstants.MISSING_DATA_LINE_DASH
         fill_alpha = VisualizationConstants.MISSING_DATA_ALPHA
     else:
-        # Use CategoryManager for dynamic color lookup based on category file order
-        line_color = focus_instance.model.get_category_color(category_name)
+        # Categories carry no hue: their place and name identify them, and the
+        # colour is left to the subsystems' scores.
+        line_color = VisualizationConstants.DEFAULT_CATEGORY_LINE_COLOR
         line_dash = VisualizationConstants.DEFAULT_CATEGORY_LINE_DASH
         fill_alpha = VisualizationConstants.DEFAULT_CATEGORY_FILL_ALPHA
 
@@ -840,6 +845,7 @@ def enrich_subsystem_category_glyph_with_data(
         alpha=alpha,
         display_label=display_label,
         line_color=line_color,
+        text_color=VisualizationConstants.CATEGORY_LABEL_COLOR,
         line_dash=line_dash,
         fill_alpha=fill_alpha,
         font_size=VisualizationConstants.FONT_SIZE_CATEGORY,

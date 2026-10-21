@@ -1,7 +1,9 @@
 """Utilities for creating Bokeh visualizations."""
 
 import math
+import textwrap
 
+from bokeh.core.properties import value
 from bokeh.models import ColumnDataSource, HoverTool, LabelSet
 from bokeh.plotting import figure
 
@@ -1228,21 +1230,32 @@ def _draw_enriched_subsystem_categories(plot, category_glyphs):
         source=source,
     )
 
-    # Add labels for category names
-    labels = LabelSet(
+    # The names keep their size on screen, so the automatic ranges cannot measure
+    # them: an invisible point at the foot of each name's band keeps the last row's
+    # names in view.
+    plot.scatter(
         x="x",
-        y="y_label",  # Use offset position above the circle
-        text="display_label",
-        text_color="text_color",  # Use category-specific color
-        text_font_size="font_size",  # Use dynamic font size from enriched data
-        text_font_style="bold",
-        text_align="center",
-        text_baseline="middle",
-        text_alpha="label_alpha",  # Use separate alpha for labels
-        level="annotation",  # Draw on top for visibility
+        y="y_label_end",
+        size=1,
+        fill_alpha=0,
+        line_alpha=0,
+        level="underlay",
         source=source,
     )
-    plot.add_layout(labels)
+    plot.text(
+        x="x",
+        y="y_label",
+        text="label_text",
+        text_color="text_color",
+        text_font=value(VisualizationConstants.FONT_FAMILY),
+        text_font_size="font_size",
+        text_font_style="bold",
+        text_align="center",
+        text_baseline="top",
+        text_alpha="label_alpha",
+        level="annotation",
+        source=source,
+    )
 
     return renderer
 
@@ -1308,10 +1321,25 @@ def _convert_glyphs_to_bokeh_data(glyphs):
         data["line_width"] = [g.get("line_width", 1) for g in glyphs]
         data["font_size"] = [g.get("font_size", "10pt") for g in glyphs]
         data["label_alpha"] = [g.get("label_alpha", 1.0) for g in glyphs]
-        # Calculate label position above the circle
+        # Each name under its circle (the y-range is flipped, so under is +y),
+        # wrapped so it keeps within the circle's width at the overview's scale.
         data["y_label"] = [
-            g["y"] - g["radius"] + 50 for g in glyphs
-        ]  # Position above circle
+            g["y"] + g["radius"] + VisualizationConstants.CATEGORY_LABEL_OFFSET
+            for g in glyphs
+        ]
+        data["y_label_end"] = [
+            y + VisualizationConstants.CATEGORY_LABEL_BAND for y in data["y_label"]
+        ]
+        data["label_text"] = [
+            "\n".join(
+                textwrap.wrap(
+                    g["display_label"],
+                    VisualizationConstants.CATEGORY_LABEL_LINE_LENGTH,
+                    break_long_words=False,
+                )
+            )
+            for g in glyphs
+        ]
         # Add hover text
         data["hover"] = [
             g.get("hover", f"Category: {g['display_label']}") for g in glyphs

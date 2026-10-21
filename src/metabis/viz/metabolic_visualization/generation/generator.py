@@ -8,6 +8,7 @@ from typing import Mapping, Optional
 from metabis.resource_registry import ResourceRegistry
 
 from .graph_building.compartment_graph import create_compartmentalized_graph_from_model
+from .graph_building.spaced_network import space_network
 from .utilities.cache_utils import (
     DEFAULT_SUBSYSTEM_LAYOUT_ENGINE,
     SUBSYSTEM_HUMAN1_VARIANT,
@@ -145,6 +146,14 @@ class MetabolicGraphGenerator:
                     f"{graph_type} '{config['element_name_normalized']}': "
                     f"{graph_resource_file}"
                 )
+            if graph_type == "metabolic_network" and self.model is not None:
+                # The packaged positions seed a layout for the current categories.
+                category_of = {
+                    subsystem: category
+                    for category, subsystems in self.model.get_subsystems_by_category().items()
+                    for subsystem in subsystems
+                }
+                glyphs, connections = space_network(glyphs, connections, category_of)
 
         return glyphs, connections, config["display_title"]
 

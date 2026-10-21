@@ -233,6 +233,16 @@ class ColorManager:
             mode, element_type, element_id, metric_name
         )
 
+    def has_value(
+        self,
+        mode: AnalysisWorkspaceMode,
+        element_type: str,
+        element_id: str,
+        metric_name: str = "default",
+    ) -> bool:
+        """Whether the registered distribution holds a finite value for this element."""
+        return self.color_lookup().has_value(mode, element_type, element_id, metric_name)
+
     def get_color_limit(
         self,
         mode: AnalysisWorkspaceMode,

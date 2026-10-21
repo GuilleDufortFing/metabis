@@ -225,8 +225,8 @@ class VisualizationConstants:
     LOW_ALPHA = 0.5
     TRANSPARENT_ALPHA = 0.0
     INFLUENCE_EDGE_ALPHA = 0.8
-    SUBSYSTEM_CONNECTION_MIN_ALPHA = 0.1
-    SUBSYSTEM_CONNECTION_MAX_ALPHA = 1
+    SUBSYSTEM_CONNECTION_MIN_ALPHA = 0.35
+    SUBSYSTEM_CONNECTION_MAX_ALPHA = 0.8
 
     # Default sizes
     REACTION_SIZE = 40
@@ -258,7 +258,7 @@ class VisualizationConstants:
     # Line widths
     DEFAULT_LINE_WIDTH = 1.0
     ENZYME_CONNECTION_WIDTH = 1.0
-    SUBSYSTEM_CONNECTION_WIDTH = 3.0
+    SUBSYSTEM_CONNECTION_WIDTH = 1.0
     INFLUENCE_LINE_WIDTH = 1.5
     COMPARTMENT_LINE_WIDTH = 7
     ARROWHEAD_LINE_WIDTH = 0.25
@@ -276,9 +276,10 @@ class VisualizationConstants:
     EDGE_GLOW_SECOND_ALPHA = 0.35
 
     # Plot styling
-    PLOT_OUTLINE_WIDTH = 7
-    PLOT_OUTLINE_ALPHA = 0.3
-    PLOT_OUTLINE_COLOR = "black"
+    # No frame around a graph: the page's card already frames it.
+    PLOT_OUTLINE_WIDTH = 1
+    PLOT_OUTLINE_ALPHA = 1.0
+    PLOT_OUTLINE_COLOR = None
     COMPARTMENT_BORDER_RADIUS = 10
 
     # Font sizes (CSS format)
@@ -318,11 +319,17 @@ class VisualizationConstants:
     SUBSYSTEM_POWER_EXPONENT = 0.7  # Used when scaling method is 'power'
 
     # Subsystem category boundary styling
-    DEFAULT_CATEGORY_COLOR = "transparent"  # Categories are transparent boundaries
-    DEFAULT_CATEGORY_LINE_COLOR = "#4682B4"  # Steel blue for category boundaries
-    DEFAULT_CATEGORY_LINE_WIDTH = 3.0  # Thicker lines for category boundaries
+    # Categories are neutral containers, in the React client's tokens: the step
+    # cards' legend-box fill (--sheet) inside a GOV.UK border grey (--rule-grey),
+    # named in the client's navy (--navy-2).
+    DEFAULT_CATEGORY_COLOR = "#f8f8f8"
+    DEFAULT_CATEGORY_LINE_COLOR = "#b1b4b6"
+    DEFAULT_CATEGORY_LINE_WIDTH = 1.2
     DEFAULT_CATEGORY_LINE_DASH = "solid"  # Solid lines for categories
-    DEFAULT_CATEGORY_FILL_ALPHA = 0.0  # Completely transparent fill
+    DEFAULT_CATEGORY_FILL_ALPHA = 1.0
+    CATEGORY_LABEL_COLOR = "#152030"
+    # A subsystem with no data is neutral grey, as Supplementary Section 1.5 says.
+    SUBSYSTEM_NO_DATA_COLOR = "#c7c7c7"
     CATEGORY_LABEL_ALPHA = 0.8  # Slightly transparent category labels
 
     # Category boundary sizing
@@ -332,7 +339,11 @@ class VisualizationConstants:
     DEFAULT_SUBSYSTEM_CATEGORY_ALPHA = 0.7  # Default alpha for subsystem categories
 
     # Category font styling
-    FONT_SIZE_CATEGORY = "12pt"  # Larger font for category labels
+    FONT_SIZE_CATEGORY = "11px"  # Category names, under each category
+    CATEGORY_LABEL_OFFSET = 60  # Layout units between a category's circle and its name
+    CATEGORY_LABEL_LINE_LENGTH = 16  # Characters per line of a category's name (spaced_network)
+    CATEGORY_LABEL_BAND = 1000  # Layout units the name may take below its circle
+    FONT_FAMILY = "Arial"  # As the React client
 
     # Subsystem name text wrapping
     SUBSYSTEM_NAME_MAX_LINE_LENGTH = 25  # Maximum characters per line

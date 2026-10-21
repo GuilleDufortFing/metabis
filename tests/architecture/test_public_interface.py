@@ -79,7 +79,11 @@ EXPECTED_ROOT_ALL = frozenset(
         "plot_metabolic_graph",
         # Plotting
         "PLOT_THEME",
+        "add_network_focus_link",
         "apply_academic_style",
+        "overview_color_bar",
+        "registered_color_bar",
+        "theme",
         "build_external_link_formatter",
         "build_statistical_number_formatter",
         "build_reduction_presentation",

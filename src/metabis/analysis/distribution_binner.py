@@ -315,6 +315,10 @@ class DistributionBinner:
             )
         return histogram_bins
 
+    def bin_for_value(self, value: float) -> int:
+        """The palette bin an arbitrary value on this scale falls in."""
+        return self._bin_for_value(value)
+
     def _bin_for_value(self, value: float) -> int:
         """Return the palette bin for an arbitrary value on this scale."""
         if not np.isfinite(value):

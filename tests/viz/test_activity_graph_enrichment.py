@@ -18,6 +18,7 @@ from metabis import (
     plot_subsystem_activity_ranking,
 )
 from metabis.viz.metabolic_visualization import EnrichmentConfig
+from metabis.viz.ranking_layout import RANKING_DOTS
 from metabis.viz.plot_subsystem_ranking import _saturating_axis_bounds
 
 SUBSYSTEM_ID = "galactose_metabolism"
@@ -152,11 +153,13 @@ def test_activity_ranking_plots_measured_members_without_a_significance_filter(
     )
 
     assert plot is not None
-    assert plot.xaxis[0].axis_label.startswith("Normalized group summary")
+    # The bottom axis carries the label; the title names the top one.
+    assert plot.below[0].axis_label.startswith("Normalized group summary")
     assert "Subsystem activity ranking - A" in plot.title.text
-    # Points pinned to the bounded axis are drawn as diamonds, not silently moved.
-    markers = set(plot.renderers[0].data_source.data["marker"])
-    assert markers <= {"circle", "diamond"}
+    # Points pinned to the bounded axis are drawn as triangles, not silently moved;
+    # the diamond is the subsystem's own score.
+    markers = set(plot.select_one({"name": RANKING_DOTS}).data_source.data["marker"])
+    assert markers <= {"circle", "triangle"}
 
 
 @pytest.mark.integration
@@ -172,7 +175,7 @@ def test_a_server_free_activity_ranking_reads_hover_downloads_from_a_page_flag(
         download_flag="metabisDownloadHoverOnClick",
     )
 
-    (callback,) = plot.renderers[0].data_source.selected.js_property_callbacks[
+    (callback,) = plot.select_one({"name": RANKING_DOTS}).data_source.selected.js_property_callbacks[
         "change:indices"
     ]
     assert callback.args["download_flag"] == "metabisDownloadHoverOnClick"
@@ -193,8 +196,9 @@ def test_the_activity_ranking_carries_its_gradient_color_reference(data_manager)
         activity_artifact=data_manager.get_activity_artifact(),
         return_plot=True,
     )
-    source = plot.renderers[0].data_source.data
-    hover = plot.select_one(HoverTool)
+    source = plot.select_one({"name": RANKING_DOTS}).data_source.data
+    dots = plot.select_one({"name": RANKING_DOTS})
+    (hover,) = [tool for tool in plot.select(type=HoverTool) if dots in (tool.renderers or [])]
 
     assert source["desc"]
     assert "<strong>Color Reference:</strong>" in hover.tooltips

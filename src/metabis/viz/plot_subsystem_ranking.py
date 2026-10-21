@@ -3,15 +3,11 @@ from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 import pandas as pd
 from bokeh.models import (
-    BoxAnnotation,
     ColumnDataSource,
-    FactorRange,
     HoverTool,
-    LabelSet,
     Range1d,
-    Span,
 )
-from bokeh.plotting import figure, show
+from bokeh.plotting import show
 
 from ..analysis.activity_analysis import (
     PLOT_SATURATION_QUANTILE,
@@ -25,13 +21,17 @@ from .color_reference import (
     GradientColorReference,
     build_reference_from_distribution,
 )
-from .metabolic_visualization.generation.data_structures.constants import (
-    VisualizationConstants,
+from .ranking_layout import (
+    RANKING_DOTS,
+    RankedSubsystem,
+    RankingRows,
+    add_focus_link,
+    order_rows,
+    ranking_figure,
+    ranking_layout,
+    spread_offset,
+    summary_panel,
 )
-from .metabolic_visualization.rendering.js_callbacks import (
-    add_factor_range_zoom_alpha_callback,
-)
-from .plot_utils import apply_academic_style
 
 
 def _attach_color_reference(
@@ -60,6 +60,42 @@ def _attach_color_reference(
     )
 
 
+def _ranked_subsystems(
+    data_manager, subsystem_stats: pd.DataFrame, score_column: str
+) -> List[RankedSubsystem]:
+    """One entry per subsystem with a score, named and placed in its category."""
+    model = data_manager.metabolic_model
+    entries = []
+    for _, row in subsystem_stats.iterrows():
+        score = row.get(score_column, None)
+        if score is None or pd.isna(score):
+            continue
+        subsystem = row["subsystem"]
+        entries.append(
+            RankedSubsystem(
+                subsystem_id=str(subsystem),
+                name=str(model.get_subsystem_name(subsystem) or subsystem),
+                category=str(model.get_subsystem_category(subsystem) or "Unknown"),
+                score=float(score),
+            )
+        )
+    return entries
+
+
+def _metric_label(metric: str) -> str:
+    return {"cohens_d": "Cohen's d", "log2_fc": "log2 fold change"}.get(
+        metric, metric.replace("_", " ")
+    )
+
+
+def _padded_range(values: List[float], *, include_zero: bool = True) -> Range1d:
+    low, high = min(values), max(values)
+    if include_zero:
+        low, high = min(low, 0.0), max(high, 0.0)
+    padding = (high - low) * 0.06 if high != low else 1.0
+    return Range1d(low - padding, high + padding)
+
+
 def plot_subsystem_comparison(
     data_manager,
     subsystem_stats: pd.DataFrame,
@@ -76,100 +112,64 @@ def plot_subsystem_comparison(
     click_filename_prefix: str = "subsystem_element",
     *,
     download_flag: str | None = None,
+    navigation_event: str | None = None,
 ):
-    """Create a category-grouped dot plot comparison of subsystems.
+    """Each subsystem's reactions (or genes) on the metric's axis, beside its delta score.
 
-    Subsystems are displayed on the y-axis, grouped by metabolic category.
-    Categories are ordered by average absolute delta score, and subsystems
-    within each category are ordered by their delta score.
-    Metric values are displayed on the x-axis.
+    One row per subsystem, grouped by category in the network's order (see
+    :mod:`.ranking_layout`). The left panel names the row and marks the
+    subsystem's delta score on its own scale; the right panel spreads the row's
+    elements within it, significant ones on the gradient and the rest grey.
 
     Args:
         data_manager: The AnalysisWorkspace object.
         subsystem_stats: DataFrame containing ranked subsystem statistics.
         metric: The metric to plot (e.g., "cohens_d", "log2_fc").
         max_points_per_subsystem: Maximum number of points to plot per subsystem.
-        width: Width of the plot.
-        height: Height of the plot. If None, calculated based on number of subsystems.
         for_genes: Whether to plot gene data (True) or reaction data (False).
-        return_plot: Whether to return the figure or show it.
+        return_plot: Whether to return the layout or show it.
         title: Optional title for the plot.
-        background_fill_color: Background color for the plot.
-        sizing_mode: Optional sizing mode (e.g., "stretch_width").
         download_flag: The ``window`` property enabling hover-panel downloads on
             tap, for a figure embedded without a Bokeh server; see
             :func:`metabis.viz.click_behavior.add_click_behavior`.
+        navigation_event: A ``window`` event a tapped row dispatches with its
+            subsystem, for a page embedding the figure without a server.
 
     Returns:
-        Bokeh figure if return_plot is True, else None.
+        The two panels as one grid if return_plot is True, else None.
     """
     if subsystem_stats is None or subsystem_stats.empty:
         print("No subsystem statistics available.")
         return None
 
-    # Get global test results
-    test_results = data_manager.get_group_comparison_artifact().get_test_results(
-        for_genes=for_genes
-    )
+    artifact = data_manager.get_group_comparison_artifact()
+    test_results = artifact.get_test_results(for_genes=for_genes)
     if test_results is None or metric not in test_results.columns:
         print(f"Metric '{metric}' not found in test results.")
         return None
 
-    # Prepare category-ordered data
-    ordered_data = _prepare_category_ordered_subsystems(
-        data_manager=data_manager,
-        subsystem_stats=subsystem_stats,
-    )
-
-    if not ordered_data["factors"]:
+    entries = _ranked_subsystems(data_manager, subsystem_stats, "delta_score")
+    if not entries:
         print("No subsystems found after category ordering.")
         return None
+    rows = order_rows(entries)
 
-    # Reverse factors for y-axis (top to bottom display: highest score at top)
-    y_factors = ordered_data["factors"][::-1]
-    # Expand the range bounds slightly to ensure top category label is visible
-    y_range = FactorRange(factors=y_factors, bounds="auto", range_padding=0.02)
-
-    # Also store reversed factors in ordered_data for decoration positioning
-    ordered_data["y_factors"] = y_factors
-
-    # Collect all scatter data
-    all_data = {
-        "y": [],  # Will be (category, subsystem) tuples
-        "x": [],  # Metric values
-        "element_id": [],
-        "display_label": [],
-        "external_url": [],
-        "subsystem": [],
-        "category": [],
-        "size": [],
-        "alpha": [],
-        "color": [],
-        "desc": [],
-    }
-
-    # Get significant elements
-    significant_set = data_manager.get_group_comparison_artifact().get_significant_elements(
-        for_genes=for_genes
-    )
+    significant_set = artifact.get_significant_elements(for_genes=for_genes)
     element_type = "gene" if for_genes else "reaction"
+    direction_map = (
+        data_manager.subsystem_analysis.get_reaction_direction_map()
+        if getattr(data_manager, "subsystem_analysis", None) is not None
+        else None
+    )
 
-    # Collect all metric values for x-range calculation
-    all_metric_values = []
-
-    for category, subsystem in ordered_data["factors"]:
-        # Get elements for this subsystem
+    all_data = _empty_points()
+    for entry in entries:
+        subsystem = entry.subsystem_id
         if for_genes:
             elements = data_manager.metabolic_model.get_genes_for_subsystem(subsystem)
         else:
             base_elements = (
-                data_manager.metabolic_model.get_reactions_for_subsystem(subsystem)
-                or []
-            )
-            direction_map = (
-                data_manager.subsystem_analysis.get_reaction_direction_map()
-                if getattr(data_manager, "subsystem_analysis", None) is not None
-                else None
+                data_manager.metabolic_model.get_reactions_for_subsystem(subsystem) or []
             )
             # Use the exact same one-column-per-base map as Delta aggregation.
             # A compatibility caller without an installed Delta Artifact receives
@@ -183,144 +183,92 @@ def plot_subsystem_comparison(
                 if direction_map is not None
                 else list(base_elements)
             )
-
-        # Filter elements present in test results
         valid_elements = [e for e in elements if e in test_results.index]
         if not valid_elements:
             continue
-
-        subsystem_results = test_results.loc[valid_elements]
-
-        # Prepare data for this subsystem (with subsampling)
-        prepared_data = _prepare_subsystem_scatter_data_horizontal(
+        prepared = _prepare_subsystem_scatter_data_horizontal(
             data_manager=data_manager,
-            subsystem_results=subsystem_results,
+            subsystem_results=test_results.loc[valid_elements],
             subsystem_name=subsystem,
-            category_name=category,
+            category_name=entry.category,
+            factor=rows.factor_of[subsystem],
             metric=metric,
             max_points=max_points_per_subsystem,
             for_genes=for_genes,
             significant_set=significant_set,
             element_type=element_type,
         )
-
-        if prepared_data:
+        if prepared:
             for key in all_data:
-                all_data[key].extend(prepared_data[key])
-            all_metric_values.extend(prepared_data["x"])
+                all_data[key].extend(prepared[key])
 
-    if not all_metric_values:
+    if not all_data["x"]:
         print("No data points found for the selected subsystems.")
         return None
 
-    # Calculate x-range with padding
-    x_min, x_max = min(all_metric_values), max(all_metric_values)
-    padding = (x_max - x_min) * 0.1 if x_max != x_min else 1.0
-    x_range = Range1d(x_min - padding, x_max + padding)
-
-    # Calculate height if not provided
-    if height is None:
-        height = max(600, len(ordered_data["factors"]) * 20)
-
-    # Create the figure
-    if title is None:
-        title = f"{metric.replace('_', ' ').title()} Distribution by Subsystem Category"
-
-    figure_kwargs = {
-        "width": width,
-        "height": height,
-        "x_range": x_range,
-        "y_range": y_range,
-        "title": title,
-        "tools": "hover,tap,pan,wheel_zoom,reset,save",
-        "toolbar_location": "above",
-        "x_axis_location": "above",
-        "background_fill_color": background_fill_color,
-        "border_fill_color": "rgba(255,255,255,0)",
-    }
-
-    if sizing_mode:
-        figure_kwargs["sizing_mode"] = sizing_mode
-
-    p = figure(**figure_kwargs)
-    apply_academic_style(p)
-
-    # Add category visual elements (backgrounds, separators, headers)
-    _add_category_decorations_horizontal(
-        p=p,
-        ordered_data=ordered_data,
-        x_range=x_range,
+    label = _metric_label(metric)
+    plot = ranking_figure(
+        rows,
+        title=title or f"{label} per {element_type}",
+        x_range=_padded_range(all_data["x"]),
+        x_label=label,
+        names=False,
+        width=width,
+        sizing_mode=sizing_mode,
     )
+    plot.background_fill_color = background_fill_color
+    add_focus_link(plot, rows, navigation_event=navigation_event)
+    dots = _draw_points(plot, all_data)
+    plot.add_tools(HoverTool(renderers=[dots], tooltips="@desc{safe}"))
 
-    # Add vertical line at 0
-    p.add_layout(
-        Span(
-            location=0,
-            dimension="height",
-            line_color=theme.THRESHOLD_LINE_COLOR,
-            line_dash=theme.THRESHOLD_LINE_DASH,
-            line_width=theme.THRESHOLD_LINE_WIDTH,
-            line_alpha=0.7,
-        )
+    scores = {entry.subsystem_id: entry.score for entry in entries}
+    reach = max([1.0, *(abs(value) for value in scores.values())])
+    summary = summary_panel(
+        rows,
+        plot,
+        scores,
+        title="Delta score",
+        x_range=Range1d(-reach * 1.08, reach * 1.08),
+        x_label="Delta score",
     )
-
-    # Grid styling
-    p.ygrid.grid_line_color = None
-    p.xgrid.grid_line_color = "#404040"
-    p.xgrid.grid_line_alpha = 0.5
-
-    # Create the data source
-    source = ColumnDataSource(all_data)
-
-    # Plot scatter points
-    p.scatter(
-        x="x",
-        y="y",
-        source=source,
-        marker="circle",
-        size="size",
-        color="color",
-        alpha="alpha",
-        line_color="white",
-        line_width=0.5,
-    )
-
-    # Set axis labels
-    p.xaxis.axis_label = metric.replace("_", " ").title()
-    p.yaxis.axis_label = None  # Categories shown via nested factor range
-
-    # Hide default y-axis completely (we use custom LabelSet instead)
-    p.yaxis.visible = False
-
-    # =========================================================================
-    # Add custom zoom-dependent labels for subsystems and categories
-    # =========================================================================
-    subsystem_label_source, category_label_source = _create_zoom_dependent_labels(
-        p=p,
-        ordered_data=ordered_data,
-        x_range=x_range,
-        data_manager=data_manager,
-    )
-
-    # Configure Hover. The hover carries the element description only: the
-    # gradient color reference repeated the same static distribution on every
-    # ranked plot and dominated its weight, for a plot whose x-axis already
-    # shows where each dot sits in that distribution.
-    hover = p.select(dict(type=HoverTool))
-    hover.tooltips = "@desc{safe}"
-
+    layout = ranking_layout(summary, plot)
     add_click_behavior(
-        p,
+        layout,
         filename_prefix=click_filename_prefix,
         enabled_toggle=enabled_toggle,
         download_flag=download_flag,
     )
 
     if return_plot:
-        return p
-    else:
-        show(p)
-        return None
+        return layout
+    show(layout)
+    return None
+
+
+def _empty_points() -> Dict[str, list]:
+    return {
+        key: []
+        for key in (
+            "y", "x", "element_id", "display_label", "external_url", "subsystem",
+            "category", "size", "alpha", "color", "marker", "desc",
+        )
+    }
+
+
+def _draw_points(plot, data: Dict[str, list]):
+    """The elements of every row, in front of the shading."""
+    return plot.scatter(
+        x="x",
+        y="y",
+        source=ColumnDataSource(data),
+        marker="marker",
+        size="size",
+        fill_color="color",
+        fill_alpha="alpha",
+        line_color="#ffffff",
+        line_width=0.5,
+        name=RANKING_DOTS,
+    )
 
 
 def _saturating_axis_bounds(
@@ -366,6 +314,7 @@ def plot_subsystem_activity_ranking(
     click_filename_prefix: str = "subsystem_element",
     *,
     download_flag: str | None = None,
+    navigation_event: str | None = None,
 ):
     """Rank subsystems by single-group activity, grouped by metabolic category.
 
@@ -373,7 +322,9 @@ def plot_subsystem_activity_ranking(
     delta score over *significant* elements, which does not exist here: nothing is
     being compared and nothing is significant. This plot ranks subsystems by their
     activity score (the median of measured member scores) and plots every measured
-    member's relative activity score, with coverage reported in the hover.
+    member's relative activity score, with coverage reported in the hover. The
+    subsystem's score is on the same scale as its members, so its diamond sits
+    among them.
 
     Args:
         data_manager: The AnalysisWorkspace object.
@@ -382,6 +333,8 @@ def plot_subsystem_activity_ranking(
         return_plot: Whether to return the figure or show it.
         download_flag: The ``window`` property enabling hover-panel downloads on
             tap, for a figure embedded without a Bokeh server.
+        navigation_event: A ``window`` event a tapped row dispatches with its
+            subsystem, for a page embedding the figure without a server.
 
     Returns:
         Bokeh figure if return_plot is True, else None.
@@ -401,38 +354,18 @@ def plot_subsystem_activity_ranking(
     overlay_name = family.value
     is_reaction_overlay = family is ActivityOverlay.REACTION
 
-    ordered_data = _prepare_category_ordered_subsystems(
-        data_manager=data_manager,
-        subsystem_stats=subsystem_stats,
-        score_column="activity_score",
-    )
-
-    if not ordered_data["factors"]:
+    entries = _ranked_subsystems(data_manager, subsystem_stats, "activity_score")
+    if not entries:
         print("No subsystems contained measured features.")
         return None
+    rows = order_rows(entries)
 
-    y_factors = ordered_data["factors"][::-1]
-    y_range = FactorRange(factors=y_factors, bounds="auto", range_padding=0.02)
-    ordered_data["y_factors"] = y_factors
-
-    all_data = {
-        "y": [],
-        "x": [],
-        "element_id": [],
-        "display_label": [],
-        "external_url": [],
-        "subsystem": [],
-        "category": [],
-        "size": [],
-        "alpha": [],
-        "color": [],
-        "marker": [],
-        "desc": [],
-    }
+    all_data = _empty_points()
     all_metric_values: List[float] = []
     activity_metric = activity_artifact.metric_key_for(family)
 
-    for category, subsystem in ordered_data["factors"]:
+    for entry in entries:
+        subsystem = entry.subsystem_id
         if is_reaction_overlay:
             members = data_manager.metabolic_model.get_reactions_for_subsystem(subsystem)
             feature_ids = [
@@ -467,18 +400,17 @@ def plot_subsystem_activity_ranking(
             element_ids=pd.Index(measured),
         )
 
+        factor = rows.factor_of[subsystem]
         for feature_id in measured:
             value = float(scores.loc[feature_id])
-            reference = get_external_reference_data(
-                data_manager, feature_id, overlay_name
-            )
-            all_data["y"].append((category, subsystem))
+            reference = get_external_reference_data(data_manager, feature_id, overlay_name)
+            all_data["y"].append((factor, spread_offset(feature_id)))
             all_data["x"].append(value)
             all_data["element_id"].append(feature_id)
             all_data["display_label"].append(reference["display_label"])
             all_data["external_url"].append(reference["external_url"])
             all_data["subsystem"].append(subsystem)
-            all_data["category"].append(category)
+            all_data["category"].append(entry.category)
             all_data["size"].append(7)
             all_data["alpha"].append(0.85)
             all_data["color"].append(colors.loc[feature_id])
@@ -520,14 +452,11 @@ def plot_subsystem_activity_ranking(
     for index, value in enumerate(all_data["x"]):
         if value < lower or value > upper:
             all_data["x"][index] = min(max(value, lower), upper)
-            all_data["marker"][index] = "diamond"
+            all_data["marker"][index] = "triangle"
             clamped += 1
 
     padding = (upper - lower) * 0.05
     x_range = Range1d(lower - padding, upper + padding)
-
-    if height is None:
-        height = max(600, len(ordered_data["factors"]) * 20)
 
     if title is None:
         element_label = "reaction" if is_reaction_overlay else "gene"
@@ -536,179 +465,51 @@ def plot_subsystem_activity_ranking(
             f"({element_label} overlay)"
         )
 
-    figure_kwargs = {
-        "width": width,
-        "height": height,
-        "x_range": x_range,
-        "y_range": y_range,
-        "title": title,
-        "tools": "hover,tap,pan,wheel_zoom,reset,save",
-        "toolbar_location": "above",
-        "x_axis_location": "above",
-        "background_fill_color": background_fill_color,
-        "border_fill_color": "rgba(255,255,255,0)",
-    }
-    if sizing_mode:
-        figure_kwargs["sizing_mode"] = sizing_mode
-
-    p = figure(**figure_kwargs)
-    apply_academic_style(p)
-
-    _add_category_decorations_horizontal(p=p, ordered_data=ordered_data, x_range=x_range)
-
-    p.add_layout(
-        Span(
-            location=0,
-            dimension="height",
-            line_color=theme.THRESHOLD_LINE_COLOR,
-            line_dash=theme.THRESHOLD_LINE_DASH,
-            line_width=theme.THRESHOLD_LINE_WIDTH,
-            line_alpha=0.7,
-        )
-    )
-
-    p.ygrid.grid_line_color = None
-    p.xgrid.grid_line_color = "#404040"
-    p.xgrid.grid_line_alpha = 0.5
-
-    source = ColumnDataSource(all_data)
-    p.scatter(
-        x="x",
-        y="y",
-        source=source,
-        marker="marker",
-        size="size",
-        color="color",
-        alpha="alpha",
-        line_color="white",
-        line_width=0.5,
-    )
-
     axis_label = "Normalized group summary"
     if clamped:
         # Say that the axis is bounded rather than quietly moving points: a clamped
-        # point is drawn as a diamond at the edge and its hover still reports the
+        # point is drawn as a triangle at the edge and its hover still reports the
         # true score.
         axis_label += (
             f" - {clamped} point(s) beyond [{lower:.2f}, {upper:.2f}] "
-            "shown as diamonds at the edge"
+            "shown as triangles at the edge"
         )
-    p.xaxis.axis_label = axis_label
-    p.yaxis.axis_label = None
-    p.yaxis.visible = False
 
-    _create_zoom_dependent_labels(
-        p=p,
-        ordered_data=ordered_data,
+    plot = ranking_figure(
+        rows,
+        title=title,
         x_range=x_range,
-        data_manager=data_manager,
+        x_label=axis_label,
+        names=True,
+        width=width,
+        sizing_mode=sizing_mode,
+    )
+    plot.background_fill_color = background_fill_color
+    add_focus_link(plot, rows, navigation_event=navigation_event)
+    dots = _draw_points(plot, all_data)
+    plot.add_tools(HoverTool(renderers=[dots], tooltips=hover_tooltip))
+    # The subsystem's own score, the median of its members, on their scale.
+    plot.scatter(
+        x=[min(max(entry.score, lower), upper) for entry in entries if entry.subsystem_id in rows.factor_of],
+        y=[rows.factor_of[entry.subsystem_id] for entry in entries if entry.subsystem_id in rows.factor_of],
+        marker="diamond",
+        size=13,
+        fill_color=theme.INK,
+        line_color="#ffffff",
+        line_width=1,
     )
 
-    hover = p.select(dict(type=HoverTool))
-    hover.tooltips = hover_tooltip
-
     add_click_behavior(
-        p,
+        plot,
         filename_prefix=click_filename_prefix,
         enabled_toggle=enabled_toggle,
         download_flag=download_flag,
     )
 
     if return_plot:
-        return p
-    show(p)
+        return plot
+    show(plot)
     return None
-
-
-def _prepare_category_ordered_subsystems(
-    data_manager,
-    subsystem_stats: pd.DataFrame,
-    score_column: str = "delta_score",
-) -> Dict[str, Any]:
-    """Prepare subsystems ordered by category and score.
-
-    Args:
-        data_manager: The AnalysisWorkspace object.
-        subsystem_stats: One row per subsystem, with a ``subsystem`` column.
-        score_column: Column holding the score subsystems are ranked by
-            ("delta_score" for comparison, "activity_score" for activity mode).
-
-    Returns a dict with:
-        - factors: List of (category, subsystem) tuples for FactorRange
-        - category_info: Dict with category metadata (color, subsystem count, boundaries)
-        - sorted_categories: Categories ordered by mean absolute score
-    """
-    metabolic_model = data_manager.metabolic_model
-
-    # Build category -> subsystems mapping with scores
-    category_subsystems: Dict[str, List[Tuple[str, float]]] = {}
-
-    for _, row in subsystem_stats.iterrows():
-        subsystem = row["subsystem"]
-        delta_score = row.get(score_column, 0)
-        if delta_score is None or pd.isna(delta_score):
-            continue
-
-        # Get category for this subsystem
-        category = metabolic_model.get_subsystem_category(subsystem)
-        if not category:
-            category = "Unknown"
-
-        if category not in category_subsystems:
-            category_subsystems[category] = []
-        category_subsystems[category].append((subsystem, delta_score))
-
-    # Calculate average absolute delta score per category
-    category_avg_scores: Dict[str, float] = {}
-    for category, subsystems in category_subsystems.items():
-        if subsystems:
-            avg_abs_score = np.mean([abs(score) for _, score in subsystems])
-            category_avg_scores[category] = avg_abs_score
-        else:
-            category_avg_scores[category] = 0.0
-
-    # Sort categories by average absolute delta score (descending)
-    sorted_categories = sorted(
-        category_subsystems.keys(),
-        key=lambda c: category_avg_scores.get(c, 0),
-        reverse=True,
-    )
-
-    # Build ordered factors and category info
-    factors = []
-    category_info = {}
-    current_idx = 0
-
-    for category in sorted_categories:
-        subsystems = category_subsystems[category]
-
-        # Sort subsystems within category by absolute delta score (descending)
-        sorted_subsystems = sorted(subsystems, key=lambda x: abs(x[1]), reverse=True)
-
-        # Get category color using CategoryManager
-        category_color = metabolic_model.get_category_color(category)
-
-        start_idx = current_idx
-
-        for subsystem, _ in sorted_subsystems:
-            factors.append((category, subsystem))
-            current_idx += 1
-
-        end_idx = current_idx
-
-        category_info[category] = {
-            "color": category_color,
-            "start_idx": start_idx,
-            "end_idx": end_idx,
-            "count": len(sorted_subsystems),
-            "avg_delta_score": category_avg_scores[category],
-        }
-
-    return {
-        "factors": factors,
-        "category_info": category_info,
-        "sorted_categories": sorted_categories,
-    }
 
 
 def _prepare_subsystem_scatter_data_horizontal(
@@ -721,8 +522,13 @@ def _prepare_subsystem_scatter_data_horizontal(
     for_genes: bool,
     significant_set: set,
     element_type: str,
+    factor: Optional[str] = None,
 ) -> Optional[Dict[str, list]]:
-    """Prepare scatter data for a single subsystem's elements (horizontal orientation)."""
+    """Points for one subsystem's elements, each at a fixed place within its row.
+
+    Past the cap, the strongest elements are kept, significant ones first: the
+    same points on every render.
+    """
     if subsystem_results.empty or metric not in subsystem_results.columns:
         return None
 
@@ -741,17 +547,20 @@ def _prepare_subsystem_scatter_data_horizontal(
             max_points=max_points,
         )
 
-    # Subsample non-significant if needed
+    # The strongest non-significant elements fill the remaining slots.
     n_interesting = len(interesting_indices)
     n_remaining_slots = max(0, max_points - n_interesting)
 
     if len(non_interesting_indices) > n_remaining_slots:
-        if n_remaining_slots > 0:
-            sampled_non_interesting = np.random.choice(
-                non_interesting_indices, size=n_remaining_slots, replace=False
-            ).tolist()
-        else:
-            sampled_non_interesting = []
+        sampled_non_interesting = (
+            _select_prioritized_subsystem_indices(
+                subsystem_results.loc[non_interesting_indices],
+                metric=metric,
+                max_points=n_remaining_slots,
+            )
+            if n_remaining_slots > 0
+            else []
+        )
     else:
         sampled_non_interesting = non_interesting_indices
 
@@ -763,8 +572,9 @@ def _prepare_subsystem_scatter_data_horizontal(
     filtered_results = subsystem_results.loc[indices_to_keep].copy()
 
     # Prepare data dictionary
+    row = factor if factor is not None else subsystem_name
     data = {
-        "y": [(category_name, subsystem_name)] * len(filtered_results),
+        "y": [(row, spread_offset(idx)) for idx in filtered_results.index],
         "x": list(filtered_results[metric]),
         "element_id": list(filtered_results.index),
         "display_label": [],
@@ -773,8 +583,9 @@ def _prepare_subsystem_scatter_data_horizontal(
         "category": [category_name] * len(filtered_results),
         "size": [8 if idx in significant_set else 5 for idx in filtered_results.index],
         "alpha": [
-            1 if idx in significant_set else 0.4 for idx in filtered_results.index
+            0.95 if idx in significant_set else 0.6 for idx in filtered_results.index
         ],
+        "marker": ["circle"] * len(filtered_results),
     }
 
     # Assign colors
@@ -848,276 +659,3 @@ def _select_prioritized_subsystem_indices(
         .index[:max_points]
         .tolist()
     )
-
-
-def _add_category_decorations_horizontal(
-    p: figure,
-    ordered_data: Dict[str, Any],
-    x_range: Range1d,
-) -> None:
-    """Add category visual decorations for horizontal layout: backgrounds, separators, and header bars.
-
-    The key challenge here is that Bokeh's nested FactorRange adds visual spacing (group_padding)
-    between category groups. This spacing causes the BoxAnnotation numeric coordinates to become
-    misaligned with the actual visual positions of factors.
-
-    To fix this, we calculate a cumulative offset based on the number of category boundaries
-    crossed as we move up from the bottom of the plot.
-    """
-    sorted_categories = ordered_data["sorted_categories"]
-    y_factors = ordered_data.get("y_factors", [])
-
-    if not y_factors:
-        return
-
-    # Build position mapping: find where each category starts and ends in the REVERSED factor list
-    # y_factors is already reversed (bottom to top), so we iterate through it directly
-    category_positions: Dict[str, Dict[str, int]] = {}
-    category_order_in_plot: List[str] = []  # Order as they appear bottom-to-top
-
-    for idx, (category, subsystem) in enumerate(y_factors):
-        if category not in category_positions:
-            category_positions[category] = {"start": idx, "end": idx + 1}
-            category_order_in_plot.append(category)
-        else:
-            category_positions[category]["end"] = idx + 1
-
-    # The group_padding in FactorRange adds visual space between groups.
-    # Default group_padding is typically ~0.2, and it affects visual positioning.
-    # We need to add a cumulative offset as we move up through categories.
-    #
-    # The offset per category boundary is approximately equal to the group_padding value.
-    # We'll use the figure's y_range.group_padding if available, otherwise use default.
-    group_padding = getattr(p.y_range, "group_padding", 0.1)
-
-    # Calculate cumulative offsets for each category based on order in plot (bottom to top)
-    category_separator_counts = {}
-    for plot_idx, category in enumerate(category_order_in_plot):
-        # Number of separators below this category = its position in the bottom-to-top order
-        category_separator_counts[category] = plot_idx
-
-    # Get category_info which contains pre-computed colors
-    category_info = ordered_data.get("category_info", {})
-
-    # Get colors for categories and draw decorations
-    for i, category in enumerate(sorted_categories):
-        if category not in category_positions:
-            continue
-
-        pos = category_positions[category]
-        # Use pre-computed color from category_info (already using CategoryManager)
-        info = category_info.get(category, {})
-        color = info.get(
-            "color", VisualizationConstants.DEFAULT_CATEGORY_COLOR_UNMAPPED
-        )
-
-        # Get the number of separators below this category
-        num_separators_below = category_separator_counts.get(category, 0)
-
-        # Calculate offset: each separator adds group_padding worth of visual space
-        offset = num_separators_below * group_padding
-
-        # Apply offset to positions
-        bottom = pos["start"] + offset
-        top = pos["end"] + offset + group_padding  # Add padding for the separator above
-
-        # Colored header bar on left side
-        header_box = BoxAnnotation(
-            top=top,
-            bottom=bottom,
-            left=x_range.start,
-            right=x_range.start + (x_range.end - x_range.start) * 0.015,
-            fill_color=color,
-            fill_alpha=0.9,
-            level="underlay",
-        )
-        p.add_layout(header_box)
-
-        # Horizontal separator line at bottom of category (between this and next category)
-        # Draw for all categories except the last one (nothing below the last category)
-        if i < len(category_order_in_plot) - 1:
-            separator = Span(
-                location=bottom,
-                dimension="width",
-                line_color=color,
-                line_width=2,
-                line_alpha=0.7,
-            )
-            p.add_layout(separator)
-
-
-def _create_zoom_dependent_labels(
-    p,
-    ordered_data: Dict[str, Any],
-    x_range: Range1d,
-    data_manager=None,
-) -> Tuple[ColumnDataSource, ColumnDataSource]:
-    """Create custom LabelSet glyphs with zoom-dependent visibility.
-
-    Creates two sets of labels:
-    1. Subsystem labels - always visible, positioned on left side
-    2. Category labels - positioned at top of each category section, centered on x-axis
-
-    Args:
-        p: Bokeh figure
-        ordered_data: Dict with factors, category_info, sorted_categories, y_factors
-        x_range: Range1d for x-axis positioning
-        data_manager: AnalysisWorkspace for getting subsystem names
-
-    Returns:
-        Tuple of (subsystem_label_source, category_label_source) ColumnDataSources
-    """
-    y_factors = ordered_data.get("y_factors", [])
-    category_info = ordered_data.get("category_info", {})
-    sorted_categories = ordered_data.get("sorted_categories", [])
-
-    if not y_factors:
-        # Return empty sources if no data
-        empty_source = ColumnDataSource(data=dict(x=[], y=[], text=[], text_alpha=[]))
-        return empty_source, empty_source
-
-    # Calculate x position for subsystem labels (left side of plot)
-    label_x = x_range.start + (x_range.end - x_range.start) * 0.02
-    # Calculate x position for category labels (center of plot)
-    category_label_x = (x_range.start + x_range.end) / 2
-
-    # Get metabolic model for subsystem name lookup
-    metabolic_model = data_manager.metabolic_model if data_manager else None
-
-    # =========================================================================
-    # Build subsystem labels data
-    # =========================================================================
-    subsystem_data = {
-        "x": [],
-        "y": [],  # Will be (category, subsystem) tuples
-        "text": [],
-        "text_alpha": [],
-    }
-
-    # Subsystem labels are always visible
-    initial_subsystem_alpha = VisualizationConstants.CATEGORY_LABEL_ALPHA
-
-    for category, subsystem_id in y_factors:
-        subsystem_data["x"].append(label_x)
-        subsystem_data["y"].append((category, subsystem_id))
-
-        # Get subsystem name from metabolic model, fallback to ID if not found
-        if metabolic_model:
-            subsystem_name = metabolic_model.get_subsystem_name(subsystem_id)
-            if not subsystem_name:
-                subsystem_name = subsystem_id
-        else:
-            subsystem_name = subsystem_id
-
-        # Truncate long subsystem names for display
-        display_name = (
-            subsystem_name if len(subsystem_name) <= 35 else subsystem_name[:32] + "..."
-        )
-        subsystem_data["text"].append(display_name)
-        subsystem_data["text_alpha"].append(initial_subsystem_alpha)
-
-    subsystem_label_source = ColumnDataSource(subsystem_data)
-
-    # Add subsystem LabelSet
-    subsystem_labels = LabelSet(
-        x="x",
-        y="y",
-        text="text",
-        text_font_size=VisualizationConstants.COMPARISON_SUBSYSTEM_FONT_SIZE,
-        text_color="black",
-        text_alpha="text_alpha",
-        text_align="left",
-        text_baseline="middle",
-        x_offset=VisualizationConstants.COMPARISON_LABEL_X_OFFSET,
-        level="annotation",
-        source=subsystem_label_source,
-    )
-    p.add_layout(subsystem_labels)
-
-    # =========================================================================
-    # Build category labels data
-    # =========================================================================
-    category_data = {
-        "x": [],
-        "y": [],  # Will be (category, subsystem) tuples pointing to top of category section
-        "text": [],
-        "text_alpha": [],
-        "text_color": [],
-    }
-
-    # Initial alpha for categories (visible when zoomed out)
-    initial_category_alpha = VisualizationConstants.COMPARISON_CATEGORY_LABEL_ALPHA_MAX
-
-    # Get group_padding for position calculation
-
-    # Build position mapping for categories (same logic as _add_category_decorations_horizontal)
-    category_positions: Dict[str, Dict[str, int]] = {}
-    category_order_in_plot: List[str] = []
-
-    for idx, (category, subsystem) in enumerate(y_factors):
-        if category not in category_positions:
-            category_positions[category] = {
-                "start": idx,
-                "end": idx + 1,
-                "first_subsystem": subsystem,
-                "last_subsystem": subsystem,
-            }
-            category_order_in_plot.append(category)
-        else:
-            category_positions[category]["end"] = idx + 1
-            category_positions[category]["last_subsystem"] = subsystem
-
-    # Position category labels at the TOP of each category section (last subsystem = highest y position)
-    # Get category_info which contains pre-computed colors
-    category_info = ordered_data.get("category_info", {})
-
-    for category in sorted_categories:
-        if category not in category_positions:
-            continue
-
-        pos = category_positions[category]
-        # Use the LAST subsystem in this category (which is at the top of the section in the reversed list)
-        top_factor = (category, pos["last_subsystem"])
-
-        # Use pre-computed color from category_info (already using CategoryManager)
-        info = category_info.get(category, {})
-        color = info.get(
-            "color", VisualizationConstants.DEFAULT_CATEGORY_COLOR_UNMAPPED
-        )
-
-        # Position at center of x-axis, at the top subsystem of the category
-        category_data["x"].append(category_label_x)
-        category_data["y"].append(top_factor)
-        category_data["text"].append(category)
-        category_data["text_alpha"].append(initial_category_alpha)
-        category_data["text_color"].append(color)
-
-    category_label_source = ColumnDataSource(category_data)
-
-    # Add category LabelSet - positioned above the top subsystem
-    category_labels = LabelSet(
-        x="x",
-        y="y",
-        text="text",
-        text_font_size=VisualizationConstants.COMPARISON_CATEGORY_FONT_SIZE,
-        text_color="text_color",
-        text_alpha="text_alpha",
-        text_align="center",  # Center horizontally
-        text_baseline="bottom",  # Position above the y coordinate
-        text_font_style="bold",
-        y_offset=8,  # Small offset above the subsystem row
-        level="annotation",
-        source=category_label_source,
-    )
-    p.add_layout(category_labels)
-
-    # =========================================================================
-    # Add zoom-based alpha callback (only for category labels now)
-    # =========================================================================
-    add_factor_range_zoom_alpha_callback(
-        plot=p,
-        subsystem_label_source=None,  # Subsystem labels always visible, no callback needed
-        category_label_source=category_label_source,
-    )
-
-    return subsystem_label_source, category_label_source

@@ -2,7 +2,7 @@
 
 from dataclasses import replace
 
-from bokeh.models import BoxAnnotation, HoverTool, LabelSet
+from bokeh.models import HoverTool
 
 from metabis.analysis.artifacts import (
     AnalysisArtifactMetadata,
@@ -121,7 +121,7 @@ def test_category_plot_uses_one_dot_per_subsystem_without_recomputing(monkeypatc
     # not a single flat red/blue; the plot exposes no legend.
     assert all(str(color).startswith("#") for color in frame["dominant_color"])
     assert len(plot.legend) == 0
-    assert all(factor[0] == "Metabolism" for factor in plot.y_range.factors)
+    assert "METABOLISM" in plot.y_range.factors
     assert plot.tags[-1] == {
         "artifact_id": artifact.metadata.artifact_id,
         "artifact_kind": "set_enrichment",
@@ -138,29 +138,30 @@ def test_rows_are_ordered_within_category_by_largest_directional_magnitude():
     assert magnitudes == sorted(magnitudes, reverse=True)
 
 
-def test_category_plot_uses_distribution_plot_category_structure():
-    category_color = "#2A9D8F"
-
+def test_category_plot_uses_the_rankings_rows():
+    """Names in a column, a header row per category, and no category hue."""
     plot = plot_set_enrichment_category(
-        _artifact(), category_colors={"Metabolism": category_color}
+        _artifact(), category_colors={"Metabolism": "#2A9D8F"}
     )
 
-    category_bands = [
-        annotation
-        for annotation in plot.select({"type": BoxAnnotation})
-        if annotation.fill_color == category_color
-    ]
-    label_sets = list(plot.select({"type": LabelSet}))
-    label_text = {
-        text
-        for label_set in label_sets
-        for text in label_set.source.data.get("text", [])
-    }
-
-    assert len(category_bands) == 1
-    assert {"Metabolism", "First pathway", "Second pathway"} <= label_text
-    assert not plot.yaxis[0].visible
+    # Bokeh lists factors bottom up; read top down, the header opens its category.
+    rows = list(reversed(plot.y_range.factors))
+    assert rows[0] == "METABOLISM"
+    assert set(rows[1:]) == {"First pathway", "Second pathway"}
+    assert plot.yaxis[0].visible
     assert plot.ygrid[0].grid_line_color is None
+    fills = {
+        renderer.glyph.fill_color
+        for renderer in plot.renderers
+        if renderer.glyph.__class__.__name__ == "HBar"
+    }
+    assert "#2A9D8F" not in fills
+
+
+def _points_hover(plot):
+    points = plot.select_one({"name": "set_enrichment_subsystem_points"})
+    (hover,) = [tool for tool in plot.select(type=HoverTool) if points in (tool.renderers or [])]
+    return hover
 
 
 def test_nonsignificant_subsystem_is_gray_and_hover_reports_both_results():
@@ -175,7 +176,7 @@ def test_nonsignificant_subsystem_is_gray_and_hover_reports_both_results():
     renderer = plot.select_one({"name": "set_enrichment_subsystem_points"})
     source = renderer.data_source.data
     index = list(source["subsystem_id"]).index("s1")
-    hover = plot.select_one(HoverTool)
+    hover = _points_hover(plot)
     html = source["hover_html"][index]
 
     assert source["dominant_color"][index] == NOT_SIGNIFICANT_COLOR
@@ -201,7 +202,7 @@ def test_every_dot_carries_the_gradient_color_reference_it_was_painted_from():
     """
     plot = plot_set_enrichment_category(_artifact())
     source = plot.select_one({"name": "set_enrichment_subsystem_points"}).data_source
-    hover = plot.select_one(HoverTool)
+    hover = _points_hover(plot)
     values = list(source.data["dominant_visual"])
 
     assert len(source.data["hover_html"]) > 0

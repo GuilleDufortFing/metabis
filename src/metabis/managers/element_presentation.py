@@ -137,6 +137,15 @@ def resolve_element_color(
                 if current_config:
                     target_metric = current_config.get("metric", "default")
 
+            # A subsystem with no score has no data, and draws neutral grey
+            # (Supplementary Section 1.5), not the white of a measured zero.
+            if not context.color_manager.has_value(
+                AnalysisWorkspaceMode.GROUP_COMPARISON,
+                element_type,
+                element_id,
+                target_metric,
+            ):
+                return theme.NOT_SIGNIFICANT
             return context.color_manager.get_element_color_from_distribution(
                 mode=AnalysisWorkspaceMode.GROUP_COMPARISON,
                 element_type=element_type,

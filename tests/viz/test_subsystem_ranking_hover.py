@@ -20,6 +20,7 @@ from bokeh.models import HoverTool
 from metabis.managers.color_manager import ColorManager
 from metabis.managers.workspace_mode import AnalysisWorkspaceMode
 from metabis.viz.plot_subsystem_ranking import plot_subsystem_comparison
+from metabis.viz.ranking_layout import RANKING_DOTS
 
 METRIC = "cohens_d"
 SUBSYSTEM = "Glycolysis"
@@ -103,12 +104,22 @@ def ranking():
         return_plot=True,
     )
     assert plot is not None
-    return plot, plot.renderers[0].data_source.data
+    return plot, _dots(plot).data_source.data
+
+
+def _dots(layout):
+    return layout.select_one({"name": RANKING_DOTS})
+
+
+def _dot_hover(layout):
+    dots = _dots(layout)
+    (hover,) = [tool for tool in layout.select({"type": HoverTool}) if dots in (tool.renderers or [])]
+    return hover
 
 
 def test_every_ranked_dot_hovers_with_its_own_statistics(ranking):
     plot, source = ranking
-    hover = plot.select_one(HoverTool)
+    hover = _dot_hover(plot)
 
     assert hover.tooltips == "@desc{safe}"
     assert len(source["desc"]) == len(EFFECTS)
@@ -116,7 +127,7 @@ def test_every_ranked_dot_hovers_with_its_own_statistics(ranking):
 
 def test_the_hover_carries_no_gradient_color_reference(ranking):
     plot, source = ranking
-    hover = plot.select_one(HoverTool)
+    hover = _dot_hover(plot)
 
     assert "Color Reference:" not in hover.tooltips
     assert "<svg" not in hover.tooltips
@@ -140,8 +151,29 @@ def test_a_server_free_ranking_reads_hover_downloads_from_a_page_flag():
         download_flag="metabisDownloadHoverOnClick",
     )
 
-    (callback,) = plot.renderers[0].data_source.selected.js_property_callbacks[
+    (callback,) = _dots(plot).data_source.selected.js_property_callbacks[
         "change:indices"
     ]
     assert callback.args["download_flag"] == "metabisDownloadHoverOnClick"
     assert "enabled_toggle" not in callback.args
+
+
+def test_rows_are_named_in_a_column_beside_their_delta_score(ranking):
+    layout, source = ranking
+    summary, dots_panel = [child[0] for child in layout.children]
+
+    # The names are the summary panel's y-axis; the dots' own axis is hidden.
+    assert summary.yaxis[0].visible is True
+    assert dots_panel.yaxis[0].visible is False
+    assert summary.y_range is dots_panel.y_range
+    assert summary.y_range.factors == [SUBSYSTEM, CATEGORY.upper()]
+    # Each dot sits at a fixed place within its row, the same on every render.
+    assert all(isinstance(y, tuple) and y[0] == SUBSYSTEM for y in source["y"])
+    assert all(abs(y[1]) < 0.5 for y in source["y"])
+
+
+def test_the_value_axis_is_drawn_above_and_below(ranking):
+    layout, _source = ranking
+    dots_panel = layout.children[1][0]
+
+    assert len(dots_panel.above) >= 1 and len(dots_panel.below) >= 1

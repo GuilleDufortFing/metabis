@@ -129,7 +129,10 @@ _MODULE_EXPORTS: dict[str, tuple[str, ...]] = {
         "plot_subsystem_activity_ranking",
         "plot_subsystem_comparison",
     ),
+    ".viz.color_bars": ("overview_color_bar", "registered_color_bar"),
     ".viz.plot_utils": ("PLOT_THEME", "apply_academic_style"),
+    ".viz.subsystem_link": ("add_network_focus_link",),
+    ".visual_config": ("theme",),
     ".viz.plot_violins": ("plot_reaction_violins",),
     ".viz.table_formatting": (
         "build_external_link_formatter",
@@ -264,8 +267,11 @@ if TYPE_CHECKING:
         plot_subsystem_activity_ranking,
         plot_subsystem_comparison,
     )
-    from .viz.plot_utils import apply_academic_style
+    from .visual_config import theme
+    from .viz.color_bars import overview_color_bar, registered_color_bar
+    from .viz.plot_utils import PLOT_THEME, apply_academic_style
     from .viz.plot_violins import plot_reaction_violins
+    from .viz.subsystem_link import add_network_focus_link
     from .viz.table_formatting import (
         build_external_link_formatter,
         build_statistical_number_formatter,
@@ -341,7 +347,11 @@ __all__ = [
     "plot_metabolic_graph",
     # Plotting
     "PLOT_THEME",
+    "add_network_focus_link",
     "apply_academic_style",
+    "overview_color_bar",
+    "registered_color_bar",
+    "theme",
     "build_external_link_formatter",
     "build_statistical_number_formatter",
     "build_reduction_presentation",
