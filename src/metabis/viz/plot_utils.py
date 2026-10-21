@@ -5,92 +5,97 @@ from bokeh.models import ColumnDataSource
 from bokeh.plotting import figure
 from bokeh.themes import Theme
 
-# --- Academic Theme Definition and Helper ---
+from ..visual_config import theme as visual_theme
 
-ACADEMIC_THEME_JSON = {
+# --- The plot theme ---
+#
+# Bokeh matches theme entries to model classes by name, through each class's
+# ancestors, and only when the theme is set on the Document that holds the models:
+# applied to one figure it reaches that figure alone, never its axes, legends or
+# title. So the theme is set where figures are serialized (the API's json_item, the
+# Bokeh app's curdoc) and keyed on "Plot", since the figure class itself is the
+# lowercase ``figure``. Every value comes from the React client's tokens (see
+# metabis.visual_config); explicit settings on a model still win over it.
+
+_FONT = visual_theme.FONT
+
+PLOT_THEME_JSON = {
     "attrs": {
-        "Figure": {
-            "background_fill_color": "#FFFFFF",
-            "border_fill_color": "#FFFFFF",
-            "outline_line_color": "#444444",
-            "outline_line_width": 1,
-            "min_border_left": 20,
-            "min_border_right": 20,
-            "min_border_top": 20,
-            "min_border_bottom": 20,
-            "toolbar_location": "right",
+        "Plot": {
+            "background_fill_color": "#ffffff",
+            "border_fill_color": "#ffffff",
+            "outline_line_color": None,
+        },
+        "Toolbar": {
+            "autohide": True,
+            "logo": None,
+        },
+        "Title": {
+            "text_font": _FONT,
+            "text_font_size": "14px",
+            "text_font_style": "bold",
+            "text_color": visual_theme.INK,
         },
         "Axis": {
-            "axis_line_color": "#333333",
-            "axis_line_width": 1.2,
-            "major_tick_in": 5,
-            "major_tick_out": 0,
-            "major_tick_line_color": "#666666",
-            "major_tick_line_width": 1,
-            "minor_tick_line_color": None,
-            "axis_label_text_font": "Helvetica",
-            "axis_label_text_font_size": "11pt",
+            "axis_label_text_font": _FONT,
+            "axis_label_text_font_size": "13px",
             "axis_label_text_font_style": "normal",
-            "axis_label_standoff": 12,
-            "major_label_text_font": "Helvetica",
-            "major_label_text_font_size": "9pt",
-            "major_label_standoff": 8,
-            "major_label_orientation": "horizontal",
+            "axis_label_text_color": visual_theme.INK,
+            "major_label_text_font": _FONT,
+            "major_label_text_font_size": "12px",
+            "major_label_text_color": visual_theme.INK_MUTED,
+            "axis_line_color": visual_theme.FRAME_LINE,
+            "major_tick_line_color": visual_theme.FRAME_LINE,
+            "major_tick_in": 0,
+            "major_tick_out": 4,
+            "minor_tick_line_color": None,
         },
         "Grid": {
-            "grid_line_color": "#E0E0E0",
-            "grid_line_dash": [3, 3],
-            "grid_line_width": 0.8,
+            "grid_line_color": visual_theme.GRID_LINE,
             "minor_grid_line_color": None,
         },
         "Legend": {
-            "background_fill_color": "#FFFFFF",
-            "background_fill_alpha": 0.80,
-            "border_line_color": "#DDDDDD",
-            "border_line_width": 0.5,
-            "label_text_font": "Helvetica",
-            "label_text_font_size": "9pt",
-            "title_text_font": "Helvetica",
+            "label_text_font": _FONT,
+            "label_text_font_size": "12px",
+            "label_text_color": visual_theme.INK,
+            "title_text_font": _FONT,
+            "title_text_font_size": "12px",
             "title_text_font_style": "bold",
-            "title_text_font_size": "10pt",
-            "spacing": 4,
-            "padding": 7,
-            "margin": 10,
-            "glyph_width": 15,
-            "label_standoff": 5,
+            "title_text_color": visual_theme.INK,
+            "border_line_color": None,
+            "background_fill_alpha": 0.9,
             "click_policy": "hide",
-            "orientation": "vertical",
         },
-        "Title": {
-            "text_font": "Helvetica",
-            "text_font_size": "13pt",
-            "text_font_style": "bold",
-            "align": "center",
-            "text_color": "#333333",
-            "standoff": 10,
+        "ColorBar": {
+            "title_text_font": _FONT,
+            "title_text_font_size": "12px",
+            "title_text_font_style": "normal",
+            "title_text_color": visual_theme.INK,
+            "major_label_text_font": _FONT,
+            "major_label_text_font_size": "11px",
+            "major_label_text_color": visual_theme.INK_MUTED,
+            "border_line_color": None,
+            "bar_line_color": None,
         },
-        "Line": {
-            "line_width": 1.75,
-            "line_alpha": 0.8,
-        },
-        "Scatter": {
-            "size": 15,
-            "alpha": 0.8,
-        },
-        "Text": {
-            "text_font": "Helvetica",
-            "text_font_size": "8pt",
-            "text_color": "#555555",
-        },
+        "Label": {"text_font": _FONT, "text_color": visual_theme.INK},
+        "LabelSet": {"text_font": _FONT, "text_color": visual_theme.INK},
     }
 }
+
+PLOT_THEME = Theme(json=PLOT_THEME_JSON)
+
 
 def apply_academic_style(
     p: figure, suppress_grid: bool = False, minimal_axes: bool = False
 ) -> figure:
-    """Applies the predefined academic theme and common styling adjustments."""
-    Theme(json=ACADEMIC_THEME_JSON).apply_to_model(p)
+    """Figure-level settings the document theme cannot reach.
+
+    The theme itself is set on the document (see ``PLOT_THEME``); this keeps the
+    toolbar out of sight until the pointer is over the plot, and drops the Bokeh
+    logo, for figures rendered without that theme too.
+    """
     p.toolbar.autohide = True
+    p.toolbar.logo = None
 
     if suppress_grid:
         p.xgrid.grid_line_color = None

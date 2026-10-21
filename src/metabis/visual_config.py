@@ -9,10 +9,15 @@ class VisualTheme:
     NOT_SIGNIFICANT: str = "#c7c7c7"  # Neutral gray for non-significant elements
 
     # Group Comparison Mode Colors (Regulation)
-    UP_REGULATED: str = "#FF0000"    # Red
-    DOWN_REGULATED: str = "#0000FF"  # Blue
-    # Significant p-value Colors
-    SIGNIFICANT_PVAL: str = "#B700FF" # Purple for significant p-values
+    # The darkest red and blue of ColorBrewer's RdBu scheme (Brewer, colorbrewer2.org),
+    # the diverging default of Seaborn and ggplot: unlike pure #FF0000 and #0000FF
+    # they keep apart in greyscale and for red-green colour blindness. The gradient
+    # still runs from white to them, as Supplementary Section 1.5 describes.
+    UP_REGULATED: str = "#B2182B"    # Red
+    DOWN_REGULATED: str = "#2166AC"  # Blue
+    # Significant p-values have no direction, so they ramp to a neutral grey, the
+    # client's ink grey, leaving purple to single-group activity alone.
+    SIGNIFICANT_PVAL: str = "#606060"
 
     # Single-Group Activity Mode Colors (Experiment Analysis)
     # Activity is a magnitude, not a direction, so its ramp is sequential rather than
@@ -34,10 +39,20 @@ class VisualTheme:
     NEUTRAL: str = "#FFFFFF"          # Standard white
 
     # Plot Elements
-    THRESHOLD_LINE_COLOR: str = "#B700FF" # Red
+    # Thresholds are reference lines, not data: a dashed dark grey, the client's ink grey.
+    THRESHOLD_LINE_COLOR: str = "#606060"
     THRESHOLD_LINE_DASH: str = "dashed"
     THRESHOLD_LINE_WIDTH: int = 1.2
     THRESHOLD_SVG_DASH: str = "3,1"
+
+    # Plot text and frame, from the React client's tokens (web/src/index.css).
+    INK: str = "#152030"        # --navy-2, the client's text colour
+    INK_MUTED: str = "#606060"  # --ink-grey, the step cards' secondary text
+    FRAME_LINE: str = "#949494"  # --line, the client's control borders
+    GRID_LINE: str = "#eeeeee"  # --card-tint
+    ROW_SHADE: str = "#f8f8f8"  # --sheet, the step cards' legend box
+    FONT: str = "Arial"         # the logo's wordmark, as the client
+
 
 # Global instance
 theme = VisualTheme()

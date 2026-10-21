@@ -125,9 +125,26 @@ def test_group_colors_cycle_instead_of_failing_beyond_the_palette_limit():
     group_ids = [f"G{index}" for index in range(ColorManager.MAX_PALETTE_COLORS + 40)]
     manager = ColorManager()
 
-    colors = manager.generate_group_colors(group_ids)
+    colors = manager.generate_group_colors(group_ids, palette_name="turbo")
 
     assert len(colors) == len(group_ids)
     assert all(colors[group_id] for group_id in group_ids)
     # Colors repeat once the palette is exhausted, but nothing is left uncolored.
     assert len(set(colors.values())) == ColorManager.MAX_PALETTE_COLORS
+
+
+def test_default_group_colors_are_okabe_ito_then_scanpy():
+    """Up to eight groups take Okabe-Ito; more take scanpy's palettes, then repeat."""
+    from metabis.managers.group_palettes import OKABE_ITO, SCANPY_20, SCANPY_102
+
+    manager = ColorManager()
+
+    def colors(n):
+        return list(manager.generate_group_colors([f"G{index}" for index in range(n)]).values())
+
+    assert colors(3) == list(OKABE_ITO[:3])
+    assert colors(8) == list(OKABE_ITO)
+    assert colors(9) == list(SCANPY_20[:9])
+    assert colors(102) == list(SCANPY_102)
+    beyond = colors(110)
+    assert beyond[102:] == list(SCANPY_102[:8])

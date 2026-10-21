@@ -217,8 +217,8 @@ class DistributionPlotSection(HoverSection):
         color_manager = context.color_manager
 
         # Default fallback colors
-        group1_color = "#FF0000"
-        group2_color = "#0000FF"
+        group1_color = theme.UP_REGULATED
+        group2_color = theme.DOWN_REGULATED
 
         if color_manager:
             group1_color = color_manager.up_color

@@ -129,7 +129,7 @@ _MODULE_EXPORTS: dict[str, tuple[str, ...]] = {
         "plot_subsystem_activity_ranking",
         "plot_subsystem_comparison",
     ),
-    ".viz.plot_utils": ("apply_academic_style",),
+    ".viz.plot_utils": ("PLOT_THEME", "apply_academic_style"),
     ".viz.plot_violins": ("plot_reaction_violins",),
     ".viz.table_formatting": (
         "build_external_link_formatter",
@@ -340,6 +340,7 @@ __all__ = [
     "PipelinePhaseMetric",
     "plot_metabolic_graph",
     # Plotting
+    "PLOT_THEME",
     "apply_academic_style",
     "build_external_link_formatter",
     "build_statistical_number_formatter",

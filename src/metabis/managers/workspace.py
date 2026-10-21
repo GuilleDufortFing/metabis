@@ -64,7 +64,7 @@ from ..visual_config import theme
 # Initialize ExperimentAnalysis for within-group analysis
 # No longer need GlyphClass import since we use string element types
 from .cache_manager import CacheManager
-from .color_manager import ColorManager
+from .color_manager import DEFAULT_GROUP_PALETTE, ColorManager
 from .data_provider import DataProvider
 from .element_presentation import (
     resolve_display_direction,
@@ -705,7 +705,7 @@ class AnalysisWorkspace:
         self.group_revision += 1
         self._invalidate_downstream_analysis(clear_groups=False)
         if self.group_manager.has_groups():
-            self.color_manager.generate_group_colors(self.get_group_ids(), palette_name="turbo")
+            self.color_manager.generate_group_colors(self.get_group_ids(), palette_name=DEFAULT_GROUP_PALETTE)
         return result
 
     def define_group_from_predicates(self, name, predicates, *, replace: bool = False):
@@ -721,7 +721,7 @@ class AnalysisWorkspace:
         )
         self.group_revision += 1
         self._invalidate_downstream_analysis(clear_groups=False)
-        self.color_manager.generate_group_colors(self.get_group_ids(), palette_name="turbo")
+        self.color_manager.generate_group_colors(self.get_group_ids(), palette_name=DEFAULT_GROUP_PALETTE)
         return group
 
     def define_group_union(self, name, source_group_ids, *, replace: bool = False):
@@ -733,7 +733,7 @@ class AnalysisWorkspace:
         )
         self.group_revision += 1
         self._invalidate_downstream_analysis(clear_groups=False)
-        self.color_manager.generate_group_colors(self.get_group_ids(), palette_name="turbo")
+        self.color_manager.generate_group_colors(self.get_group_ids(), palette_name=DEFAULT_GROUP_PALETTE)
         return group
 
     # ============================================================================
@@ -1184,7 +1184,7 @@ class AnalysisWorkspace:
         if self.group_manager.has_groups():
             group_ids = self.group_manager.get_group_ids()
             self.color_manager.generate_group_colors(
-                group_ids, palette_name="turbo"
+                group_ids, palette_name=DEFAULT_GROUP_PALETTE
             )
 
         return grouping_result
@@ -1252,7 +1252,7 @@ class AnalysisWorkspace:
         return self.color_manager.get_group_color(group_id)
 
     def regenerate_group_colors(
-        self, palette_name: str = "turbo", custom_colors: Dict[str, str] = None
+        self, palette_name: str = DEFAULT_GROUP_PALETTE, custom_colors: Dict[str, str] = None
     ) -> Dict[str, str]:
         """Regenerate colors for all groups with new palette.
 

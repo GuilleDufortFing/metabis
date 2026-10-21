@@ -483,7 +483,7 @@ def _subsystem_hover_html(
     if show_stats:
         parts.extend(
             [
-                "<div style='border-left:3px solid #FF0000;padding-left:6px;"
+                f"<div style='border-left:3px solid {theme.UP_REGULATED};padding-left:6px;"
                 "margin-top:4px;'>"
                 f"<strong>Target-higher</strong> · {_status(decision.target_significant)}"
                 "<br/>Ratio "
@@ -492,7 +492,7 @@ def _subsystem_hover_html(
                 f"Overlap {detail['target_overlap_size']} of "
                 f"{detail['subsystem_size']} · query {detail['target_query_size']}"
                 "</div>",
-                "<div style='border-left:3px solid #0000FF;padding-left:6px;"
+                f"<div style='border-left:3px solid {theme.DOWN_REGULATED};padding-left:6px;"
                 "margin-top:4px;'>"
                 f"<strong>Target-lower</strong> · {_status(decision.baseline_significant)}"
                 "<br/>Ratio "

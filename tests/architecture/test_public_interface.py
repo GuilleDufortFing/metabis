@@ -78,6 +78,7 @@ EXPECTED_ROOT_ALL = frozenset(
         "PipelinePhaseMetric",
         "plot_metabolic_graph",
         # Plotting
+        "PLOT_THEME",
         "apply_academic_style",
         "build_external_link_formatter",
         "build_statistical_number_formatter",
