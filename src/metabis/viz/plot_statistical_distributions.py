@@ -4,19 +4,25 @@ import numpy as np
 import pandas as pd
 from bokeh.layouts import column, row
 from bokeh.models import (
+    BooleanFilter,
+    CDSView,
     ColumnDataSource,
     DataTable,
     Div,
     HoverTool,
+    LabelSet,
+    Legend,
+    LegendItem,
     Span,
     TableColumn,
+    Title,
 )
 from bokeh.plotting import figure, show
 
 from ..managers.workspace_mode import AnalysisWorkspaceMode
 from ..visual_config import theme
 from .click_behavior import add_click_behavior, get_external_reference_data
-from .plot_histograms import create_bokeh_histogram
+from .color_bars import registered_color_bar
 from .table_formatting import (
     build_external_link_formatter,
     build_statistical_number_formatter,
@@ -217,6 +223,109 @@ def statistical_results_rows(
     )
 
 
+# Two greys for the p-value histogram, either side of its threshold: it has no
+# direction, so it takes no part of the red-blue gradient.
+P_SIGNIFICANT_GREY = "#999999"  # the client's --label-grey
+P_OTHER_GREY = "#dddddd"  # the client's --card-grey
+STRONGEST_NAMED = 6
+STAT_PLOT_HEIGHT = 300
+SCATTER_PLOT_HEIGHT = 340
+
+
+def _metric_color(data_manager, element_type: str, metric: str):
+    """A function from a value to the colour the registered distribution paints it."""
+    lookup = data_manager.color_manager.color_lookup()
+    info = lookup.distributions.get(
+        (AnalysisWorkspaceMode.GROUP_COMPARISON, element_type, metric)
+    )
+    if not info:
+        return lambda _value: theme.NEUTRAL
+    binner, colors = info["binner"], info["bin_colors"]
+    return lambda value: colors.get(int(binner.bin_for_value(float(value))), colors[0])
+
+
+def _threshold_spans(plot, value, *, dimension: str, symmetric: bool) -> None:
+    if value is None or value == 0 or not np.isfinite(value):
+        return
+    for location in ((value, -value) if symmetric else (value,)):
+        plot.add_layout(
+            Span(
+                location=location,
+                dimension=dimension,
+                line_color=theme.THRESHOLD_LINE_COLOR,
+                line_dash=theme.THRESHOLD_LINE_DASH,
+                line_width=theme.THRESHOLD_LINE_WIDTH,
+            )
+        )
+
+
+def _strongest(data: Dict[str, list], y_col: str, significant: List[bool], count: int) -> List[int]:
+    """The rows of the most significant elements, one per base reaction."""
+    ys = np.asarray(data[y_col], dtype=float)
+    order = sorted(
+        (i for i, flag in enumerate(significant) if flag and np.isfinite(ys[i])),
+        key=lambda i: -ys[i],
+    )
+    chosen, seen = [], set()
+    ids = list(data["element_id"])
+    for index in order:
+        base = str(ids[index]).removesuffix("_back")
+        if base in seen:
+            continue
+        seen.add(base)
+        chosen.append(index)
+        if len(chosen) == count:
+            break
+    return chosen
+
+
+def _name_points(plot, data, rows: List[int], x_col: str, y_col: str) -> None:
+    """Name a few points, nudged apart where their names would meet.
+
+    Names right of the plot's middle read leftwards, so they stay inside it; a
+    name near one already placed moves down a line.
+    """
+    if not rows:
+        return
+    x_values = np.asarray(data[x_col], dtype=float)
+    y_values = np.asarray(data[y_col], dtype=float)
+    names = list(data["display_label"])
+    xs = x_values[np.isfinite(x_values)]
+    ys = y_values[np.isfinite(y_values)]
+    x_low, x_span = float(xs.min()), float(xs.max() - xs.min()) or 1.0
+    y_low, y_span = float(ys.min()), float(ys.max() - ys.min()) or 1.0
+    placed: List[tuple] = []
+    labels = {"x": [], "y": [], "text": [], "align": [], "x_offset": [], "y_offset": []}
+    for index in rows:
+        x, y = float(x_values[index]), float(y_values[index])
+        nx, ny = (x - x_low) / x_span, (y - y_low) / y_span
+        right = nx > 0.6
+        clashes = sum(1 for px, py, pright in placed if pright == right and abs(px - nx) < 0.35 and abs(py - ny) < 0.06)
+        placed.append((nx, ny, right))
+        labels["x"].append(x)
+        labels["y"].append(y)
+        labels["text"].append(str(names[index]))
+        labels["align"].append("right" if right else "left")
+        labels["x_offset"].append(-6 if right else 6)
+        labels["y_offset"].append(-13 * clashes)
+    plot.add_layout(
+        LabelSet(
+            x="x",
+            y="y",
+            text="text",
+            text_align="align",
+            x_offset="x_offset",
+            y_offset="y_offset",
+            text_baseline="middle",
+            text_font_size="11px",
+            text_color=theme.INK,
+            background_fill_color="#ffffff",
+            background_fill_alpha=0.75,
+            source=ColumnDataSource(labels),
+        )
+    )
+
+
 def _create_scatter_figure(
     dm,
     source: ColumnDataSource,
@@ -229,110 +338,107 @@ def _create_scatter_figure(
     thresholds: dict = None,
     threshold_counts: Optional[tuple] = None,
     width: int = 500,
-    height: int = 400,
+    height: int = SCATTER_PLOT_HEIGHT,
     element_type: str = "reaction",
     enabled_toggle=None,
     filename_prefix: str = "statistical_element",
     download_flag: Optional[str] = None,
+    color_metric: Optional[str] = None,
+    color_label: Optional[str] = None,
 ):
-    """Create a scatter figure comparing two parameters.
+    """Every element on two statistics: significant ones on the gradient, the rest grey.
 
-    Args:
-        dm: The dm object
-        source: Single ColumnDataSource containing all points
-        x_col: Column name for x-axis data
-        y_col: Column name for y-axis data
-        x_label: X-axis label
-        y_label: Y-axis label
-        color_col: Column name for color data
-        thresholds: Dict with threshold values for x and y axes
-        threshold_counts: Optional tuple of (count, percentage) for threshold annotation
-        width: Figure width in pixels
-        height: Figure height in pixels
-        element_type: The type of element ("reaction" or "gene")
-
-    Returns:
-        Bokeh figure with scatter plot
+    The non-significant points are drawn first and the significant ones over them,
+    each set listed in the legend below with its count; the strongest significant
+    elements are named on a volcano plot (``y_col`` an adjusted p), and a colour bar
+    keys the gradient.
     """
-    # Create figure
     scatter_fig = figure(
         sizing_mode="stretch_width",
-        title=f"{x_label} vs {y_label}",
+        title=f"{x_label} and {y_label}",
         x_axis_label=x_label,
         y_axis_label=y_label,
         background_fill_color=background_fill_color,
         height=height,
-        tools="pan,box_zoom,wheel_zoom,reset,save,hover",
+        tools="pan,box_zoom,wheel_zoom,reset,save",
         active_scroll="wheel_zoom",
     )
-
-    # Add scatter points
-    scatter_fig.scatter(
+    significant = list(source.data["significant"])
+    views = {
+        flag: CDSView(filter=BooleanFilter([value is flag for value in significant]))
+        for flag in (False, True)
+    }
+    others = scatter_fig.scatter(
         x=x_col,
         y=y_col,
         source=source,
+        view=views[False],
         marker="circle",
-        size="size",
-        color=color_col,
-        alpha="alpha",
+        size=4,
+        fill_color=theme.NOT_SIGNIFICANT,
+        fill_alpha=0.55,
+        line_color=None,
     )
+    marked = scatter_fig.scatter(
+        x=x_col,
+        y=y_col,
+        source=source,
+        view=views[True],
+        marker="circle",
+        size=6,
+        fill_color=color_col,
+        fill_alpha=0.9,
+        line_color="#ffffff",
+        line_width=0.3,
+    )
+    scatter_fig.add_tools(HoverTool(renderers=[others, marked], tooltips="@desc{safe}"))
 
-    # Add thresholds if provided
     if thresholds:
-        x_thresh = thresholds.get("x_thresh")
-        y_thresh = thresholds.get("y_thresh")
-        x_symmetric = thresholds.get("x_symmetric", False)
-        y_symmetric = thresholds.get("y_symmetric", False)
+        _threshold_spans(
+            scatter_fig,
+            thresholds.get("x_thresh"),
+            dimension="height",
+            symmetric=thresholds.get("x_symmetric", False),
+        )
+        _threshold_spans(
+            scatter_fig,
+            thresholds.get("y_thresh"),
+            dimension="width",
+            symmetric=thresholds.get("y_symmetric", False),
+        )
 
-        if x_thresh is not None and x_thresh != 0:
-            # Add positive threshold
-            scatter_fig.add_layout(
-                Span(
-                    location=x_thresh,
-                    dimension="height",
-                    line_color=theme.THRESHOLD_LINE_COLOR,
-                    line_dash=theme.THRESHOLD_LINE_DASH,
-                    line_width=theme.THRESHOLD_LINE_WIDTH,
-                )
-            )
-            # Add negative threshold if symmetric
-            if x_symmetric:
-                scatter_fig.add_layout(
-                    Span(
-                        location=-x_thresh,
-                        dimension="height",
-                        line_color=theme.THRESHOLD_LINE_COLOR,
-                        line_dash=theme.THRESHOLD_LINE_DASH,
-                        line_width=theme.THRESHOLD_LINE_WIDTH,
-                    )
-                )
-
-        if y_thresh is not None and y_thresh != 0:
-            # Add positive threshold
-            scatter_fig.add_layout(
-                Span(
-                    location=y_thresh,
-                    dimension="width",
-                    line_color=theme.THRESHOLD_LINE_COLOR,
-                    line_dash=theme.THRESHOLD_LINE_DASH,
-                    line_width=theme.THRESHOLD_LINE_WIDTH,
-                )
-            )
-            # Add negative threshold if symmetric
-            if y_symmetric:
-                scatter_fig.add_layout(
-                    Span(
-                        location=-y_thresh,
-                        dimension="width",
-                        line_color=theme.THRESHOLD_LINE_COLOR,
-                        line_dash=theme.THRESHOLD_LINE_DASH,
-                        line_width=theme.THRESHOLD_LINE_WIDTH,
-                    )
-                )
-
-    # Configure hover tool
-    hover = scatter_fig.select(dict(type=HoverTool))
-    hover.tooltips = "@desc{safe}"
+    n_marked = sum(1 for value in significant if value)
+    coloured = f", coloured by {color_label}" if color_label else ""
+    scatter_fig.add_layout(
+        Legend(
+            items=[
+                LegendItem(label=f"Significant ({n_marked:,}){coloured}", renderers=[marked]),
+                LegendItem(label=f"Not significant ({len(significant) - n_marked:,})", renderers=[others]),
+            ],
+            orientation="horizontal",
+            location="center",
+        ),
+        "below",
+    )
+    if "adjusted_pval" in y_col:
+        _name_points(
+            scatter_fig,
+            source.data,
+            _strongest(source.data, y_col, significant, STRONGEST_NAMED),
+            x_col,
+            y_col,
+        )
+    if color_metric is not None:
+        bar = registered_color_bar(
+            dm.color_manager,
+            mode=AnalysisWorkspaceMode.GROUP_COMPARISON,
+            element_type=element_type,
+            metric_name=color_metric,
+            title=color_label or color_metric,
+        )
+        if bar is not None:
+            bar.height = 120
+            scatter_fig.add_layout(bar, "right")
 
     add_click_behavior(
         scatter_fig,
@@ -356,8 +462,8 @@ def _wrap_statistical_plot(plot):
     )
 
 
-def _build_responsive_plot_layout(plots: List[Any], plots_per_row: int = 4):
-    """Arrange plots into wrapping rows that can collapse on narrow screens."""
+def _build_responsive_plot_layout(plots: List[Any], plots_per_row: int = 2):
+    """Two by two, in rows that wrap on narrow screens; every plot keeps its toolbar."""
     rows = []
     for start_idx in range(0, len(plots), plots_per_row):
         row_plots = [
@@ -387,6 +493,111 @@ def _build_responsive_plot_layout(plots: List[Any], plots_per_row: int = 4):
         },
         css_classes=["stats-plot-grid"],
     )
+
+
+def _significance_histogram(
+    values: pd.Series,
+    significant: np.ndarray,
+    *,
+    title: str,
+    x_label: str,
+    color_for,
+    threshold: Optional[float],
+    counted: Optional[int],
+    total: int,
+    background_fill_color: str = "#ffffff",
+    element_label: str = "reactions",
+    bins: int = 40,
+):
+    """One metric's distribution, its significant elements on the gradient beneath the rest.
+
+    Bins cover the 0.5th to the 99.5th percentile, so one extreme value cannot
+    flatten every bar; the few values beyond fall in the edge bins. With
+    ``color_for`` None (a p-value, which has no direction) the bars are grey,
+    darker past the threshold.
+    """
+    numbers = pd.to_numeric(values, errors="coerce").to_numpy(dtype=float)
+    finite = np.isfinite(numbers)
+    plot = figure(
+        sizing_mode="stretch_width",
+        height=STAT_PLOT_HEIGHT,
+        title=title,
+        x_axis_label=x_label,
+        y_axis_label=f"Number of {element_label}",
+        background_fill_color=background_fill_color,
+        tools="xpan,xwheel_zoom,reset,save",
+    )
+    if not finite.any():
+        return plot
+    low, high = np.nanpercentile(numbers[finite], [0.5, 99.5])
+    if color_for is None:
+        low = min(low, 0.0)
+    if high <= low:
+        low, high = low - 0.5, high + 0.5
+    edges = np.linspace(low, high, bins + 1)
+    clipped = np.clip(numbers[finite], low, high)
+    flags = np.asarray(significant, dtype=bool)[finite]
+    marked, _ = np.histogram(clipped[flags], edges)
+    others, _ = np.histogram(clipped[~flags], edges)
+    centres = (edges[:-1] + edges[1:]) / 2
+    left, right = edges[:-1], edges[1:]
+    data = {
+        "left": left,
+        "right": right,
+        "marked": marked,
+        "total": marked + others,
+        "others": others,
+    }
+    if color_for is None:
+        data["fill"] = [
+            P_SIGNIFICANT_GREY if threshold is not None and centre >= threshold else P_OTHER_GREY
+            for centre in centres
+        ]
+        source = ColumnDataSource(data)
+        bars = [
+            plot.quad(left="left", right="right", bottom=0, top="total", fill_color="fill", line_color="#ffffff", source=source)
+        ]
+    else:
+        data["fill"] = [color_for(centre) for centre in centres]
+        source = ColumnDataSource(data)
+        bars = [
+            plot.quad(left="left", right="right", bottom=0, top="marked", fill_color="fill", line_color="#ffffff", source=source),
+            plot.quad(
+                left="left",
+                right="right",
+                bottom="marked",
+                top="total",
+                fill_color=theme.NOT_SIGNIFICANT,
+                fill_alpha=0.6,
+                line_color="#ffffff",
+                source=source,
+            ),
+        ]
+    plot.add_tools(
+        HoverTool(
+            renderers=bars,
+            tooltips=[
+                (x_label, "@left{0.000} to @right{0.000}"),
+                ("Significant", "@marked"),
+                ("Not significant", "@others"),
+            ],
+        )
+    )
+    plot.y_range.start = 0
+    _threshold_spans(plot, threshold, dimension="height", symmetric=color_for is not None)
+    if threshold and counted is not None and total:
+        # Under the title, clear of the bars: how many pass this threshold alone.
+        past = f"{x_label} above {threshold:.2f}" if color_for is None else f"|{x_label}| above {threshold:.2f}"
+        plot.add_layout(
+            Title(
+                text=f"{counted:,} of {total:,} {element_label} ({counted / total:.0%}) with {past}",
+                text_font_size="12px",
+                text_font_style="normal",
+                text_color=theme.INK_MUTED,
+            ),
+            "above",
+        )
+    return plot
 
 
 def plot_statistical_histograms(
@@ -455,106 +666,43 @@ def plot_statistical_histograms(
             ),
         }
 
-    # Create histogram figures for selected parameters
-    histograms = []
     element_type = "gene" if for_genes else "reaction"
-
-    # Helper to get histogram data from registered distributions
-    def get_hist_data(metric_name):
-        # Use the first element ID to get the distribution details
-        # We only care about the 'histogram' part
-        first_id = test_results.index[0] if not test_results.empty else "dummy"
-        details = color_manager.get_distribution_details(
-            mode=AnalysisWorkspaceMode.GROUP_COMPARISON,
-            element_type=element_type,
-            element_id=first_id,
-            metric_name=metric_name,
+    significant = test_results.index.isin(
+        list(group_comparison.get_significant_elements(for_genes=for_genes))
+    )
+    specs = {
+        "pval": ("neg_log_adjusted_pval", "-log10 adjusted p", "pval"),
+        "cohens_d": ("cohens_d", "Cohen's d", "cohens_d"),
+        "log2_fc": ("log2_fc", "log2 fold change", "log2_fc"),
+        "mean_difference": ("mean_difference", "Mean difference", "mean_difference"),
+    }
+    thresholds_by_metric = {}
+    if show_thresholds:
+        thresholds_by_metric = {
+            "pval": -np.log10(pval_threshold) if pval_threshold > 0 else None,
+            "cohens_d": cohens_d_threshold,
+            "log2_fc": log2_fc_threshold,
+            "mean_difference": mean_difference_threshold,
+        }
+    histograms = []
+    for parameter in parameters_to_plot:
+        column_name, label, metric = specs[parameter]
+        histograms.append(
+            _significance_histogram(
+                test_results[column_name],
+                significant,
+                title=label,
+                x_label=label,
+                color_for=None
+                if parameter == "pval"
+                else _metric_color(data_manager, element_type, metric),
+                threshold=thresholds_by_metric.get(parameter),
+                counted=threshold_counts.get(parameter) if show_thresholds else None,
+                total=total_elements,
+                background_fill_color=background_fill_color,
+                element_label="genes" if for_genes else "reactions",
+            )
         )
-        return details["histogram"]
-
-    if "pval" in parameters_to_plot:
-        log_threshold = None
-        if show_thresholds:
-            count = threshold_counts["pval"]
-            percent = (count / total_elements) * 100
-            # Calculate threshold in -log10 space
-            log_threshold = -np.log10(pval_threshold) if pval_threshold > 0 else 0
-
-        # Use registered neg_log_adjusted_pval distribution
-        hist_data = get_hist_data("neg_log_adjusted_pval")
-
-        hist_p = create_bokeh_histogram(
-            histogram_data=hist_data,
-            title="Distribution of -log10(Adjusted P-values)",
-            x_label="-log10(Adjusted P-value)",
-            width=plot_width,
-            height=plot_height,
-            threshold=log_threshold,
-            threshold_counts=(count, percent) if show_thresholds else None,
-            show_threshold_annotation=show_thresholds,
-            background_fill_color=background_fill_color,
-        )
-        histograms.append(hist_p)
-
-    if "cohens_d" in parameters_to_plot:
-        if show_thresholds:
-            count = threshold_counts["cohens_d"]
-            percent = (count / total_elements) * 100
-
-        hist_data = get_hist_data("cohens_d")
-
-        hist_d = create_bokeh_histogram(
-            histogram_data=hist_data,
-            title="Distribution of Cohen's d",
-            x_label="Cohen's d",
-            width=plot_width,
-            height=plot_height,
-            threshold=cohens_d_threshold if show_thresholds else None,
-            threshold_counts=(count, percent) if show_thresholds else None,
-            show_threshold_annotation=show_thresholds,
-            background_fill_color=background_fill_color,
-        )
-        histograms.append(hist_d)
-
-    if "log2_fc" in parameters_to_plot:
-        if show_thresholds:
-            count = threshold_counts["log2_fc"]
-            percent = (count / total_elements) * 100
-
-        hist_data = get_hist_data("log2_fc")
-
-        hist_fc = create_bokeh_histogram(
-            histogram_data=hist_data,
-            title="Distribution of Log2 Fold Change",
-            x_label="Log2 FC",
-            width=plot_width,
-            height=plot_height,
-            threshold=log2_fc_threshold if show_thresholds else None,
-            threshold_counts=(count, percent) if show_thresholds else None,
-            show_threshold_annotation=show_thresholds,
-            background_fill_color=background_fill_color,
-        )
-        histograms.append(hist_fc)
-
-    if "mean_difference" in parameters_to_plot:
-        if show_thresholds:
-            count = threshold_counts["mean_difference"]
-            percent = (count / total_elements) * 100
-
-        hist_data = get_hist_data("mean_difference")
-
-        hist_mean_diff = create_bokeh_histogram(
-            histogram_data=hist_data,
-            title="Distribution of Mean Differences",
-            x_label="Mean Difference",
-            width=plot_width,
-            height=plot_height,
-            threshold=mean_difference_threshold if show_thresholds else None,
-            threshold_counts=(count, percent) if show_thresholds else None,
-            show_threshold_annotation=show_thresholds,
-            background_fill_color=background_fill_color,
-        )
-        histograms.append(hist_mean_diff)
 
     histogram_layout = _build_responsive_plot_layout(histograms)
 
@@ -610,25 +758,14 @@ def _prepare_scatter_source(
                     test_results["mean_difference"].abs().nlargest(top_n).index
                 )
 
-    # Subsample non-interesting indices if there are too many while preserving
-    # the original result ordering for deterministic rendering.
+    # Every element is drawn, the same on every render: the non-significant first,
+    # so the significant ones sit on top of them.
+    significant_set = set(significant_elements)
     all_indices = list(test_results.index)
-    non_interesting_indices = [
-        idx for idx in all_indices if idx not in interesting_indices
+    ordered = [idx for idx in all_indices if idx not in significant_set] + [
+        idx for idx in all_indices if idx in significant_set
     ]
-
-    if len(non_interesting_indices) > 200:
-        # Randomly sample 200 indices
-        sampled_indices = np.random.choice(
-            non_interesting_indices, size=200, replace=False
-        )
-        indices_to_keep = [idx for idx in all_indices if idx in interesting_indices]
-        indices_to_keep.extend(sampled_indices)
-    else:
-        indices_to_keep = all_indices
-
-    # Filter test_results to only include kept indices
-    test_results = test_results.loc[indices_to_keep]
+    test_results = test_results.loc[ordered]
 
     # Prepare data dict
     data = {
@@ -642,10 +779,7 @@ def _prepare_scatter_source(
         "cohens_d": test_results["cohens_d"],
         "log2_fc": test_results["log2_fc"],
         "mean_difference": test_results["mean_difference"],
-        "alpha": [
-            0.8 if idx in significant_elements else 0.3 for idx in test_results.index
-        ],
-        "size": [5 if idx in significant_elements else 3 for idx in test_results.index],
+        "significant": [idx in significant_set for idx in test_results.index],
     }
 
     for idx in test_results.index:
@@ -659,7 +793,6 @@ def _prepare_scatter_source(
 
     # Generate colors for each metric
     metrics_to_color = ["cohens_d", "log2_fc", "mean_difference"]
-    significant_set = set(significant_elements)
 
     for metric in metrics_to_color:
         if metric in test_results.columns:
@@ -808,8 +941,9 @@ def plot_statistical_scatterplots(
             "x_col": "cohens_d",
             "y_col": "neg_log_adjusted_pval",
             "x_label": "Cohen's d",
-            "y_label": "-log10(P-value)",
+            "y_label": "-log10 adjusted p",
             "color_col": "color_cohens_d",
+            "color_metric": "cohens_d",
             "x_thresh": cohens_d_threshold,
             "y_thresh": neg_log_pval_threshold,
             "x_symmetric": True,
@@ -823,9 +957,10 @@ def plot_statistical_scatterplots(
             "params": ["pval", "log2_fc"],
             "x_col": "log2_fc",
             "y_col": "neg_log_adjusted_pval",
-            "x_label": "Log2 FC",
-            "y_label": "-log10(P-value)",
+            "x_label": "log2 fold change",
+            "y_label": "-log10 adjusted p",
             "color_col": "color_log2_fc",
+            "color_metric": "log2_fc",
             "x_thresh": log2_fc_threshold,
             "y_thresh": neg_log_pval_threshold,
             "x_symmetric": True,
@@ -840,8 +975,9 @@ def plot_statistical_scatterplots(
             "x_col": "cohens_d",
             "y_col": "log2_fc",
             "x_label": "Cohen's d",
-            "y_label": "Log2 FC",
+            "y_label": "log2 fold change",
             "color_col": "color_cohens_d",
+            "color_metric": "cohens_d",
             "x_thresh": cohens_d_threshold,
             "y_thresh": log2_fc_threshold,
             "x_symmetric": True,
@@ -855,9 +991,10 @@ def plot_statistical_scatterplots(
             "params": ["mean_difference", "log2_fc"],
             "x_col": "mean_difference",
             "y_col": "log2_fc",
-            "x_label": "Mean Difference",
-            "y_label": "Log2 FC",
+            "x_label": "Mean difference",
+            "y_label": "log2 fold change",
             "color_col": "color_mean_difference",
+            "color_metric": "mean_difference",
             "x_thresh": mean_difference_threshold,
             "y_thresh": log2_fc_threshold,
             "x_symmetric": True,
@@ -898,6 +1035,8 @@ def plot_statistical_scatterplots(
                 enabled_toggle=enabled_toggle,
                 filename_prefix=click_filename_prefix,
                 download_flag=download_flag,
+                color_metric=config["color_metric"],
+                color_label=config["x_label"],
             )
             scatter_plots.append(plot)
 

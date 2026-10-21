@@ -124,9 +124,23 @@ def test_server_free_scatter_taps_read_the_download_flag():
         )
         if isinstance(callback, CustomJS)
     ]
-    assert len(callbacks) == 4
+    # One source feeds all four plots, each drawing it twice (significant or not).
+    assert len({id(callback) for callback in callbacks}) == 1
     assert all(
         callback.args["download_flag"] == "metabisDownloadHoverOnClick"
         for callback in callbacks
     )
     assert not any("enabled_toggle" in callback.args for callback in callbacks)
+
+
+def test_every_element_is_drawn_and_the_significant_ones_last():
+    """No sampling: the scatters are the same on every render."""
+    layout = plot_statistical_scatterplots(_workspace(), return_plot=True)
+    plots = [plot for plot in layout.references() if isinstance(plot, Plot)]
+    source = plots[0].renderers[0].data_source
+
+    flags = list(source.data["significant"])
+    assert len(flags) == len(_workspace().get_group_comparison_artifact().get_test_results())
+    assert flags == sorted(flags)
+    assert len(plots) == 4
+    assert all(len(plot.below) >= 2 for plot in plots)  # the axis and the legend
