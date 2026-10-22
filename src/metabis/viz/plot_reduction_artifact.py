@@ -1,38 +1,58 @@
-"""Artifact-first Bokeh factories for dimensionality-reduction results."""
+"""Artifact-first Bokeh factories for dimensionality-reduction results.
+
+The sample scatters follow how single-cell tools draw an embedding: points sized
+by how many there are, translucent with a white edge so overlaps show, the legend
+outside with each group's count, both axes at one scale, PCA axes with their
+share of variance, and UMAP and t-SNE axes with no numbers, which carry no unit
+(as scanpy and Seurat draw them).
+"""
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 
 import numpy as np
 import pandas as pd
 from bokeh.models import (
     Arrow,
-    BasicTicker,
-    ColorBar,
     ColumnDataSource,
+    CustomJS,
     FactorRange,
     HoverTool,
-    LinearColorMapper,
+    LabelSet,
     Range1d,
+    Span,
+    Title,
     VeeHead,
 )
 from bokeh.palettes import Category10
 from bokeh.plotting import figure
-from bokeh.transform import transform
 
 from ..analysis.dimensionality_reduction import ReductionArtifact
+from ..managers.group_palettes import OKABE_ITO
 from ..visual_config import theme
 from .click_behavior import get_external_reference_data
 from .plot_reduced_dimension import (
-    add_cluster_metrics_to_plot,
     calculate_cluster_metrics,
-    move_legend_outside_if_crowded,
+    get_metric_interpretation,
 )
 from .plot_utils import apply_academic_style
 
-DEFAULT_CATEGORICAL_PALETTE = Category10[10]
-DEFAULT_SINGLE_COLOR = DEFAULT_CATEGORICAL_PALETTE[0]
+DEFAULT_CATEGORICAL_PALETTE = OKABE_ITO
+DEFAULT_SINGLE_COLOR = OKABE_ITO[3]  # Okabe-Ito blue, for samples with no group
+# Category10 is kept for callers that imported it from here.
+LEGACY_CATEGORICAL_PALETTE = Category10[10]
+VARIANCE_MARKS = (0.5, 0.8)  # where the cumulative share is marked
+BIPLOT_SECTORS = 8  # one arrow per 45 degrees
+BIPLOT_MINIMUM_SHARE = 0.15  # of the longest arrow
+LOADING_BAR_COLOR = theme.INK_MUTED  # a loading's sign is a direction, not up or down
+LOADING_ROW_HEIGHT = 20
+
+
+def point_size(count: int) -> float:
+    """Fewer points draw larger: about 9 px for 300 samples, 6 for 1,000, 3 for 10,000."""
+    return float(np.clip(160 / math.sqrt(max(count, 1)), 3, 10))
 
 
 @dataclass(frozen=True)
@@ -78,9 +98,9 @@ class ReductionPlotPresentation:
     show_sample_labels: bool = False
     highlight_group_id: str | None = None
     show_separation_metrics: bool = True
-    max_variance_components: int = 50
-    loading_component_count: int = 8
-    loading_feature_count: int = 50
+    max_variance_components: int = 20
+    loading_component_count: int = 2
+    loading_feature_count: int = 12
     loading_sort_component: int | None = None
     biplot_pc_x: int = 1
     biplot_pc_y: int = 2
@@ -166,17 +186,141 @@ def _feature_lookup(presentation: ReductionPlotPresentation):
 
 
 def _apply_presentation_style(plot, presentation: ReductionPlotPresentation):
+    """The presentation's background, and its text colour when it is not the default.
+
+    On the default black the plot theme's navy and greys stay; another colour,
+    chosen for a dark background, is applied to every title and axis.
+    """
     plot.background_fill_color = presentation.background_color
     plot.border_fill_color = presentation.border_color
+    if presentation.text_color in {"black", "#000000"}:
+        return plot
     if plot.title:
         plot.title.text_color = presentation.text_color
     for axis in plot.xaxis + plot.yaxis:
         axis.axis_label_text_color = presentation.text_color
         axis.major_label_text_color = presentation.text_color
         axis.major_tick_line_color = presentation.text_color
-        axis.minor_tick_line_color = presentation.text_color
         axis.axis_line_color = presentation.text_color
     return plot
+
+
+def _axis_labels(artifact: ReductionArtifact, first: int = 1, second: int = 2):
+    """PC axes with their share of variance; UMAP and t-SNE axes by name alone."""
+    method = str(artifact.key.method)
+    variance = artifact.pca.explained_variance_ratio if artifact.pca is not None else None
+    if method.upper() == "PCA":
+        if variance is not None and len(variance) >= max(first, second):
+            return (
+                f"PC{first} ({variance[first - 1] * 100:.1f}%)",
+                f"PC{second} ({variance[second - 1] * 100:.1f}%)",
+            )
+        return f"PC{first}", f"PC{second}"
+    name = "t-SNE" if method.upper().replace("-", "") == "TSNE" else method.upper()
+    return f"{name}{first}", f"{name}{second}"
+
+
+def _unitless_axes(plot) -> None:
+    """No numbers on an axis whose distances carry no unit."""
+    for axis in plot.xaxis + plot.yaxis:
+        axis.major_label_text_font_size = "0px"
+        axis.major_tick_line_color = None
+
+
+def _style_points(plot, source, *, color: str, size: float, label: str, name: str | None = None):
+    """One group's points: translucent, with a white edge so overlaps show."""
+    return plot.scatter(
+        "x",
+        "y",
+        source=source,
+        size=size,
+        fill_color=color,
+        fill_alpha=0.8,
+        line_color="#ffffff",
+        line_width=0.6,
+        legend_label=label,
+        name=name,
+    )
+
+
+def _legend_outside(plot) -> None:
+    """The legend beside the plot, never over its points; a click hides a group."""
+    if not plot.legend:
+        return
+    legend = plot.legend[0]
+    if legend not in plot.right:
+        plot.add_layout(legend, "right")
+    legend.location = "top_left"
+    legend.click_policy = "hide"
+
+
+def _separation_note(plot, coordinates, labels) -> None:
+    """How well the groups separate, as a line under the plot rather than its title."""
+    if len(set(labels)) < 2 or len(coordinates) < 2 * len(set(labels)):
+        return
+    metrics = calculate_cluster_metrics(np.asarray(coordinates), list(labels))
+    if "silhouette" not in metrics:
+        return
+    parts = [f"silhouette {metrics['silhouette']:.2f}"]
+    if "davies_bouldin" in metrics:
+        parts.append(f"Davies-Bouldin {metrics['davies_bouldin']:.2f}")
+    if "calinski_harabasz" in metrics:
+        parts.append(f"Calinski-Harabasz {metrics['calinski_harabasz']:.1f}")
+    quality = get_metric_interpretation("silhouette", metrics["silhouette"]).lower()
+    plot.add_layout(
+        Title(
+            text=f"Separation of the groups is {quality} ({', '.join(parts)}).",
+            text_font_size="12px",
+            text_font_style="normal",
+            text_color=theme.INK_MUTED,
+        ),
+        "below",
+    )
+
+
+SELECTION_LABELS_CODE = """
+const xs = [], ys = [], names = [], lift = []
+const xspan = Math.abs(plot.x_range.end - plot.x_range.start) || 1
+const yspan = Math.abs(plot.y_range.end - plot.y_range.start) || 1
+const placed = []
+for (const source of sources) {
+  for (const i of source.selected.indices) {
+    const x = source.data.x[i], y = source.data.y[i]
+    let clashes = 0
+    for (const [px, py] of placed) {
+      if (Math.abs(px - x) < 0.12 * xspan && Math.abs(py - y) < 0.04 * yspan) clashes += 1
+    }
+    placed.push([x, y])
+    xs.push(x); ys.push(y); names.push(source.data.display_label[i]); lift.push(-12 * clashes)
+  }
+}
+labels.data = {x: xs, y: ys, display_label: names, y_offset: lift}
+"""
+
+
+def _selection_labels(plot, sources) -> ColumnDataSource:
+    """Name only the points a box selection picks, each a line clear of its neighbours.
+
+    Every sample stays named in its hover; a thousand labels at once cannot be read.
+    """
+    labels = ColumnDataSource({"x": [], "y": [], "display_label": [], "y_offset": []})
+    plot.text(
+        "x",
+        "y",
+        text="display_label",
+        source=labels,
+        text_font_size="11px",
+        text_color=theme.INK,
+        text_baseline="middle",
+        x_offset=6,
+        y_offset="y_offset",
+        name="selection_labels",
+    )
+    callback = CustomJS(args=dict(sources=list(sources), labels=labels, plot=plot), code=SELECTION_LABELS_CODE)
+    for source in sources:
+        source.selected.js_on_change("indices", callback)
+    plot.add_tools("box_select")
+    return labels
 
 
 def _reduction_sample_presentations(
@@ -280,9 +424,9 @@ def build_reduction_presentation(
     show_sample_labels: bool = False,
     highlight_group_id: str | None = None,
     show_separation_metrics: bool = True,
-    max_variance_components: int = 50,
-    loading_component_count: int = 8,
-    loading_feature_count: int = 50,
+    max_variance_components: int = 20,
+    loading_component_count: int = 2,
+    loading_feature_count: int = 12,
     loading_sort_component: int | None = None,
     biplot_pc_x: int = 1,
     biplot_pc_y: int = 2,
@@ -335,125 +479,83 @@ def plot_reduction_artifact(
             height=presentation.height,
             title=title,
             tools="pan,box_zoom,wheel_zoom,reset,save",
+            match_aspect=True,
         )
     )
+    size = point_size(len(artifact.sample_ids))
 
     separation_coordinates: list[np.ndarray] = []
     separation_labels: list[str] = []
-    if presentation.groups:
-        for index, group in enumerate(presentation.groups):
-            member_set = set(group.sample_ids)
-            indices = [
-                row
-                for row, sample_id in enumerate(artifact.sample_ids)
-                if sample_id in member_set
-            ]
-            if not indices:
-                continue
-            values = coordinates[indices, :2]
-            canonical_ids = [artifact.sample_ids[row] for row in indices]
-            source = ColumnDataSource(
-                {
-                    "x": values[:, 0],
-                    "y": values[:, 1],
-                    "sample_id": canonical_ids,
-                    "display_label": [
-                        sample_lookup[sample_id].display_label
-                        for sample_id in canonical_ids
-                    ],
-                    "group_id": [group.group_id] * len(indices),
-                    "group": [group.display_name] * len(indices),
-                }
-            )
-            color = group.color or DEFAULT_CATEGORICAL_PALETTE[
-                index % len(DEFAULT_CATEGORICAL_PALETTE)
-            ]
-            plot.scatter(
-                "x",
-                "y",
-                source=source,
-                color=color,
-                legend_label=group.display_name,
-            )
-            if presentation.show_sample_labels:
-                plot.text(
-                    "x",
-                    "y",
-                    text="display_label",
-                    source=source,
-                    text_font_size="7pt",
-                    x_offset=4,
-                )
-            if presentation.highlight_group_id == group.group_id:
-                centroid = values.mean(axis=0)
-                plot.text(
-                    x=[centroid[0]],
-                    y=[centroid[1]],
-                    text=[group.display_name],
-                    text_font_size="10pt",
-                    text_baseline="middle",
-                    text_align="center",
-                    text_color=color,
-                    text_font_style="bold",
-                )
-            separation_coordinates.extend(values)
-            separation_labels.extend([group.group_id] * len(values))
-    else:
+    sources = []
+    point_renderers = []
+    groups = presentation.groups or (
+        ReductionGroupPresentation("", "All samples", DEFAULT_SINGLE_COLOR, tuple(artifact.sample_ids)),
+    )
+    for index, group in enumerate(groups):
+        member_set = set(group.sample_ids)
+        indices = [
+            row for row, sample_id in enumerate(artifact.sample_ids) if sample_id in member_set
+        ]
+        if not indices:
+            continue
+        values = coordinates[indices, :2]
+        canonical_ids = [artifact.sample_ids[row] for row in indices]
         source = ColumnDataSource(
             {
-                "x": coordinates[:, 0],
-                "y": coordinates[:, 1],
-                "sample_id": list(artifact.sample_ids),
-                "display_label": [sample.display_label for sample in presentation.samples],
-                "group_id": [""] * len(artifact.sample_ids),
-                "group": ["All samples"] * len(artifact.sample_ids),
+                "x": values[:, 0],
+                "y": values[:, 1],
+                "sample_id": canonical_ids,
+                "display_label": [sample_lookup[sample_id].display_label for sample_id in canonical_ids],
+                "group_id": [group.group_id] * len(indices),
+                "group": [group.display_name] * len(indices),
             }
         )
-        plot.scatter(
-            "x",
-            "y",
-            source=source,
-            color=DEFAULT_SINGLE_COLOR,
-            legend_label="All samples",
-        )
-        if presentation.show_sample_labels:
-            plot.text(
-                "x",
-                "y",
-                text="display_label",
-                source=source,
-                text_font_size="7pt",
-                x_offset=4,
+        color = group.color or DEFAULT_CATEGORICAL_PALETTE[index % len(DEFAULT_CATEGORICAL_PALETTE)]
+        point_renderers.append(
+            _style_points(
+                plot, source, color=color, size=size, label=f"{group.display_name} ({len(indices):,})"
             )
+        )
+        sources.append(source)
+        if presentation.highlight_group_id and presentation.highlight_group_id == group.group_id:
+            centroid = values.mean(axis=0)
+            plot.text(
+                x=[centroid[0]],
+                y=[centroid[1]],
+                text=[group.display_name],
+                text_font_size="13px",
+                text_baseline="middle",
+                text_align="center",
+                text_color=theme.INK,
+                text_font_style="bold",
+            )
+        if presentation.groups:
+            separation_coordinates.extend(values)
+            separation_labels.extend([group.group_id] * len(values))
 
+    if presentation.show_sample_labels:
+        _selection_labels(plot, sources)
     plot.add_tools(
         HoverTool(
+            renderers=point_renderers,
             tooltips=[
                 ("Sample ID", "@sample_id"),
                 ("Display label", "@display_label"),
                 ("Group", "@group"),
                 ("X", "@x{0.00}"),
                 ("Y", "@y{0.00}"),
-            ]
+            ],
         )
     )
-    plot.xaxis.axis_label = f"{artifact.key.method} Component 1"
-    plot.yaxis.axis_label = f"{artifact.key.method} Component 2"
-    plot.legend.location = "right"
-    plot.legend.orientation = "vertical"
-    move_legend_outside_if_crowded(
-        plot, len(presentation.groups) if presentation.groups else 1
-    )
-
-    if (
-        presentation.show_separation_metrics
-        and len(set(separation_labels)) >= 2
-        and len(separation_coordinates) >= 2 * len(set(separation_labels))
-    ):
-        metrics = calculate_cluster_metrics(
-            np.asarray(separation_coordinates), separation_labels
-        )
-        add_cluster_metrics_to_plot(plot, metrics, title)
+    x_label, y_label = _axis_labels(artifact)
+    plot.xaxis.axis_label = x_label
+    plot.yaxis.axis_label = y_label
+    if str(artifact.key.method).upper() != "PCA":
+        _unitless_axes(plot)
+        plot.grid.grid_line_color = None
+    _legend_outside(plot)
+    if presentation.show_separation_metrics:
+        _separation_note(plot, separation_coordinates, separation_labels)
     return _apply_presentation_style(plot, presentation)
 
 
@@ -470,7 +572,12 @@ def _require_pca_loadings(artifact: ReductionArtifact) -> None:
 def plot_pca_variance_artifact(
     artifact: ReductionArtifact, presentation: ReductionPlotPresentation
 ):
-    """Build explained/cumulative variance from the PCA artifact."""
+    """Each component's share of the variance in percent, and the running total.
+
+    The first components hold the story, so at most ``max_variance_components``
+    are drawn (20 by default); the cumulative line is marked where it passes 50%
+    and 80%. The download covers every retained component.
+    """
     _validate_inputs(artifact, presentation)
     _require_pca_variance(artifact)
     assert artifact.pca is not None
@@ -486,27 +593,23 @@ def plot_pca_variance_artifact(
             "components": components,
             "explained_variance": variance,
             "cumulative_variance": cumulative,
+            "explained_percent": variance * 100,
+            "cumulative_percent": cumulative * 100,
             "explained_variance_str": [f"{value * 100:.1f}%" for value in variance],
-            "cumulative_variance_str": [
-                f"{value * 100:.1f}%" for value in cumulative
-            ],
+            "cumulative_variance_str": [f"{value * 100:.1f}%" for value in cumulative],
         }
     )
-    title = f"PCA Explained Variance: {artifact.data_source_name}"
+    title = f"PCA explained variance of {artifact.data_source_name}"
     if count < retained:
-        title += (
-            f" (first {count} of {retained} PCs from "
-            f"{artifact.n_variable_features_used} features)"
-        )
+        title += f" (first {count} of {retained} PCs from {artifact.n_variable_features_used} features)"
     else:
-        title += (
-            f" ({retained} PCs from {artifact.n_variable_features_used} features)"
-        )
+        title += f" ({retained} PCs from {artifact.n_variable_features_used} features)"
     plot = apply_academic_style(
         figure(
             width=presentation.width,
             height=presentation.height,
             x_range=Range1d(0.5, count + 0.5),
+            y_range=Range1d(0, 100),
             title=title,
             tools="pan,wheel_zoom,box_zoom,reset,save",
         )
@@ -514,169 +617,239 @@ def plot_pca_variance_artifact(
     plot.xgrid.grid_line_color = None
     plot.vbar(
         x="components",
-        top="explained_variance",
+        top="explained_percent",
         width=0.7,
         source=source,
-        legend_label="Explained Variance per PC",
-        color=DEFAULT_CATEGORICAL_PALETTE[0],
-        alpha=0.7,
-        line_color="#333333",
-        line_width=0.5,
+        legend_label="Each component",
+        fill_color=theme.FRAME_LINE,
+        line_color=None,
     )
     plot.line(
         x="components",
-        y="cumulative_variance",
+        y="cumulative_percent",
         source=source,
-        legend_label="Cumulative Explained Variance",
-        line_width=2.5,
-        color=DEFAULT_CATEGORICAL_PALETTE[1],
+        legend_label="Cumulative",
+        line_width=2,
+        color=theme.INK,
     )
     plot.scatter(
         x="components",
-        y="cumulative_variance",
+        y="cumulative_percent",
         source=source,
-        color=DEFAULT_CATEGORICAL_PALETTE[1],
-        size=6,
+        color=theme.INK,
+        size=5,
         marker="circle",
     )
+    for share in VARIANCE_MARKS:
+        reached = np.nonzero(cumulative >= share)[0]
+        plot.add_layout(
+            Span(
+                location=share * 100,
+                dimension="width",
+                line_color=theme.THRESHOLD_LINE_COLOR,
+                line_dash=theme.THRESHOLD_LINE_DASH,
+                line_width=theme.THRESHOLD_LINE_WIDTH,
+            )
+        )
+        text = (
+            f"{share:.0%} by PC{reached[0] + 1}"
+            if reached.size
+            else f"{share:.0%} not reached in {count} PCs"
+        )
+        plot.add_layout(
+            LabelSet(
+                x="x",
+                y="y",
+                text="text",
+                source=ColumnDataSource({"x": [count + 0.4], "y": [share * 100], "text": [text]}),
+                text_align="right",
+                text_baseline="bottom",
+                text_font_size="11px",
+                text_color=theme.INK_MUTED,
+                y_offset=3,
+            )
+        )
     plot.add_tools(
         HoverTool(
             tooltips=[
                 ("PC", "@components"),
-                ("Explained Var.", "@explained_variance_str"),
-                ("Cumulative Var.", "@cumulative_variance_str"),
+                ("Explained", "@explained_variance_str"),
+                ("Cumulative", "@cumulative_variance_str"),
             ]
         )
     )
-    plot.xaxis.axis_label = "Principal Component"
-    plot.yaxis.axis_label = "Proportion of Variance Explained"
-    plot.y_range.start = 0
-    plot.y_range.end = max(1.0, float(np.max(cumulative)) * 1.05)
-    plot.legend.location = "center_right"
+    plot.xaxis.axis_label = "Principal component"
+    plot.yaxis.axis_label = "Variance explained (%)"
+    # Below the plot, clear of the 50% and 80% marks at its right edge.
+    legend = plot.legend[0]
+    plot.add_layout(legend, "below")
+    legend.orientation = "horizontal"
+    legend.location = "center"
     return _apply_presentation_style(plot, presentation)
 
 
-def _selected_loadings(
-    artifact: ReductionArtifact, presentation: ReductionPlotPresentation
-):
-    assert artifact.pca is not None
-    assert artifact.pca.loadings is not None
+def _loading_rows(artifact: ReductionArtifact, presentation: ReductionPlotPresentation):
+    """Per component, its strongest loadings of each sign, tied features in one bar.
+
+    Features that load identically (several reactions Compass scores alike, one
+    flux through a chain) share a bar named after the first, with the number of its
+    twins, so the bars show distinct directions rather than one direction repeated.
+    """
+    assert artifact.pca is not None and artifact.pca.loadings is not None
     loadings = artifact.pca.loadings
     component_count = min(presentation.loading_component_count, loadings.shape[0])
-    if presentation.loading_sort_component is not None:
-        if presentation.loading_sort_component > loadings.shape[0]:
-            raise ValueError(
-                f"PC for sorting must be between 1 and {loadings.shape[0]}"
+    per_sign = max(1, presentation.loading_feature_count // 2)
+    feature_lookup = _feature_lookup(presentation)
+    variance = artifact.pca.explained_variance_ratio
+    rows = []
+    for component in range(component_count):
+        values = loadings[component]
+        header = f"PC{component + 1}"
+        if variance is not None and len(variance) > component:
+            header += f" ({variance[component] * 100:.1f}%)"
+        rows.append({"header": header})
+        tied: dict[float, list[int]] = {}
+        for index, value in enumerate(values):
+            tied.setdefault(round(float(value), 9), []).append(index)
+        distinct = sorted(tied, key=lambda value: -value)
+        positives = [value for value in distinct if value > 0][:per_sign]
+        negatives = [value for value in reversed(distinct) if value < 0][:per_sign]
+        for value in positives + list(reversed(negatives)):
+            members = tied[value]
+            first = artifact.feature_names[members[0]]
+            presentation_of = feature_lookup[first]
+            name = presentation_of.display_label
+            if len(members) > 1:
+                name += f" and {len(members) - 1} identical"
+            rows.append(
+                {
+                    "PC": f"PC{component + 1}",
+                    "feature_id": first,
+                    "Feature": name,
+                    "loading": float(values[members[0]]),
+                    "twins": ", ".join(feature_lookup[artifact.feature_names[i]].display_label for i in members[1:11]),
+                    "hover": presentation_of.hover_html or f"Feature: {first}",
+                    "external_url": presentation_of.external_url,
+                    "display_label": presentation_of.display_label,
+                }
             )
-        sort_index = presentation.loading_sort_component - 1
-        order = np.argsort(np.abs(loadings[sort_index]))[::-1]
-    else:
-        order = np.argsort(np.sum(np.abs(loadings[:component_count]), axis=0))[::-1]
-    feature_count = min(presentation.loading_feature_count, loadings.shape[1])
-    indices = order[:feature_count]
-    return component_count, indices, loadings[:component_count, indices]
+    return component_count, rows
 
 
 def plot_pca_loadings_artifact(
     artifact: ReductionArtifact, presentation: ReductionPlotPresentation
 ):
-    """Build the PCA loading heatmap without a manager/cache dependency."""
+    """The strongest loadings of each sign, per component, as named bars.
+
+    ``loading_component_count`` components are drawn, each opening with a header
+    row; ``loading_feature_count`` bars each, half of each sign. The download is
+    the complete matrix. ``loading_sort_component`` no longer applies: each
+    component is ordered by its own loadings.
+    """
     _validate_inputs(artifact, presentation)
     _require_pca_loadings(artifact)
     assert artifact.pca is not None
     assert artifact.pca.loadings is not None
     if artifact.pca.loadings.size == 0:
         raise ValueError("Loadings matrix is empty")
-    component_count, feature_indices, selected = _selected_loadings(
-        artifact, presentation
-    )
-    feature_lookup = _feature_lookup(presentation)
-    feature_ids = [artifact.feature_names[index] for index in feature_indices]
-    feature_labels = [feature_lookup[feature_id].display_label for feature_id in feature_ids]
-    pc_labels = [f"PC{index + 1}" for index in range(component_count)]
-    frame = (
-        pd.DataFrame(selected, index=pc_labels, columns=feature_ids)
-        .stack()
-        .rename("loading")
-        .reset_index()
-    )
-    frame.columns = ["PC", "feature_id", "loading"]
-    frame["Feature"] = [feature_lookup[value].display_label for value in frame["feature_id"]]
-    frame["display_label"] = frame["Feature"]
-    frame["hover"] = [
-        feature_lookup[value].hover_html or f"Feature: {value}"
-        for value in frame["feature_id"]
-    ]
-    frame["external_url"] = [
-        feature_lookup[value].external_url for value in frame["feature_id"]
-    ]
-    max_abs = float(np.max(np.abs(selected))) if selected.size else 1.0
-    if max_abs == 0:
-        max_abs = 1.0
-    mapper = LinearColorMapper(palette="RdBu11", low=-max_abs, high=max_abs)
-    title = (
-        f"PCA Loadings: {artifact.data_source_name} "
-        f"(Top {component_count} PCs, {len(feature_ids)} Features)"
-    )
-    if presentation.loading_sort_component is None:
-        title += ", sorted by sum of abs. loadings"
-    else:
-        title += f", sorted by PC{presentation.loading_sort_component}"
+    component_count, rows = _loading_rows(artifact, presentation)
+
+    factors, headers, used = [], [], set()
+    for row in rows:
+        text = row.get("header") or row["Feature"]
+        # A feature can load on several components; each bar keeps its own row.
+        while text in used:
+            text += "\u200b"
+        used.add(text)
+        factors.append(text)
+        if "header" in row:
+            headers.append(text)
+        else:
+            row["y"] = text
+    bars = [row for row in rows if "header" not in row]
+    reach = max([abs(row["loading"]) for row in bars] + [1e-9]) * 1.08
     plot = apply_academic_style(
         figure(
             width=presentation.width,
-            height=presentation.height,
-            x_range=FactorRange(factors=feature_labels),
-            y_range=FactorRange(factors=list(reversed(pc_labels))),
-            title=title,
-            tools="save,pan,box_zoom,wheel_zoom,reset",
-            x_axis_location="above",
-        ),
-        suppress_grid=True,
+            # Every bar keeps a readable row, however many are asked for.
+            height=max(presentation.height, LOADING_ROW_HEIGHT * len(factors) + 90),
+            x_range=Range1d(-reach, reach),
+            y_range=FactorRange(factors=list(reversed(factors)), range_padding=0.0),
+            title=(
+                f"PCA loadings of {artifact.data_source_name}, the strongest of each sign "
+                f"in the first {component_count} PCs"
+            ),
+            tools="xpan,xwheel_zoom,reset,save",
+        )
     )
-    plot.axis.axis_line_color = None
-    plot.axis.major_tick_line_color = None
-    plot.rect(
-        x="Feature",
-        y="PC",
-        width=1,
-        height=1,
-        source=frame,
-        fill_color=transform("loading", mapper),
+    plot.ygrid.grid_line_color = None
+    if headers:
+        plot.hbar(
+            y=headers,
+            left=-reach * 2,
+            right=reach * 2,
+            height=1.0,
+            fill_color="#eeeeee",
+            line_color=None,
+            level="underlay",
+        )
+    source = ColumnDataSource(pd.DataFrame(bars)) if bars else ColumnDataSource(
+        {key: [] for key in ("y", "loading", "PC", "feature_id", "Feature", "twins", "hover", "external_url", "display_label")}
+    )
+    renderer = plot.hbar(
+        y="y",
+        left=0,
+        right="loading",
+        height=0.7,
+        source=source,
+        fill_color=LOADING_BAR_COLOR,
         line_color=None,
     )
-    plot.add_layout(
-        ColorBar(
-            color_mapper=mapper,
-            ticker=BasicTicker(desired_num_ticks=7),
-            label_standoff=8,
-            border_line_color=None,
-            location=(0, 0),
-            major_label_text_font_size="8pt",
-            title="Loading",
-            title_text_font_style="normal",
-            title_text_font_size="9pt",
-            title_standoff=8,
-        ),
-        "right",
-    )
+    plot.add_layout(Span(location=0, dimension="height", line_color=theme.INK_MUTED, line_width=1))
     plot.add_tools(
         HoverTool(
+            renderers=[renderer],
             tooltips="""
                 <div>
                     <div><strong>Feature ID:</strong> @feature_id</div>
                     <div><strong>Feature:</strong> @display_label</div>
                     <div><strong>PC:</strong> @PC</div>
                     <div><strong>Loading:</strong> @loading{0.000}</div>
+                    <div>@twins</div>
                     @hover{safe}
                 </div>
-            """
+            """,
         )
     )
-    plot.xaxis.major_label_orientation = np.pi / 4
-    plot.xaxis.axis_label = "Features"
-    plot.yaxis.axis_label = "Principal Components"
+    yaxis = plot.yaxis[0]
+    yaxis.axis_line_color = None
+    yaxis.major_tick_line_color = None
+    yaxis.major_label_text_font_size = "11px"
+    yaxis.major_label_text_color = theme.INK
+    plot.xaxis.axis_label = "Loading"
     return _apply_presentation_style(plot, presentation)
+
+
+def biplot_arrows(loadings_x: np.ndarray, loadings_y: np.ndarray, limit: int | None) -> list[int]:
+    """The longest arrow in each 45 degree sector, at least 15% of the longest.
+
+    The strongest loadings often point the same way (tied reactions, one chain),
+    so the top few by length would draw one arrow several times; one per sector
+    shows the directions the variance runs in. At most ``limit``, longest first.
+    """
+    magnitudes = np.hypot(loadings_x, loadings_y)
+    if magnitudes.size == 0 or float(magnitudes.max()) == 0:
+        return []
+    floor = BIPLOT_MINIMUM_SHARE * float(magnitudes.max())
+    angles = np.mod(np.arctan2(loadings_y, loadings_x), 2 * np.pi)
+    sectors = np.floor(angles / (2 * np.pi / BIPLOT_SECTORS)).astype(int) % BIPLOT_SECTORS
+    chosen = []
+    for sector in range(BIPLOT_SECTORS):
+        members = np.nonzero((sectors == sector) & (magnitudes >= floor))[0]
+        if members.size:
+            chosen.append(int(members[np.argmax(magnitudes[members])]))
+    chosen.sort(key=lambda index: -magnitudes[index])
+    return chosen[:limit] if limit is not None else chosen
 
 
 def plot_pca_biplot_artifact(
@@ -716,62 +889,51 @@ def plot_pca_biplot_artifact(
             }
         )
     scores = pd.DataFrame(rows)
-    title = f"PCA Biplot (PC{pc_x} vs PC{pc_y}) for {artifact.data_source_name}"
+    title = f"PCA biplot of {artifact.data_source_name}, PC{pc_x} and PC{pc_y}"
     plot = apply_academic_style(
         figure(
             width=presentation.width,
             height=presentation.height,
             title=title,
             tools="pan,wheel_zoom,box_zoom,reset,save",
+            match_aspect=True,
         )
     )
-    variance = artifact.pca.explained_variance_ratio
-    if variance is None:
-        plot.xaxis.axis_label = f"PC{pc_x}"
-        plot.yaxis.axis_label = f"PC{pc_y}"
-    else:
-        plot.xaxis.axis_label = f"PC{pc_x} ({variance[x_index] * 100:.1f}%)"
-        plot.yaxis.axis_label = f"PC{pc_y} ({variance[y_index] * 100:.1f}%)"
-    sample_renderers = []
+    x_label, y_label = _axis_labels(artifact, pc_x, pc_y)
+    plot.xaxis.axis_label = x_label
+    plot.yaxis.axis_label = y_label
+    size = point_size(len(scores))
+    sample_renderers, sample_sources = [], []
     for group_name in dict.fromkeys(scores["group"].tolist()):
         group_rows = scores[scores["group"] == group_name]
-        # The labels draw off the same source as the points they name, so the
-        # biplot carries one copy of each group's coordinates.
         source = ColumnDataSource(group_rows)
-        renderer = plot.scatter(
-            x="x",
-            y="y",
-            source=source,
-            legend_label=str(group_name),
-            color=group_rows["color"].iloc[0],
-            name="sample_points",
-        )
-        sample_renderers.append(renderer)
-        if presentation.show_sample_labels:
-            plot.text(
-                "x",
-                "y",
-                text="display_label",
-                source=source,
-                text_font_size="7pt",
-                x_offset=4,
+        sample_renderers.append(
+            _style_points(
+                plot,
+                source,
+                color=group_rows["color"].iloc[0],
+                size=size,
+                label=f"{group_name} ({len(group_rows):,})",
+                name="sample_points",
             )
+        )
+        sample_sources.append(source)
+    if presentation.show_sample_labels:
+        _selection_labels(plot, sample_sources)
     if presentation.highlight_group_id:
         highlighted = scores[scores["group_id"] == presentation.highlight_group_id]
         if not highlighted.empty:
             group = next(
-                item
-                for item in presentation.groups
-                if item.group_id == presentation.highlight_group_id
+                item for item in presentation.groups if item.group_id == presentation.highlight_group_id
             )
             plot.text(
                 x=[highlighted["x"].mean()],
                 y=[highlighted["y"].mean()],
                 text=[group.display_name],
-                text_font_size="10pt",
+                text_font_size="13px",
                 text_baseline="middle",
                 text_align="center",
-                text_color=group.color,
+                text_color=theme.INK,
                 text_font_style="bold",
             )
 
@@ -788,41 +950,32 @@ def plot_pca_biplot_artifact(
         max_loading = 1.0
     scale = score_range / max_loading * 0.20 * presentation.biplot_arrow_scale
     feature_lookup = _feature_lookup(presentation)
+    chosen = biplot_arrows(loadings_x, loadings_y, presentation.biplot_top_arrows)
     arrows = pd.DataFrame(
         {
-            "x_end": loadings_x * scale,
-            "y_end": loadings_y * scale,
-            "feature_id": artifact.feature_names,
-            "magnitude": magnitudes,
-            "x_start": 0,
-            "y_start": 0,
+            "x_end": loadings_x[chosen] * scale,
+            "y_end": loadings_y[chosen] * scale,
+            "feature_id": [artifact.feature_names[index] for index in chosen],
+            "magnitude": magnitudes[chosen],
+            "x_start": 0.0,
+            "y_start": 0.0,
         }
     )
-    if (
-        presentation.biplot_top_arrows is not None
-        and presentation.biplot_top_arrows < len(arrows)
-    ):
-        arrows = arrows.nlargest(presentation.biplot_top_arrows, "magnitude")
-    arrows["display_label"] = [
-        feature_lookup[value].display_label for value in arrows["feature_id"]
-    ]
+    arrows["display_label"] = [feature_lookup[value].display_label for value in arrows["feature_id"]]
     arrows["hover"] = [
-        feature_lookup[value].hover_html or f"Feature: {value}"
-        for value in arrows["feature_id"]
+        feature_lookup[value].hover_html or f"Feature: {value}" for value in arrows["feature_id"]
     ]
-    arrows["external_url"] = [
-        feature_lookup[value].external_url for value in arrows["feature_id"]
-    ]
+    arrows["external_url"] = [feature_lookup[value].external_url for value in arrows["feature_id"]]
+    # Each name at its tip, set outwards along its arrow so it clears the others.
+    arrows["align"] = ["left" if x >= 0 else "right" for x in arrows["x_end"]]
+    arrows["baseline"] = ["bottom" if y >= 0 else "top" for y in arrows["y_end"]]
+    arrows["x_offset"] = [4 if x >= 0 else -4 for x in arrows["x_end"]]
+    arrows["y_offset"] = [-3 if y >= 0 else 3 for y in arrows["y_end"]]
     arrow_source = ColumnDataSource(arrows)
-    arrow_color = theme.ACTIVITY_UP
+    arrow_color = theme.INK_MUTED
     plot.add_layout(
         Arrow(
-            end=VeeHead(
-                size=7,
-                fill_color=arrow_color,
-                line_color=arrow_color,
-                line_width=1,
-            ),
+            end=VeeHead(size=7, fill_color=arrow_color, line_color=arrow_color, line_width=1),
             x_start="x_start",
             y_start="y_start",
             x_end="x_end",
@@ -830,29 +983,22 @@ def plot_pca_biplot_artifact(
             source=arrow_source,
             line_color=arrow_color,
             line_width=1.5,
-            line_alpha=0.7,
         )
     )
     arrow_hover_renderer = plot.scatter(
-        x="x_end",
-        y="y_end",
-        source=arrow_source,
-        size=10,
-        alpha=0,
-        name="arrow_endpoints",
+        x="x_end", y="y_end", source=arrow_source, size=10, alpha=0, name="arrow_endpoints"
     )
     plot.text(
         x="x_end",
         y="y_end",
         text="display_label",
         source=arrow_source,
-        text_font_size="7pt",
-        text_color="#333333",
-        text_alpha=0.85,
-        text_baseline="middle",
-        text_align="left",
-        x_offset=4,
-        y_offset=4,
+        text_font_size="11px",
+        text_color=theme.INK,
+        text_align="align",
+        text_baseline="baseline",
+        x_offset="x_offset",
+        y_offset="y_offset",
     )
     plot.add_tools(
         HoverTool(
@@ -881,18 +1027,8 @@ def plot_pca_biplot_artifact(
     )
     if presentation.show_separation_metrics:
         valid = scores[~scores["group"].isin(["Unassigned", "N/A"])]
-        if len(set(valid["group_id"])) >= 2:
-            add_cluster_metrics_to_plot(
-                plot,
-                calculate_cluster_metrics(
-                    valid[["x", "y"]].to_numpy(), valid["group_id"].tolist()
-                ),
-                title,
-            )
-    plot.legend.location = "top_right"
-    move_legend_outside_if_crowded(
-        plot, len(plot.legend[0].items) if plot.legend else 0
-    )
+        _separation_note(plot, valid[["x", "y"]].to_numpy(), valid["group_id"].tolist())
+    _legend_outside(plot)
     return _apply_presentation_style(plot, presentation)
 
 

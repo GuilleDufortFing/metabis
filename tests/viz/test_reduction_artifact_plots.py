@@ -207,15 +207,46 @@ def test_variance_uses_exact_artifact_values_and_selected_component_limit():
     assert "first 2 of 3 PCs" in plot.title.text
 
 
-def test_loadings_uses_selected_counts_sorting_and_frozen_feature_presentation():
+def test_loadings_name_the_strongest_of_each_sign_per_component():
     plot = plot_pca_loadings_artifact(artifact(), presentation())
     source = source_with(plot, "loading")
+    rows = list(reversed(plot.y_range.factors))
 
-    assert set(source.data["PC"]) == {"PC1", "PC2"}
-    assert list(dict.fromkeys(source.data["feature_id"])) == ["R1", "R2"]
-    assert set(source.data["display_label"]) == {"Display R1", "Display R2"}
+    # Two components, each a header row then its strongest positive and negative.
+    assert rows[0] == "PC1 (60.0%)"
+    assert "PC2 (30.0%)" in rows
+    by_component = {
+        (pc, feature): loading
+        for pc, feature, loading in zip(
+            source.data["PC"], source.data["feature_id"], source.data["loading"]
+        )
+    }
+    assert by_component == {
+        ("PC1", "R1"): 0.9,
+        ("PC1", "R3"): -0.1,
+        ("PC2", "R3"): 0.4,
+        ("PC2", "R2"): -0.8,
+    }
+    assert all(label.startswith("Display ") for label in source.data["display_label"])
     assert all("Hover R" in hover for hover in source.data["hover"])
-    assert "sorted by PC1" in plot.title.text
+    assert "first 2 PCs" in plot.title.text
+
+
+def test_identical_loadings_share_one_bar_that_counts_its_twins():
+    tied = artifact()
+    tied = replace(
+        tied,
+        pca=replace(
+            tied.pca,
+            loadings=np.array([[0.5, 0.5, -0.2], [0.1, -0.8, 0.4], [0.2, 0.1, 0.7]]),
+        ),
+    )
+    plot = plot_pca_loadings_artifact(tied, presentation(loading_component_count=1))
+    source = source_with(plot, "loading")
+
+    assert list(source.data["feature_id"]) == ["R1", "R3"]
+    assert source.data["Feature"][0] == "Display R1 and 1 identical"
+    assert source.data["twins"][0] == "Display R2"
 
 
 def test_biplot_uses_canonical_samples_and_limits_feature_arrows():
@@ -249,29 +280,39 @@ def sample_label_renderers(plot):
     ]
 
 
-def test_biplot_labels_samples_only_when_the_shared_toggle_is_active():
+def test_sample_labels_name_only_the_points_a_box_selection_picks():
     labelled = plot_pca_biplot_artifact(artifact(), presentation())
-    unlabelled = plot_pca_biplot_artifact(
-        artifact(), presentation(show_sample_labels=False)
-    )
+    unlabelled = plot_pca_biplot_artifact(artifact(), presentation(show_sample_labels=False))
 
-    renderers = sample_label_renderers(labelled)
-    assert sorted(
-        label
-        for renderer in renderers
-        for label in renderer.data_source.data["display_label"]
-    ) == ["Label s1", "Label s2", "Label s3", "Label s4"]
-    # One source per group serves both its points and their labels.
-    assert {id(renderer.data_source) for renderer in renderers} == {
-        id(source) for source in sources(labelled) if "sample_id" in source.data
-    }
-    assert sample_label_renderers(unlabelled) == []
+    (labels,) = labelled.select({"name": "selection_labels"})
+    # Nothing is named until a box selection picks points; hovers name every sample.
+    assert labels.data_source.data["display_label"] == []
+    (callback,) = {
+        id(callback): callback
+        for source in sources(labelled)
+        if "sample_id" in source.data
+        for callback in source.selected.js_property_callbacks["change:indices"]
+    }.values()
+    assert callback.args["labels"] is labels.data_source
+    assert any(tool.__class__.__name__ == "BoxSelectTool" for tool in labelled.tools)
+    assert not unlabelled.select({"name": "selection_labels"})
     # The arrow tips keep their own labels either way.
     assert [
         renderer.data_source
         for renderer in unlabelled.renderers
         if getattr(getattr(renderer, "glyph", None), "text", None) == "display_label"
     ] == [source_with(unlabelled, "magnitude")]
+
+
+def test_the_biplot_draws_one_arrow_per_direction():
+    from metabis.viz.plot_reduction_artifact import biplot_arrows
+
+    # Three arrows point the same way, one the opposite way, one is too short.
+    x = np.array([1.0, 0.95, 0.9, -0.8, 0.05])
+    y = np.array([0.1, 0.12, 0.08, -0.1, 0.0])
+
+    assert biplot_arrows(x, y, None) == [0, 3]
+    assert biplot_arrows(x, y, 1) == [0]
 
 
 def test_presentation_is_frozen_and_must_exactly_align_with_artifact():
