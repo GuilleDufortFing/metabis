@@ -41,11 +41,11 @@ NODE_GAP = 90.0
 CATEGORY_PADDING = 80.0
 CATEGORY_GAP = 220.0
 # A category's name keeps its size on screen while the layout scales with the
-# overview's column. At its usual width, about 600 px for these 10,000 units, a cell
-# of 2,000 units is 120 px: room for 16 characters of 11 px text a line, and the
-# band below it for four such lines.
-CATEGORY_MIN_CELL = 2000.0
-CATEGORY_LABEL_BAND = 1000.0
+# overview's column. That column is 400 to 600 px for these 10,000 units, so a cell
+# of 2,500 units, four to a row, is 100 to 150 px: room for 14 characters of 10 px
+# text a line, and the band below it for four such lines.
+CATEGORY_MIN_CELL = 2500.0
+CATEGORY_LABEL_BAND = 1100.0
 ROW_WIDTH = 10000.0
 RELAXATION_ROUNDS = 600
 

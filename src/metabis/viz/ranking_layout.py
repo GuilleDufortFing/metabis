@@ -24,6 +24,7 @@ page to relay to both.
 
 from __future__ import annotations
 
+import math
 import textwrap
 import zlib
 from dataclasses import dataclass, field
@@ -63,11 +64,11 @@ FOCUSED_ROWS = "metabis-ranking-focused"
 RANKING_PLOT = "metabis-ranking"
 RANKING_DOTS = "metabis-ranking-dots"
 
-# Beside the network the ranking has about 550 px: names wrap onto a second line
-# past this many characters, so the name column stays near 200 px, and every row
+# Beside the network the ranking has 450 to 550 px: names wrap onto a second line
+# past this many characters, so the name column stays near 180 px, and every row
 # is tall enough for two lines of 11 px text.
-NAME_LENGTH = 34
-HEADER_LENGTH = 26  # capitals run wider
+NAME_LENGTH = 28
+HEADER_LENGTH = 22  # capitals run wider
 ROW_HEIGHT = 30
 HEADER_SHADE = "#eeeeee"  # the client's --card-tint
 ROW_SHADE = theme.ROW_SHADE  # the client's --sheet, about DataTables' stripe
@@ -111,7 +112,11 @@ def wrapped_name(name: str, length: int = NAME_LENGTH) -> str:
     lines = textwrap.wrap(name, length, break_long_words=False, break_on_hyphens=False)
     if len(lines) <= 2:
         return "\n".join(lines)
-    return "\n".join([lines[0], " ".join(lines[1:])])
+    # Too long for two lines of ``length``: two balanced lines, a little wider.
+    balanced = textwrap.wrap(
+        name, math.ceil(len(name) / 2) + 2, break_long_words=False, break_on_hyphens=False
+    )
+    return "\n".join([balanced[0], " ".join(balanced[1:])])
 
 
 def order_rows(entries: Iterable[RankedSubsystem]) -> RankingRows:
@@ -242,7 +247,7 @@ def shade_rows(plot, rows: RankingRows, x_range: Range1d) -> None:
 # room the summary's own axis takes beside them.
 NAME_CHARACTER_WIDTH = 5.4
 HEADER_CHARACTER_WIDTH = 7.3
-SUMMARY_FRAME_WIDTH = 104
+SUMMARY_FRAME_WIDTH = 84
 
 
 def names_width(rows: RankingRows) -> int:

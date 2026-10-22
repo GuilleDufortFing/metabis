@@ -57,7 +57,7 @@ STANDARD_STRUCTURE = "4233e408abb355939b0372d16f2a7f32657abedf48860333edb0158054
 # OVERVIEW_STRUCTURE is re-recorded on 2026-10-21 for the spaced overview: the
 # packaged positions now seed a layout per category (spaced_network), so every
 # node moved, while the nodes, edges and their order stayed.
-OVERVIEW_STRUCTURE = "83b7a02add59723ea547b30afd031038748593dd97a44b358dd73360f2c4832d"
+OVERVIEW_STRUCTURE = "7d375b006e428e2d88f81841d2a3d4fa17c822bed558546004195449981281bf"
 
 
 def prepare_graph(

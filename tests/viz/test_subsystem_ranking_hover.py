@@ -20,7 +20,7 @@ from bokeh.models import HoverTool
 from metabis.managers.color_manager import ColorManager
 from metabis.managers.workspace_mode import AnalysisWorkspaceMode
 from metabis.viz.plot_subsystem_ranking import plot_subsystem_comparison
-from metabis.viz.ranking_layout import RANKING_DOTS
+from metabis.viz.ranking_layout import HEADER_LENGTH, RANKING_DOTS, wrapped_name
 
 METRIC = "cohens_d"
 SUBSYSTEM = "Glycolysis"
@@ -166,7 +166,8 @@ def test_rows_are_named_in_a_column_beside_their_delta_score(ranking):
     assert summary.yaxis[0].visible is True
     assert dots_panel.yaxis[0].visible is False
     assert summary.y_range is dots_panel.y_range
-    assert summary.y_range.factors == [SUBSYSTEM, CATEGORY.upper()]
+    # A long header wraps onto a second line rather than widening the column.
+    assert summary.y_range.factors == [SUBSYSTEM, wrapped_name(CATEGORY.upper(), HEADER_LENGTH)]
     # Each dot sits at a fixed place within its row, the same on every render.
     assert all(isinstance(y, tuple) and y[0] == SUBSYSTEM for y in source["y"])
     assert all(abs(y[1]) < 0.5 for y in source["y"])

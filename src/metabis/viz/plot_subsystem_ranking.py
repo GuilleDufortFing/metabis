@@ -209,9 +209,9 @@ def plot_subsystem_comparison(
     label = _metric_label(metric)
     plot = ranking_figure(
         rows,
-        title=title or f"{label} per {element_type}",
+        title=title or label,
         x_range=_padded_range(all_data["x"]),
-        x_label=label,
+        x_label=f"{label} per {element_type}",
         names=False,
         width=width,
         sizing_mode=sizing_mode,

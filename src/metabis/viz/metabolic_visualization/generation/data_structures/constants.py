@@ -339,10 +339,10 @@ class VisualizationConstants:
     DEFAULT_SUBSYSTEM_CATEGORY_ALPHA = 0.7  # Default alpha for subsystem categories
 
     # Category font styling
-    FONT_SIZE_CATEGORY = "11px"  # Category names, under each category
+    FONT_SIZE_CATEGORY = "10px"  # Category names, under each category
     CATEGORY_LABEL_OFFSET = 60  # Layout units between a category's circle and its name
-    CATEGORY_LABEL_LINE_LENGTH = 16  # Characters per line of a category's name (spaced_network)
-    CATEGORY_LABEL_BAND = 1000  # Layout units the name may take below its circle
+    CATEGORY_LABEL_LINE_LENGTH = 14  # Characters per line of a category's name (spaced_network)
+    CATEGORY_LABEL_BAND = 1100  # Layout units the name may take below its circle
     FONT_FAMILY = "Arial"  # As the React client
 
     # Subsystem name text wrapping
