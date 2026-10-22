@@ -47,7 +47,24 @@ from .loaders import (
     load_metabolites_from_file,
     load_reactions_from_files,
     load_subsystem_metabolite_classification,
+    split_transport_by_compartment,
+    TRANSPORT_BETWEEN,
+    TRANSPORT_PARTS,
+    TRANSPORT_SUBSYSTEM,
+    TRANSPORT_WITHIN,
+    _clean_subsystem_name,
 )
+
+# The subsystems the divided transport is drawn from (loaders.transport_part).
+TRANSPORT_PART_IDS = frozenset(
+    _clean_subsystem_name(name)
+    for name in (*TRANSPORT_PARTS.values(), TRANSPORT_BETWEEN, TRANSPORT_WITHIN)
+)
+
+# How the model is built from its source files; the cache's name includes it, so a
+# model built another way is never read back from an old cache. "transport by
+# compartment": Human1's transport divided as Recon3D divides it (loaders).
+MODEL_BUILD_REVISION = "transport by compartment"
 
 
 class MetabolicModelInterface(ABC):
@@ -298,6 +315,7 @@ class MetabolicModel(MetabolicModelInterface):
                 reactions = load_reactions_from_files(
                     meta_file, gem_file, reactions_mapping_file
                 )
+                split_transport_by_compartment(reactions)
                 metabolites = load_metabolites_from_file(metabolites_file)
                 genes = load_genes_from_file(genes_file)
 
@@ -1368,6 +1386,10 @@ class MetabolicModel(MetabolicModelInterface):
             }
 
         slug = subsystem.id
+        # Metabolic Atlas has no page for the parts of the divided transport
+        # (loaders.transport_part): they link to its Transport reactions page.
+        if slug in TRANSPORT_PART_IDS:
+            slug = _clean_subsystem_name(TRANSPORT_SUBSYSTEM)
         external_url = (
             "https://metabolicatlas.org/explore/Human-GEM/gem-browser/subsystem/"
             f"{quote(slug)}"
@@ -1868,8 +1890,12 @@ class MetabolicModel(MetabolicModelInterface):
         return list(self.resource_registry.get_reference_model_file_paths().values())
 
     def _get_source_files_hash(self) -> str:
-        """Generate hash based on source file modification times and sizes."""
-        hash_input = []
+        """Generate hash based on source file modification times and sizes.
+
+        :data:`MODEL_BUILD_REVISION` names how the model is built from those
+        files, so a cache built another way is never read back.
+        """
+        hash_input = [MODEL_BUILD_REVISION]
 
         for file_path in self._get_source_files():
             if os.path.exists(file_path):

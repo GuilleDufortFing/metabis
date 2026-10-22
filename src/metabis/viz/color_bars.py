@@ -234,3 +234,75 @@ def add_pathway_key(
         # its height.
         bar.height = 140
         plot.add_layout(bar, "right")
+
+
+# The network's category key, which the page shows on demand (an export's key).
+CATEGORY_KEY = "metabis-category-key"
+KEY_CHARACTER_WIDTH = 5.1  # pixels, about, of a character of 10 px Arial
+KEY_LINE_HEIGHT = 14  # pixels a line of the key takes
+KEY_LINE_LENGTH = 28  # characters a line of a category's name in the key
+KEY_INDENT = " " * 7  # as wide, in Arial, as two digits and the three spaces after
+
+
+def add_category_key(plot, *, visible: bool = False) -> Optional[Legend]:
+    """A numbered key of the network's categories, under it, in two columns.
+
+    The network marks each category with a number on its rim, and the rankings name
+    it beside the same number; an exported network has no ranking beside it, so its
+    key names the numbers. Hidden unless ``visible``: the page shows it for export.
+    Its ``tags`` give the height it takes, in pixels.
+    """
+    import math
+    import textwrap
+
+    categories = None
+    for renderer in plot.renderers:
+        data = getattr(getattr(renderer, "data_source", None), "data", {}) or {}
+        if "badge" in data and "display_label" in data:
+            categories = data
+            break
+    if not categories or not categories["badge"]:
+        return None
+    numbered = sorted(
+        (int(number), str(label))
+        for number, label in zip(categories["badge"], categories["display_label"])
+        if str(number).isdigit()
+    )
+    # A legend draws a glyph from its renderer's first row: a point the plot never
+    # shows, so each row reads as its number and name alone.
+    nowhere = plot.scatter(x=[float("nan")], y=[float("nan")], size=0, line_color=None)
+    # In Arial two spaces are as wide as a digit, so one digit padded by two lines
+    # its name up with the names after two digits. A long name wraps under itself,
+    # its second line a row of its own: BokehJS measures a legend row as one line.
+    half = math.ceil(len(numbered) / 2)
+    columns = []
+    for part in (numbered[:half], numbered[half:]):
+        lines = []
+        for number, label in part:
+            wrapped = textwrap.wrap(label, KEY_LINE_LENGTH, break_long_words=False) or [label]
+            lines.append(f"{'  ' if number < 10 else ''}{number}   {wrapped[0]}")
+            lines.extend(KEY_INDENT + line for line in wrapped[1:])
+        columns.append(lines)
+    rows = max(len(column) for column in columns)
+    labels = [line for column in columns for line in column + [" "] * (rows - len(column))]
+    legend = Legend(
+        items=[LegendItem(label=label, renderers=[nowhere]) for label in labels],
+        orientation="vertical",
+        nrows=rows,
+        location="top_left",
+        click_policy="none",
+        glyph_width=1,
+        glyph_height=KEY_LINE_HEIGHT,
+        label_height=KEY_LINE_HEIGHT,
+        label_standoff=0,
+        label_text_font_size="10px",
+        # The first column's longest line, and a gap, set the columns' width.
+        label_width=int(max(len(line) for line in columns[0]) * KEY_CHARACTER_WIDTH) + 16,
+        spacing=0,
+        visible=visible,
+        name=CATEGORY_KEY,
+    )
+    # The pixels the key adds under the plot, for a page that grows the plot by as much.
+    legend.tags = [{"height": rows * KEY_LINE_HEIGHT + 2 * legend.padding + 2 * legend.margin}]
+    plot.add_layout(legend, "below")
+    return legend

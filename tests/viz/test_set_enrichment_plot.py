@@ -2,7 +2,7 @@
 
 from dataclasses import replace
 
-from bokeh.models import HoverTool
+from bokeh.models import HoverTool, Text
 
 from metabis.analysis.artifacts import (
     AnalysisArtifactMetadata,
@@ -24,6 +24,7 @@ from metabis.analysis.set_enrichment import (
     run_set_enrichment,
 )
 from metabis.analysis_workspace import RevisionKind, WorkspaceRevisions
+from metabis.viz.ranking_layout import RANKING_NAMES, RANKING_PLOT
 from metabis.viz.plot_set_enrichment import (
     NOT_SIGNIFICANT_COLOR,
     plot_set_enrichment_category,
@@ -97,14 +98,15 @@ def test_category_plot_uses_one_dot_per_subsystem_without_recomputing(monkeypatc
         ),
     )
 
-    plot = plot_set_enrichment_category(artifact)
+    layout = plot_set_enrichment_category(artifact)
+    plot = layout.select_one({"name": RANKING_PLOT})
     points = plot.select_one({"name": "set_enrichment_subsystem_points"})
     frame = points.data_source.data
 
     # A single dot per subsystem replaces the earlier paired points; the old
     # Target-higher/Target-lower glyphs no longer exist.
-    assert not plot.select({"name": "set_enrichment_target_points"})
-    assert not plot.select({"name": "set_enrichment_baseline_points"})
+    assert not list(layout.select({"name": "set_enrichment_target_points"}))
+    assert not list(layout.select({"name": "set_enrichment_baseline_points"}))
     assert set(frame["subsystem_id"]) == {"s1", "s2"}
     assert len(frame["subsystem_id"]) == 2
     # Each dot sits at the larger-magnitude direction, sign preserved.
@@ -121,8 +123,8 @@ def test_category_plot_uses_one_dot_per_subsystem_without_recomputing(monkeypatc
     # not a single flat red/blue; the plot exposes no legend.
     assert all(str(color).startswith("#") for color in frame["dominant_color"])
     assert len(plot.legend) == 0
-    assert "METABOLISM" in plot.y_range.factors
-    assert plot.tags[-1] == {
+    assert "heading:1:0" in plot.y_range.factors
+    assert layout.tags[-1] == {
         "artifact_id": artifact.metadata.artifact_id,
         "artifact_kind": "set_enrichment",
         "feature_type": "gene",
@@ -139,20 +141,28 @@ def test_rows_are_ordered_within_category_by_largest_directional_magnitude():
 
 
 def test_category_plot_uses_the_rankings_rows():
-    """Names in a column, a header row per category, and no category hue."""
-    plot = plot_set_enrichment_category(
-        _artifact(), category_colors={"Metabolism": "#2A9D8F"}
+    """Names in a panel, a numbered heading per category, and no category hue."""
+    layout = plot_set_enrichment_category(
+        _artifact(),
+        category_colors={"Metabolism": "#2A9D8F"},
+        category_numbers={"Lipids": 1, "Metabolism": 2},
     )
+    names = layout.select_one({"name": RANKING_NAMES})
+    plot = layout.select_one({"name": RANKING_PLOT})
 
-    # Bokeh lists factors bottom up; read top down, the header opens its category.
+    # Bokeh lists factors bottom up; read top down, the heading opens its category,
+    # under the network's number for it.
     rows = list(reversed(plot.y_range.factors))
-    assert rows[0] == "METABOLISM"
+    assert rows[0] == "heading:2:0"
     assert set(rows[1:]) == {"First pathway", "Second pathway"}
-    assert plot.yaxis[0].visible
+    assert names.y_range is plot.y_range
+    texts = [r.data_source.data for r in names.renderers if isinstance(r.glyph, Text)]
+    assert any(data.get("text") == ["Metabolism"] and data.get("number") == ["2"] for data in texts)
     assert plot.ygrid[0].grid_line_color is None
     fills = {
         renderer.glyph.fill_color
-        for renderer in plot.renderers
+        for panel in (names, plot)
+        for renderer in panel.renderers
         if renderer.glyph.__class__.__name__ == "HBar"
     }
     assert "#2A9D8F" not in fills
@@ -160,7 +170,9 @@ def test_category_plot_uses_the_rankings_rows():
 
 def _points_hover(plot):
     points = plot.select_one({"name": "set_enrichment_subsystem_points"})
-    (hover,) = [tool for tool in plot.select(type=HoverTool) if points in (tool.renderers or [])]
+    (hover,) = [
+        tool for tool in plot.select({"type": HoverTool}) if points in (tool.renderers or [])
+    ]
     return hover
 
 

@@ -21,16 +21,19 @@ from .color_reference import (
     GradientColorReference,
     build_reference_from_distribution,
 )
+from .metabolic_visualization.generation.graph_building.spaced_network import (
+    category_numbers,
+)
 from .ranking_layout import (
     RANKING_DOTS,
     RankedSubsystem,
     RankingRows,
     add_focus_link,
+    names_panel,
     order_rows,
     ranking_figure,
     ranking_layout,
     spread_offset,
-    summary_panel,
 )
 
 
@@ -82,6 +85,15 @@ def _ranked_subsystems(
     return entries
 
 
+def model_category_numbers(data_manager) -> Dict[str, int]:
+    """The network's numbers for the model's categories in use."""
+    model = getattr(data_manager, "metabolic_model", None)
+    by_category = getattr(model, "get_subsystems_by_category", None)
+    if not callable(by_category):
+        return {}
+    return category_numbers(category for category, members in by_category().items() if members)
+
+
 def _metric_label(metric: str) -> str:
     return {"cohens_d": "Cohen's d", "log2_fc": "log2 fold change"}.get(
         metric, metric.replace("_", " ")
@@ -113,6 +125,9 @@ def plot_subsystem_comparison(
     *,
     download_flag: str | None = None,
     navigation_event: str | None = None,
+    entries: Optional[List[RankedSubsystem]] = None,
+    groups: Optional[Dict[str, List[str]]] = None,
+    category_numbers: Optional[Dict[str, int]] = None,
 ):
     """Each subsystem's reactions (or genes) on the metric's axis, beside its delta score.
 
@@ -134,11 +149,17 @@ def plot_subsystem_comparison(
             :func:`metabis.viz.click_behavior.add_click_behavior`.
         navigation_event: A ``window`` event a tapped row dispatches with its
             subsystem, for a page embedding the figure without a server.
+        entries: Rows other than the model's subsystems, each with its score,
+            such as a transport subsystem's families; ``subsystem_stats`` is
+            then not read.
+        groups: The reactions (or genes) of each row in ``entries``, by its id.
+        category_numbers: The numbers the rows' headings carry; by default the
+            network's numbers for the model's categories.
 
     Returns:
         The two panels as one grid if return_plot is True, else None.
     """
-    if subsystem_stats is None or subsystem_stats.empty:
+    if entries is None and (subsystem_stats is None or subsystem_stats.empty):
         print("No subsystem statistics available.")
         return None
 
@@ -148,11 +169,16 @@ def plot_subsystem_comparison(
         print(f"Metric '{metric}' not found in test results.")
         return None
 
-    entries = _ranked_subsystems(data_manager, subsystem_stats, "delta_score")
+    if entries is None:
+        entries = _ranked_subsystems(data_manager, subsystem_stats, "delta_score")
     if not entries:
         print("No subsystems found after category ordering.")
         return None
-    rows = order_rows(entries)
+    rows = order_rows(
+        entries,
+        numbers=category_numbers or model_category_numbers(data_manager),
+        scores=True,
+    )
 
     significant_set = artifact.get_significant_elements(for_genes=for_genes)
     element_type = "gene" if for_genes else "reaction"
@@ -165,11 +191,15 @@ def plot_subsystem_comparison(
     all_data = _empty_points()
     for entry in entries:
         subsystem = entry.subsystem_id
-        if for_genes:
+        if groups is not None and for_genes:
+            elements = list(groups.get(subsystem, []))
+        elif for_genes:
             elements = data_manager.metabolic_model.get_genes_for_subsystem(subsystem)
         else:
             base_elements = (
-                data_manager.metabolic_model.get_reactions_for_subsystem(subsystem) or []
+                list(groups.get(subsystem, []))
+                if groups is not None
+                else data_manager.metabolic_model.get_reactions_for_subsystem(subsystem) or []
             )
             # Use the exact same one-column-per-base map as Delta aggregation.
             # A compatibility caller without an installed Delta Artifact receives
@@ -212,7 +242,6 @@ def plot_subsystem_comparison(
         title=title or label,
         x_range=_padded_range(all_data["x"]),
         x_label=f"{label} per {element_type}",
-        names=False,
         width=width,
         sizing_mode=sizing_mode,
     )
@@ -221,17 +250,15 @@ def plot_subsystem_comparison(
     dots = _draw_points(plot, all_data)
     plot.add_tools(HoverTool(renderers=[dots], tooltips="@desc{safe}"))
 
-    scores = {entry.subsystem_id: entry.score for entry in entries}
-    reach = max([1.0, *(abs(value) for value in scores.values())])
-    summary = summary_panel(
+    names = names_panel(
         rows,
         plot,
-        scores,
+        {entry.subsystem_id: entry.score for entry in entries},
         title="Delta score",
-        x_range=Range1d(-reach * 1.08, reach * 1.08),
         x_label="Delta score",
+        navigation_event=navigation_event,
     )
-    layout = ranking_layout(summary, plot)
+    layout = ranking_layout(names, plot)
     add_click_behavior(
         layout,
         filename_prefix=click_filename_prefix,
@@ -315,6 +342,9 @@ def plot_subsystem_activity_ranking(
     *,
     download_flag: str | None = None,
     navigation_event: str | None = None,
+    entries: Optional[List[RankedSubsystem]] = None,
+    groups: Optional[Dict[str, List[str]]] = None,
+    category_numbers: Optional[Dict[str, int]] = None,
 ):
     """Rank subsystems by single-group activity, grouped by metabolic category.
 
@@ -335,17 +365,22 @@ def plot_subsystem_activity_ranking(
             tap, for a figure embedded without a Bokeh server.
         navigation_event: A ``window`` event a tapped row dispatches with its
             subsystem, for a page embedding the figure without a server.
+        entries: Rows other than the model's subsystems, each with its score,
+            such as a transport subsystem's families.
+        groups: The reactions (or genes) of each row in ``entries``, by its id.
+        category_numbers: The numbers the rows' headings carry; by default the
+            network's numbers for the model's categories.
 
     Returns:
-        Bokeh figure if return_plot is True, else None.
+        The names panel and the dots as one grid if return_plot is True, else None.
     """
     family = ActivityOverlay(
         overlay
         if overlay is not None
         else getattr(data_manager, "activity_overlay", ActivityOverlay.REACTION)
     )
-    subsystem_stats = activity_artifact.subsystems_for(family)
-    if subsystem_stats is None or subsystem_stats.empty:
+    subsystem_stats = activity_artifact.subsystems_for(family) if entries is None else None
+    if entries is None and (subsystem_stats is None or subsystem_stats.empty):
         print("No subsystem activity available.")
         return None
 
@@ -354,11 +389,16 @@ def plot_subsystem_activity_ranking(
     overlay_name = family.value
     is_reaction_overlay = family is ActivityOverlay.REACTION
 
-    entries = _ranked_subsystems(data_manager, subsystem_stats, "activity_score")
+    if entries is None:
+        entries = _ranked_subsystems(data_manager, subsystem_stats, "activity_score")
     if not entries:
         print("No subsystems contained measured features.")
         return None
-    rows = order_rows(entries)
+    rows = order_rows(
+        entries,
+        numbers=category_numbers or model_category_numbers(data_manager),
+        scores=False,
+    )
 
     all_data = _empty_points()
     all_metric_values: List[float] = []
@@ -367,11 +407,17 @@ def plot_subsystem_activity_ranking(
     for entry in entries:
         subsystem = entry.subsystem_id
         if is_reaction_overlay:
-            members = data_manager.metabolic_model.get_reactions_for_subsystem(subsystem)
+            members = (
+                list(groups.get(subsystem, []))
+                if groups is not None
+                else data_manager.metabolic_model.get_reactions_for_subsystem(subsystem)
+            )
             feature_ids = [
                 displayed_feature_id(feature_result.activity_score, member)
                 for member in members
             ]
+        elif groups is not None:
+            feature_ids = list(groups.get(subsystem, []))
         else:
             feature_ids = data_manager.metabolic_model.get_genes_for_subsystem(subsystem)
 
@@ -480,7 +526,6 @@ def plot_subsystem_activity_ranking(
         title=title,
         x_range=x_range,
         x_label=axis_label,
-        names=True,
         width=width,
         sizing_mode=sizing_mode,
     )
@@ -498,17 +543,25 @@ def plot_subsystem_activity_ranking(
         line_color="#ffffff",
         line_width=1,
     )
+    names = names_panel(
+        rows,
+        plot,
+        title="Subsystem",
+        x_label=axis_label,
+        navigation_event=navigation_event,
+    )
+    layout = ranking_layout(names, plot)
 
     add_click_behavior(
-        plot,
+        layout,
         filename_prefix=click_filename_prefix,
         enabled_toggle=enabled_toggle,
         download_flag=download_flag,
     )
 
     if return_plot:
-        return plot
-    show(plot)
+        return layout
+    show(layout)
     return None
 
 

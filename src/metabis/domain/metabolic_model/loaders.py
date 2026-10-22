@@ -422,6 +422,57 @@ def load_genes_from_file(file_path: str) -> List[Gene]:
     return genes
 
 
+# Human1 keeps every transport reaction in one subsystem, too large to draw and
+# whose single score hides opposite movements. Recon3D and Recon2 divide transport
+# by compartment instead ("Transport, mitochondrial" and so on), and each Human1
+# equation names its compartments, so Human1's transport divides the same way.
+TRANSPORT_SUBSYSTEM = "Transport reactions"
+TRANSPORT_PARTS = {
+    "e": "Transport, extracellular",
+    "m": "Transport, mitochondrial",
+    "r": "Transport, endoplasmic reticular",
+    "l": "Transport, lysosomal",
+    "x": "Transport, peroxisomal",
+    "g": "Transport, Golgi apparatus",
+    "n": "Transport, nuclear",
+}
+TRANSPORT_BETWEEN = "Transport, between organelles"
+TRANSPORT_WITHIN = "Transport, within one compartment"
+# Compartment tags that belong with another: the inner mitochondrion, and
+# the alternative tags of the extracellular space and the peroxisome.
+_SAME_COMPARTMENT = {"i": "m", "s": "e", "p": "x"}
+
+
+def transport_part(equation: str) -> str:
+    """The transport subsystem a reaction joins, from the compartments its equation names.
+
+    The cytosol is the default side, so a reaction between the cytosol and one
+    organelle belongs to that organelle; one touching the extracellular space
+    belongs there; one between organelles alone, or within one compartment, has
+    a subsystem of its own.
+    """
+    compartments = {
+        _SAME_COMPARTMENT.get(tag, tag) for tag in re.findall(r"\[(\w)\]", equation or "")
+    } - {"c"}
+    if not compartments:
+        return TRANSPORT_WITHIN
+    if len(compartments) == 1:
+        return TRANSPORT_PARTS.get(next(iter(compartments)), TRANSPORT_BETWEEN)
+    if "e" in compartments:
+        return TRANSPORT_PARTS["e"]
+    return TRANSPORT_BETWEEN
+
+
+def split_transport_by_compartment(reactions: List[Reaction]) -> None:
+    """Move each transport reaction into the transport subsystem of its compartments."""
+    for reaction in reactions:
+        if getattr(reaction, "_original_subsystem_name", "") != TRANSPORT_SUBSYSTEM:
+            continue
+        part = transport_part(reaction.equation)
+        reaction._original_subsystem_name = part
+        reaction.subsystem_id = _clean_subsystem_name(part)
+
+
 def create_subsystems_from_reactions(reactions: List[Reaction]) -> List[Subsystem]:
     """Create subsystem entities from reaction subsystem information.
 

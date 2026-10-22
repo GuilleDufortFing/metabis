@@ -73,7 +73,12 @@ def add_network_focus_link(plot, nodes: Optional[ColumnDataSource] = None) -> Op
     if nodes is None:
         return None
     nodes.data["base_alpha"] = list(nodes.data.get("alpha", [1.0] * len(nodes.data["x"])))
-    focus = focus_source()
+    # The network's names already follow a focus source of their own; the ring
+    # and the fading follow the same one.
+    focus = next((tag for tag in plot.tags if getattr(tag, "name", None) == FOCUS_SOURCE), None)
+    if focus is None:
+        focus = focus_source()
+        attach(plot, focus)
     ring = ColumnDataSource({"x": [], "y": [], "radius": []})
     plot.circle(
         x="x",
@@ -121,7 +126,6 @@ def add_network_focus_link(plot, nodes: Optional[ColumnDataSource] = None) -> Op
     for tool in plot.select(type=HoverTool):
         if nodes in [getattr(r, "data_source", None) for r in (tool.renderers or [])]:
             tool.callback = focus_dispatch(nodes, "element_id")
-    attach(plot, focus)
     return focus
 
 

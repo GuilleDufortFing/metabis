@@ -23,7 +23,14 @@ from ..analysis.set_enrichment import (
     SetEnrichmentFeatureType,
 )
 from ..visual_config import theme
-from .ranking_layout import RankedSubsystem, add_focus_link, order_rows, ranking_figure
+from .ranking_layout import (
+    RankedSubsystem,
+    add_focus_link,
+    names_panel,
+    order_rows,
+    ranking_figure,
+    ranking_layout,
+)
 from .set_enrichment_overview import signed_log2_gradient_scale
 
 # One dot per subsystem takes the shared signed-log2 gradient (red for
@@ -267,12 +274,15 @@ def plot_set_enrichment_category(
     artifact: SetEnrichmentArtifact,
     *,
     category_colors: Mapping[str, str] | None = None,
+    category_numbers: Mapping[str, int] | None = None,
     navigation_event: str | None = None,
 ):
     """One dot per subsystem, in the subsystem rankings' layout (see ranking_layout).
 
     ``category_colors`` is accepted for compatibility and unused: categories carry
-    no hue, so the colour is left to the enrichment score.
+    no hue, so the colour is left to the enrichment score. ``category_numbers`` are
+    the network's numbers for every category in use, so the headings match it.
+    Returns the names panel and the dots as one grid.
     """
     if not isinstance(artifact, SetEnrichmentArtifact):
         raise TypeError("artifact must be a SetEnrichmentArtifact")
@@ -289,7 +299,7 @@ def plot_set_enrichment_category(
         )
         for _, row in frame.iterrows()
     ]
-    rows = order_rows(entries)
+    rows = order_rows(entries, numbers=category_numbers, scores=False)
     frame["y_factor"] = [rows.factor_of[str(sid)] for sid in frame.get("subsystem_id", [])]
 
     values = [
@@ -309,10 +319,9 @@ def plot_set_enrichment_category(
     )
     plot = ranking_figure(
         rows,
-        title=f"{family}-Set Enrichment - Over-Representation Analysis by subsystem category",
+        title=f"{family}-Set Enrichment (ORA)",
         x_range=x_range,
         x_label="Signed log2(enrichment ratio), Target-lower to Target-higher",
-        names=True,
         tools="xpan,xwheel_zoom,reset,save,tap",
     )
     add_focus_link(plot, rows, navigation_event=navigation_event)
@@ -344,7 +353,15 @@ def plot_set_enrichment_category(
             show_arrow=False,
         )
     )
-    plot.tags.append(
+    names = names_panel(
+        rows,
+        plot,
+        title="Subsystem",
+        x_label="Signed log2(enrichment ratio), Target-lower to Target-higher",
+        navigation_event=navigation_event,
+    )
+    layout = ranking_layout(names, plot)
+    layout.tags.append(
         {
             "artifact_id": artifact.metadata.artifact_id,
             "artifact_kind": artifact.metadata.kind.value,
@@ -352,7 +369,7 @@ def plot_set_enrichment_category(
             "presentation": "paired_set_enrichment_category",
         }
     )
-    return plot
+    return layout
 
 
 __all__ = ["plot_set_enrichment_category"]

@@ -312,3 +312,79 @@ def add_factor_range_zoom_alpha_callback(
     # Attach callback to y_range changes (start/end for FactorRange)
     plot.y_range.js_on_change("start", callback)
     plot.y_range.js_on_change("end", callback)
+
+
+# The network's subsystem names (bokeh_plotting._draw_enriched_subsystems): about
+# how wide a character, and how tall a line, of their 8 pt bold Arial is, in pixels.
+NETWORK_LABEL_CHARACTER_WIDTH = 6.2
+NETWORK_LABEL_LINE_HEIGHT = 12.0
+# A search naming more subsystems than this rings them without naming them.
+NETWORK_NAMED_MATCHES = 10
+
+
+def add_fitting_label_callback(plot, label_source, focus):
+    """Name a node only where its name fits inside it, or when the page points at it.
+
+    A name fits when its lines take at most 90% of the node's width on screen, so
+    the names that show never meet; zooming in names more nodes. The subsystem in
+    ``focus`` (the page's shared selection, :mod:`metabis.viz.subsystem_link`), and
+    a search's few matches, are named whatever their size, on a white backing; near
+    either side of the view, such a name starts or ends at its node's edge, so the
+    frame does not cut it.
+    """
+    callback = CustomJS(
+        args=dict(
+            plot=plot,
+            labels=label_source,
+            focus=focus,
+            named_matches=NETWORK_NAMED_MATCHES,
+        ),
+        code="""
+        // The frame's width is unset until the plot is first laid out.
+        let width
+        try { width = plot.inner_width } catch { return }
+        const scale = width / Math.abs(plot.x_range.end - plot.x_range.start)
+        if (!Number.isFinite(scale) || scale <= 0) return
+        const data = labels.data
+        const kinds = focus.data.kind
+        const matches = focus.data.id.filter((id, i) => kinds[i] === 'match')
+        const named = new Set(focus.data.id.filter((id, i) => kinds[i] === 'focus'))
+        if (matches.length <= named_matches) matches.forEach((id) => named.add(id))
+        const alpha = []
+        const backing = []
+        const align = []
+        const offset = []
+        const start = Math.min(plot.x_range.start, plot.x_range.end)
+        for (let i = 0; i < data.element_id.length; i++) {
+          const room = 2 * data.radius[i] * scale * 0.9
+          const fits = data.label_width[i] <= room && data.label_height[i] <= room
+          const shown = named.has(data.element_id[i])
+          alpha.push(fits || shown ? 1 : 0)
+          backing.push(shown && !fits ? 0.85 : 0)
+          // Where the node sits across the view, from 0 at the left to 1 at the right.
+          const across = (data.x[i] - start) * scale / width
+          const edge = data.radius[i] * scale
+          if (shown && !fits && across < 0.3) {
+            align.push('left')
+            offset.push(-edge)
+          } else if (shown && !fits && across > 0.7) {
+            align.push('right')
+            offset.push(edge)
+          } else {
+            align.push('center')
+            offset.push(0)
+          }
+        }
+        data.text_alpha = alpha
+        data.background_fill_alpha = backing
+        data.text_align = align
+        data.x_offset = offset
+        labels.change.emit()
+        """,
+    )
+    for attribute in ("start", "end"):
+        plot.x_range.js_on_change(attribute, callback)
+        plot.y_range.js_on_change(attribute, callback)
+    plot.js_on_change("inner_width", callback)
+    focus.js_on_change("data", callback)
+    return callback

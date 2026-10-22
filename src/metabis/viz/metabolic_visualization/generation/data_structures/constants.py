@@ -289,6 +289,7 @@ class VisualizationConstants:
     FONT_SIZE_REACTION = "8pt"
     FONT_SIZE_COMPARTMENT = "13px"
     FONT_SIZE_SUBSYSTEM = "8pt"
+    NETWORK_LABEL_LINE_LENGTH = 16  # Characters a line of a network node's name
 
     # Label positioning offsets
     LABEL_OFFSET_DOWN = -5  # For metabolites, genes, reactions
@@ -339,10 +340,8 @@ class VisualizationConstants:
     DEFAULT_SUBSYSTEM_CATEGORY_ALPHA = 0.7  # Default alpha for subsystem categories
 
     # Category font styling
-    FONT_SIZE_CATEGORY = "10px"  # Category names, under each category
-    CATEGORY_LABEL_OFFSET = 60  # Layout units between a category's circle and its name
-    CATEGORY_LABEL_LINE_LENGTH = 14  # Characters per line of a category's name (spaced_network)
-    CATEGORY_LABEL_BAND = 1100  # Layout units the name may take below its circle
+    FONT_SIZE_CATEGORY = "10px"  # Category names, where a graph draws them
+    FONT_SIZE_CATEGORY_NUMBER = "10px"  # The number on a category's rim (spaced_network)
     FONT_FAMILY = "Arial"  # As the React client
 
     # Subsystem name text wrapping

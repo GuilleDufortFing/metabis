@@ -129,9 +129,28 @@ _MODULE_EXPORTS: dict[str, tuple[str, ...]] = {
         "plot_subsystem_activity_ranking",
         "plot_subsystem_comparison",
     ),
-    ".viz.color_bars": ("add_pathway_key", "overview_color_bar", "registered_color_bar"),
+    ".viz.color_bars": (
+        "add_category_key",
+        "add_pathway_key",
+        "overview_color_bar",
+        "registered_color_bar",
+    ),
     ".viz.plot_utils": ("PLOT_THEME", "apply_academic_style"),
     ".viz.subsystem_link": ("add_network_focus_link",),
+    ".viz.transport_view": ("is_transport_subsystem", "plot_transport_view"),
+    ".viz.compartment_maps": (
+        "COMPARTMENT_MAPS",
+        "add_map_find",
+        "add_map_links",
+        "highlight_reactions",
+        "map_ids_for_reactions",
+        "map_reaction_ids",
+        "map_subsystems",
+        "maps_for_reactions",
+    ),
+    ".viz.metabolic_visualization.generation.graph_building.spaced_network": (
+        "category_numbers",
+    ),
     ".visual_config": ("theme",),
     ".viz.plot_violins": ("plot_reaction_violins",),
     ".viz.table_formatting": (
@@ -268,10 +287,29 @@ if TYPE_CHECKING:
         plot_subsystem_comparison,
     )
     from .visual_config import theme
-    from .viz.color_bars import add_pathway_key, overview_color_bar, registered_color_bar
+    from .viz.color_bars import (
+        add_category_key,
+        add_pathway_key,
+        overview_color_bar,
+        registered_color_bar,
+    )
     from .viz.plot_utils import PLOT_THEME, apply_academic_style
     from .viz.plot_violins import plot_reaction_violins
     from .viz.subsystem_link import add_network_focus_link
+    from .viz.transport_view import is_transport_subsystem, plot_transport_view
+    from .viz.compartment_maps import (
+        COMPARTMENT_MAPS,
+        add_map_find,
+        add_map_links,
+        highlight_reactions,
+        map_ids_for_reactions,
+        map_reaction_ids,
+        map_subsystems,
+        maps_for_reactions,
+    )
+    from .viz.metabolic_visualization.generation.graph_building.spaced_network import (
+        category_numbers,
+    )
     from .viz.table_formatting import (
         build_external_link_formatter,
         build_statistical_number_formatter,
@@ -346,11 +384,23 @@ __all__ = [
     "PipelinePhaseMetric",
     "plot_metabolic_graph",
     # Plotting
+    "COMPARTMENT_MAPS",
     "PLOT_THEME",
+    "add_category_key",
+    "add_map_find",
+    "add_map_links",
     "add_network_focus_link",
     "add_pathway_key",
     "apply_academic_style",
+    "category_numbers",
+    "highlight_reactions",
+    "is_transport_subsystem",
+    "map_ids_for_reactions",
+    "map_reaction_ids",
+    "map_subsystems",
+    "maps_for_reactions",
     "overview_color_bar",
+    "plot_transport_view",
     "registered_color_bar",
     "theme",
     "build_external_link_formatter",

@@ -9,7 +9,16 @@ from bokeh.plotting import figure
 
 # Import visualization constants
 from ..generation.data_structures.constants import VisualizationConstants
-from .js_callbacks import add_zoom_based_alpha_callback
+from ...subsystem_link import attach, focus_source
+from .js_callbacks import (
+    NETWORK_LABEL_CHARACTER_WIDTH,
+    NETWORK_LABEL_LINE_HEIGHT,
+    add_fitting_label_callback,
+    add_zoom_based_alpha_callback,
+)
+
+# The network's subsystem names, which the page's shared selection also names.
+NETWORK_LABELS = "metabis-network-labels"
 
 
 def _include_point(bounds, x_value, y_value):
@@ -787,34 +796,52 @@ def _draw_enriched_subsystems(plot, subsystem_glyphs):
     )
     plot.add_tools(hover)
 
-    # Add labels with size proportional to subsystem radius
-    # Initialize label alpha based on current zoom level
-    initial_alpha = VisualizationConstants.SUBSYSTEM_LABEL_ALPHA_MIN
-
-    # Add alpha values to the data source for labels
-    label_data = _label_only_data(data)
-    label_data["text_alpha"] = [initial_alpha] * len(label_data["x"])
-    label_source = ColumnDataSource(label_data)
+    # Each name is drawn only where it fits inside its node, or for the subsystem
+    # the page points at (js_callbacks.add_fitting_label_callback). The labels'
+    # source holds only what they draw, so a page looking for the subsystems'
+    # own source by its fields never takes it for that.
+    label_data = {key: data[key] for key in ("x", "y", "element_id", "radius", "display_label")}
+    lines = [
+        textwrap.wrap(
+            str(name),
+            VisualizationConstants.NETWORK_LABEL_LINE_LENGTH,
+            break_long_words=False,
+        )
+        or [""]
+        for name in label_data["display_label"]
+    ]
+    label_data["label_text"] = ["\n".join(name) for name in lines]
+    label_data["label_width"] = [
+        max(len(line) for line in name) * NETWORK_LABEL_CHARACTER_WIDTH for name in lines
+    ]
+    label_data["label_height"] = [len(name) * NETWORK_LABEL_LINE_HEIGHT for name in lines]
+    label_data["text_alpha"] = [0.0] * len(lines)
+    label_data["background_fill_alpha"] = [0.0] * len(lines)
+    label_data["text_align"] = ["center"] * len(lines)
+    label_data["x_offset"] = [0.0] * len(lines)
+    label_source = ColumnDataSource(label_data, name=NETWORK_LABELS)
 
     labels = LabelSet(
         x="x",
         y="y",
-        text="display_label",
-        text_color="black",
-        text_font_size=(
-            VisualizationConstants.FONT_SIZE_SUBSYSTEM
-        ),  # Use consistent size for readability
+        text="label_text",
+        text_color=VisualizationConstants.CATEGORY_LABEL_COLOR,
+        text_font=value(VisualizationConstants.FONT_FAMILY),
+        text_font_size=VisualizationConstants.FONT_SIZE_SUBSYSTEM,
         text_font_style="bold",
-        text_align="center",
+        text_align="text_align",
         text_baseline="middle",
-        text_alpha="text_alpha",  # Use dynamic alpha from data source
+        x_offset="x_offset",
+        text_alpha="text_alpha",
+        background_fill_color="#ffffff",
+        background_fill_alpha="background_fill_alpha",
         level="glyph",
         source=label_source,
     )
     plot.add_layout(labels)
-
-    # Add JavaScript callback to dynamically adjust label alpha based on zoom
-    add_zoom_based_alpha_callback(plot, label_source, glyph_type="subsystem")
+    focus = focus_source()
+    attach(plot, focus)
+    add_fitting_label_callback(plot, label_source, focus)
 
     return renderer
 
@@ -1243,31 +1270,30 @@ def _draw_enriched_subsystem_categories(plot, category_glyphs):
         source=source,
     )
 
-    # The names keep their size on screen, so the automatic ranges cannot measure
-    # them: an invisible point at the foot of each name's band keeps the last row's
-    # names in view.
-    plot.scatter(
-        x="x",
-        y="y_label_end",
-        size=1,
-        fill_alpha=0,
-        line_alpha=0,
-        level="underlay",
-        source=source,
-    )
-    plot.text(
-        x="x",
-        y="y_label",
-        text="label_text",
-        text_color="text_color",
+    # Each category's number on its rim, up and to the left, as the rankings head
+    # the category with the same number; pointing at it names the category.
+    badges = plot.text(
+        x="x_badge",
+        y="y_badge",
+        text="badge",
+        text_color="#ffffff",
         text_font=value(VisualizationConstants.FONT_FAMILY),
-        text_font_size="font_size",
+        text_font_size=VisualizationConstants.FONT_SIZE_CATEGORY_NUMBER,
         text_font_style="bold",
         text_align="center",
-        text_baseline="top",
-        text_alpha="label_alpha",
+        text_baseline="middle",
+        outline_shape="circle",
+        background_fill_color="text_color",
+        padding=2,
         level="annotation",
         source=source,
+    )
+    plot.add_tools(
+        HoverTool(
+            renderers=[badges],
+            tooltips="<b>@badge</b> @display_label",
+            attachment="right",
+        )
     )
 
     return renderer
@@ -1334,25 +1360,11 @@ def _convert_glyphs_to_bokeh_data(glyphs):
         data["line_width"] = [g.get("line_width", 1) for g in glyphs]
         data["font_size"] = [g.get("font_size", "10pt") for g in glyphs]
         data["label_alpha"] = [g.get("label_alpha", 1.0) for g in glyphs]
-        # Each name under its circle (the y-range is flipped, so under is +y),
-        # wrapped so it keeps within the circle's width at the overview's scale.
-        data["y_label"] = [
-            g["y"] + g["radius"] + VisualizationConstants.CATEGORY_LABEL_OFFSET
-            for g in glyphs
-        ]
-        data["y_label_end"] = [
-            y + VisualizationConstants.CATEGORY_LABEL_BAND for y in data["y_label"]
-        ]
-        data["label_text"] = [
-            "\n".join(
-                textwrap.wrap(
-                    g["display_label"],
-                    VisualizationConstants.CATEGORY_LABEL_LINE_LENGTH,
-                    break_long_words=False,
-                )
-            )
-            for g in glyphs
-        ]
+        # The number sits on the rim at 135 degrees, up and to the left (the
+        # y-range is flipped, so up is -y).
+        data["x_badge"] = [g["x"] - g["radius"] * math.sqrt(0.5) for g in glyphs]
+        data["y_badge"] = [g["y"] - g["radius"] * math.sqrt(0.5) for g in glyphs]
+        data["badge"] = [str(g.get("number", "")) for g in glyphs]
         # Add hover text
         data["hover"] = [
             g.get("hover", f"Category: {g['display_label']}") for g in glyphs

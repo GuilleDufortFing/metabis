@@ -18,7 +18,7 @@ from metabis import (
     plot_subsystem_activity_ranking,
 )
 from metabis.viz.metabolic_visualization import EnrichmentConfig
-from metabis.viz.ranking_layout import RANKING_DOTS
+from metabis.viz.ranking_layout import RANKING_DOTS, RANKING_NAMES, RANKING_PLOT
 from metabis.viz.plot_subsystem_ranking import _saturating_axis_bounds
 
 SUBSYSTEM_ID = "galactose_metabolism"
@@ -146,13 +146,16 @@ def test_activity_ranking_plots_measured_members_without_a_significance_filter(
 ):
     data_manager.activate_activity_mode(activity_config())
 
-    plot = plot_subsystem_activity_ranking(
+    layout = plot_subsystem_activity_ranking(
         data_manager=data_manager,
         activity_artifact=data_manager.get_activity_artifact(),
         return_plot=True,
     )
 
-    assert plot is not None
+    assert layout is not None
+    # The names take a panel of their own; the dots' panel is the ranking.
+    plot = layout.select_one({"name": RANKING_PLOT})
+    assert layout.select_one({"name": RANKING_NAMES}) is not None
     # The bottom axis carries the label; the title names the top one.
     assert plot.below[0].axis_label.startswith("Normalized group summary")
     assert "Subsystem activity ranking - A" in plot.title.text
@@ -198,7 +201,7 @@ def test_the_activity_ranking_carries_its_gradient_color_reference(data_manager)
     )
     source = plot.select_one({"name": RANKING_DOTS}).data_source.data
     dots = plot.select_one({"name": RANKING_DOTS})
-    (hover,) = [tool for tool in plot.select(type=HoverTool) if dots in (tool.renderers or [])]
+    (hover,) = [tool for tool in plot.select({"type": HoverTool}) if dots in (tool.renderers or [])]
 
     assert source["desc"]
     assert "<strong>Color Reference:</strong>" in hover.tooltips

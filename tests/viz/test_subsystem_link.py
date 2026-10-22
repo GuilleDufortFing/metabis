@@ -74,3 +74,34 @@ def test_the_ranking_bands_its_rows_and_names_a_tapped_one():
     focused = layout.select_one({"name": "metabis-ranking-focused"})
     drawn_by = [r for r in layout.select({"type": GlyphRenderer}) if getattr(r, "data_source", None) is focused]
     assert len(drawn_by) == 2
+
+
+def test_only_the_networks_nodes_carry_its_subsystem_fields():
+    """The names' source holds what they draw, so the nodes' source is the one found."""
+    from bokeh.plotting import figure
+
+    from metabis.viz.metabolic_visualization.rendering.bokeh_plotting import (
+        NETWORK_LABELS,
+        _draw_enriched_subsystems,
+    )
+
+    glyph = {
+        "id": "glycolysis",
+        "glyph_class": "subsystem",
+        "x": 0.0,
+        "y": 0.0,
+        "alpha": 1.0,
+        "display_label": "Glycolysis / Gluconeogenesis",
+        "color": "#ffffff",
+        "width": 50.0,
+        "height": 50.0,
+        "radius": 25.0,
+        "is_subsystem": True,
+    }
+    plot = figure()
+    _draw_enriched_subsystems(plot, [glyph])
+    sources = [model for model in plot.references() if isinstance(model, ColumnDataSource)]
+    (labels,) = [source for source in sources if source.name == NETWORK_LABELS]
+
+    assert "is_subsystem" not in labels.data
+    assert [source for source in sources if "is_subsystem" in source.data]

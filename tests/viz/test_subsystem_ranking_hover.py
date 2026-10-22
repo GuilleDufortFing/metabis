@@ -20,7 +20,9 @@ from bokeh.models import HoverTool
 from metabis.managers.color_manager import ColorManager
 from metabis.managers.workspace_mode import AnalysisWorkspaceMode
 from metabis.viz.plot_subsystem_ranking import plot_subsystem_comparison
-from metabis.viz.ranking_layout import HEADER_LENGTH, RANKING_DOTS, wrapped_name
+from bokeh.models import Text
+
+from metabis.viz.ranking_layout import RANKING_DOTS
 
 METRIC = "cohens_d"
 SUBSYSTEM = "Glycolysis"
@@ -158,16 +160,22 @@ def test_a_server_free_ranking_reads_hover_downloads_from_a_page_flag():
     assert "enabled_toggle" not in callback.args
 
 
-def test_rows_are_named_in_a_column_beside_their_delta_score(ranking):
+def test_rows_are_named_in_a_panel_beside_their_delta_score(ranking):
     layout, source = ranking
-    summary, dots_panel = [child[0] for child in layout.children]
+    names, dots_panel = [child[0] for child in layout.children]
 
-    # The names are the summary panel's y-axis; the dots' own axis is hidden.
-    assert summary.yaxis[0].visible is True
-    assert dots_panel.yaxis[0].visible is False
-    assert summary.y_range is dots_panel.y_range
-    # A long header wraps onto a second line rather than widening the column.
-    assert summary.y_range.factors == [SUBSYSTEM, wrapped_name(CATEGORY.upper(), HEADER_LENGTH)]
+    # The names are drawn in a panel of their own, which never pans with the
+    # dots; neither panel has a y-axis.
+    assert not names.yaxis and not dots_panel.yaxis
+    assert names.y_range is dots_panel.y_range
+    # The category heads its rows, as a heading of its own, not as one of them.
+    assert names.y_range.factors == [SUBSYSTEM, "heading:1:0"]
+    texts = [r.data_source.data for r in names.renderers if isinstance(r.glyph, Text)]
+    assert any(data.get("text") == [SUBSYSTEM] for data in texts)
+    # The heading carries the category's number from the network.
+    assert any(
+        data.get("text") == [CATEGORY] and data.get("number") == ["1"] for data in texts
+    )
     # Each dot sits at a fixed place within its row, the same on every render.
     assert all(isinstance(y, tuple) and y[0] == SUBSYSTEM for y in source["y"])
     assert all(abs(y[1]) < 0.5 for y in source["y"])

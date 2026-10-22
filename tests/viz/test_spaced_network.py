@@ -9,10 +9,15 @@ import pytest
 import metabis
 from metabis import MetabolicModel
 from metabis.viz.metabolic_visualization.generation.graph_building.spaced_network import (
+    CATEGORIES_SET_APART,
     CATEGORY_ORDER,
     NODE_GAP,
+    TARGET_ASPECT,
+    add_missing_subsystems,
+    category_numbers,
     category_sort_key,
     node_radius,
+    pack_circles,
     space_network,
 )
 
@@ -82,15 +87,43 @@ def test_a_node_area_is_proportional_to_its_reactions(packaged, category_of):
     )
 
 
-def test_categories_read_in_textbook_order(packaged, category_of):
+def test_categories_are_numbered_in_textbook_order(packaged, category_of):
     glyphs, _ = space_network(packaged["glyphs"], packaged["connections"], category_of)
     _, circles = _split(glyphs)
-    # A row's circles share their centre line; rows read top to bottom, then left to right.
-    reading = [c["label"] for c in sorted(circles.values(), key=lambda c: (round(c["y"]), c["x"]))]
+    numbered = [c["label"] for c in sorted(circles.values(), key=lambda c: c["number"])]
 
-    assert reading == sorted(circles, key=category_sort_key)
-    assert reading[: len(CATEGORY_ORDER)] == list(CATEGORY_ORDER)
-    assert reading[-2:] == ["Membrane Transport & Exchange", "Model Utilities & Non-human Pathways"]
+    assert [c["number"] for c in circles.values()] == list(range(1, len(circles) + 1))
+    assert numbered == sorted(circles, key=category_sort_key)
+    assert numbered[: len(CATEGORY_ORDER)] == list(CATEGORY_ORDER)
+    assert numbered[-2:] == ["Membrane Transport & Exchange", "Model Utilities & Non-human Pathways"]
+    assert category_numbers(category_of.values()) == {
+        label: circle["number"] for label, circle in circles.items()
+    }
+
+
+def test_the_pathways_pack_left_and_the_set_apart_stack_in_a_column_right(
+    packaged, category_of
+):
+    glyphs, _ = space_network(packaged["glyphs"], packaged["connections"], category_of)
+    _, circles = _split(glyphs)
+    apart = [circles[name] for name in CATEGORIES_SET_APART]
+    pathways = [c for name, c in circles.items() if name not in CATEGORIES_SET_APART]
+
+    assert max(c["x"] + c["radius"] for c in pathways) < min(c["x"] - c["radius"] for c in apart)
+    assert apart[0]["y"] < apart[1]["y"]
+    # Packed, the pathways start at the top: the first row sits against it.
+    assert min(c["y"] - c["radius"] for c in circles.values()) == pytest.approx(0.0)
+    width = max(c["x"] + c["radius"] for c in circles.values())
+    height = max(c["y"] + c["radius"] for c in circles.values())
+    assert width / height == pytest.approx(TARGET_ASPECT, rel=0.15)
+
+
+def test_a_circle_rises_into_the_highest_gap_that_fits():
+    # Two large circles side by side leave room above-right for a small one, not below.
+    centres = pack_circles([500.0, 500.0, 100.0], width=2400.0, gap=50.0)
+    small = centres[2]
+    assert small[1] == pytest.approx(100.0)
+    assert small[0] > centres[1][0]
 
 
 def test_edges_stay_within_a_category_and_the_layout_is_reproducible(
@@ -123,3 +156,24 @@ def test_an_uploaded_category_gets_its_own_place_and_keeps_only_its_edges(
         and moved[e["source"]] != moved[e["target"]]
         for e in edges
     )
+
+
+def test_a_subsystem_the_packaged_layout_lacks_gets_a_node_and_its_edges():
+    glyphs = [
+        {"id": "a", "glyph_class": "subsystem", "x": 0.0, "y": 0.0, "reaction_count": 4},
+        {"id": "b", "glyph_class": "subsystem", "x": 600.0, "y": 0.0, "reaction_count": 9},
+    ]
+    category_of = {"a": "One", "b": "One", "new": "One", "newer": "One"}
+    main = {"a": ["m1"], "b": ["m2"], "new": ["m1", "m3"], "newer": ["m3"]}
+    completed, edges = add_missing_subsystems(
+        glyphs, [], category_of, {"new": 16, "newer": 1}, main
+    )
+
+    new = {glyph["id"]: glyph for glyph in completed}
+    assert new["new"]["reaction_count"] == 16 and new["newer"]["reaction_count"] == 1
+    # Seeded around the category's centre, then spaced like any other node.
+    assert abs(new["new"]["x"] - 300.0) <= 300.0
+    pairs = {frozenset((edge["source"], edge["target"])) for edge in edges}
+    assert pairs == {frozenset(("new", "a")), frozenset(("new", "newer"))}
+    laid_out, _ = space_network(completed, edges, category_of)
+    assert {g["id"] for g in laid_out if g["glyph_class"] == "subsystem"} == set(category_of)

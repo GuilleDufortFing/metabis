@@ -56,8 +56,13 @@ HUMAN1_STRUCTURE = "97aa9426b748b16100ebfdf9e7ea2bcdc7738d3628b16c271b7fad57ba54
 STANDARD_STRUCTURE = "4233e408abb355939b0372d16f2a7f32657abedf48860333edb0158054894725"
 # OVERVIEW_STRUCTURE is re-recorded on 2026-10-21 for the spaced overview: the
 # packaged positions now seed a layout per category (spaced_network), so every
-# node moved, while the nodes, edges and their order stayed.
-OVERVIEW_STRUCTURE = "7d375b006e428e2d88f81841d2a3d4fa17c822bed558546004195449981281bf"
+# node moved, while the nodes, edges and their order stayed. Re-recorded on
+# 2026-10-22 for the numbered, packed categories: the categories moved, and with
+# them every node. Re-recorded the same day for transport divided by compartment:
+# nine transport subsystems replace one (165 nodes become 173), joined to each
+# other and to Exchange/demand where they share main metabolites (374 edges
+# become 407).
+OVERVIEW_STRUCTURE = "fe48a564da800ab2135ac9f93f26ff75278098dd54814115f64ff3b782211630"
 
 
 def prepare_graph(
@@ -274,8 +279,8 @@ def test_the_overview_network_keeps_its_structure(model, structural_manager):
     )
 
     assert artifact.display_title == "Complete Metabolic Network"
-    assert artifact.node_count == 165
-    assert artifact.edge_count == 374
+    assert artifact.node_count == 173
+    assert artifact.edge_count == 407
     # The overview draws subsystems and their categories, never single reactions.
     assert {node["glyph_class"] for node in artifact.nodes} == {
         "subsystem",
