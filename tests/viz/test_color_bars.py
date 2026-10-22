@@ -64,3 +64,33 @@ def test_no_spread_draws_no_bar():
         )
         is None
     )
+
+
+def test_the_pathway_key_names_each_shape_and_adds_a_bar_per_family():
+    from bokeh.models import ColorBar, Legend
+    from bokeh.plotting import figure
+
+    from metabis.viz.color_bars import add_pathway_key
+
+    workspace = _Workspace({"a": -0.4, "b": 0.1, "c": 0.5, "d": 0.2})
+    workspace.color_manager.register_distribution(
+        mode=MODE,
+        element_type="reaction",
+        data=pd.Series({"r1": -1.0, "r2": 0.5, "r3": 0.8}, dtype=float),
+        metric_name="cohens_d",
+        center_method="zero",
+        spread_method="std",
+    )
+    plot = figure()
+    add_pathway_key(plot, workspace, visualization_mode="group_comparison", color_metric="cohens_d")
+
+    (legend,) = [item for item in plot.below if isinstance(item, Legend)]
+    assert [item.label.value for item in legend.items] == [
+        "Reaction",
+        "Gene",
+        "Metabolite",
+        "Not significant, or no data",
+    ]
+    # Reactions have a distribution here and genes none, so one bar.
+    bars = [item for item in plot.right if isinstance(item, ColorBar)]
+    assert [bar.title for bar in bars] == ["Reactions, Cohen's d"]

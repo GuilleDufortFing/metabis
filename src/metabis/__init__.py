@@ -129,7 +129,7 @@ _MODULE_EXPORTS: dict[str, tuple[str, ...]] = {
         "plot_subsystem_activity_ranking",
         "plot_subsystem_comparison",
     ),
-    ".viz.color_bars": ("overview_color_bar", "registered_color_bar"),
+    ".viz.color_bars": ("add_pathway_key", "overview_color_bar", "registered_color_bar"),
     ".viz.plot_utils": ("PLOT_THEME", "apply_academic_style"),
     ".viz.subsystem_link": ("add_network_focus_link",),
     ".visual_config": ("theme",),
@@ -268,7 +268,7 @@ if TYPE_CHECKING:
         plot_subsystem_comparison,
     )
     from .visual_config import theme
-    from .viz.color_bars import overview_color_bar, registered_color_bar
+    from .viz.color_bars import add_pathway_key, overview_color_bar, registered_color_bar
     from .viz.plot_utils import PLOT_THEME, apply_academic_style
     from .viz.plot_violins import plot_reaction_violins
     from .viz.subsystem_link import add_network_focus_link
@@ -348,6 +348,7 @@ __all__ = [
     # Plotting
     "PLOT_THEME",
     "add_network_focus_link",
+    "add_pathway_key",
     "apply_academic_style",
     "overview_color_bar",
     "registered_color_bar",

@@ -687,15 +687,28 @@ def _draw_enriched_compartments(plot, compartment_glyphs):
     label_data = _label_only_data(data)
     label_data["base_alpha"] = label_data.get("alpha", [1.0] * len(label_data["x"]))
     label_data["text_alpha"] = [a * initial_alpha for a in label_data["base_alpha"]]
+    # A long name takes two lines, so a narrow compartment's name keeps near its width.
+    label_data["display_label"] = [
+        "\n".join(textwrap.wrap(str(name), 12, break_long_words=False))
+        for name in label_data["display_label"]
+    ]
     label_source = ColumnDataSource(label_data)
 
+    # Each name inside its compartment's top-left corner, on a white backing.
     labels = LabelSet(
         x="x_label",
         y="y_label",
         text="display_label",
-        text_color="black",
+        text_color=VisualizationConstants.CATEGORY_LABEL_COLOR,
+        text_font=value(VisualizationConstants.FONT_FAMILY),
         text_font_size=VisualizationConstants.FONT_SIZE_COMPARTMENT,
         text_font_style="bold",
+        text_align="left",
+        text_baseline="top",
+        x_offset=8,
+        y_offset=-6,
+        background_fill_color="#ffffff",
+        background_fill_alpha=0.85,
         level="underlay",
         text_alpha="text_alpha",  # Use dynamic alpha from data source
         source=label_source,

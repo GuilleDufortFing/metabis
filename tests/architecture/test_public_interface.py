@@ -80,6 +80,7 @@ EXPECTED_ROOT_ALL = frozenset(
         # Plotting
         "PLOT_THEME",
         "add_network_focus_link",
+        "add_pathway_key",
         "apply_academic_style",
         "overview_color_bar",
         "registered_color_bar",

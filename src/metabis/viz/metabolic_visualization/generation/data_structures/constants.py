@@ -260,7 +260,7 @@ class VisualizationConstants:
     ENZYME_CONNECTION_WIDTH = 1.0
     SUBSYSTEM_CONNECTION_WIDTH = 1.0
     INFLUENCE_LINE_WIDTH = 1.5
-    COMPARTMENT_LINE_WIDTH = 7
+    COMPARTMENT_LINE_WIDTH = 2
     ARROWHEAD_LINE_WIDTH = 0.25
 
     # Edge glow/halo styling (for always-visible edges with colored background)
@@ -287,7 +287,7 @@ class VisualizationConstants:
     FONT_SIZE_METABOLITE_INTERMEDIATE = "6pt"
     FONT_SIZE_GENE = "6pt"
     FONT_SIZE_REACTION = "8pt"
-    FONT_SIZE_COMPARTMENT = "18pt"
+    FONT_SIZE_COMPARTMENT = "13px"
     FONT_SIZE_SUBSYSTEM = "8pt"
 
     # Label positioning offsets

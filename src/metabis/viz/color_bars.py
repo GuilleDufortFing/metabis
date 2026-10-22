@@ -11,7 +11,7 @@ from __future__ import annotations
 from typing import Any, Optional, Sequence, Tuple
 
 import numpy as np
-from bokeh.models import ColorBar, LinearColorMapper
+from bokeh.models import ColorBar, Legend, LegendItem, LinearColorMapper
 
 from ..managers.workspace_mode import AnalysisWorkspaceMode
 
@@ -144,3 +144,93 @@ def overview_color_bar(
         title="Delta score",
         bounds=(-1.0, 1.0) if transform == "sign" else None,
     )
+
+
+METRIC_LABELS = {
+    "cohens_d": "Cohen's d",
+    "log2_fc": "log2 fold change",
+    "mean_difference": "mean difference",
+}
+
+
+def add_pathway_key(
+    plot,
+    data_manager: Any,
+    *,
+    visualization_mode: str,
+    color_metric: str = "cohens_d",
+    activity_artifact: Any = None,
+) -> None:
+    """A key row under a subsystem graph: what each shape is, and what each colour means.
+
+    A diamond is a reaction, a rectangle a gene, an oval a metabolite; grey is a
+    feature that is not significant or has no data. Each feature family that
+    colours the graph adds its colour bar, read from its own distribution.
+    """
+    from ..visual_config import theme
+
+    outline = dict(fill_color="#ffffff", line_color=theme.INK_MUTED, line_width=1)
+    # A legend draws a glyph from its renderer's first row, so each key glyph has
+    # one, at a place the plot never shows.
+    nowhere = dict(x=[float("nan")], y=[float("nan")])
+    shapes = [
+        ("Reaction", plot.scatter(**nowhere, marker="diamond", size=13, **outline)),
+        (
+            "Gene",
+            plot.rect(**nowhere, width=18, height=10, width_units="screen", height_units="screen", **outline),
+        ),
+        (
+            "Metabolite",
+            plot.ellipse(**nowhere, width=18, height=11, width_units="screen", height_units="screen", **outline),
+        ),
+        (
+            "Not significant, or no data",
+            plot.scatter(**nowhere, marker="square", size=11, fill_color=theme.NOT_SIGNIFICANT, line_color=None),
+        ),
+    ]
+    legend = Legend(
+        items=[LegendItem(label=label, renderers=[renderer]) for label, renderer in shapes],
+        orientation="horizontal",
+        location="center",
+        click_policy="none",
+        # A rectangle's key fills its glyph box: a low box keeps it a gene's shape.
+        glyph_width=18,
+        glyph_height=11,
+    )
+    plot.add_layout(legend, "below")
+
+    registry = getattr(data_manager, "color_manager", None)
+    if visualization_mode == "activity":
+        if activity_artifact is None:
+            return
+        from ..analysis.activity_analysis import ActivityOverlay
+
+        families = [
+            (
+                AnalysisWorkspaceMode.EXPERIMENT_ANALYSIS,
+                overlay.value,
+                activity_artifact.metric_key_for(overlay),
+                f"{label} activity",
+            )
+            for overlay, label in ((ActivityOverlay.REACTION, "Reaction"), (ActivityOverlay.GENE, "Gene"))
+        ]
+    else:
+        metric = METRIC_LABELS.get(color_metric, color_metric)
+        families = [
+            (AnalysisWorkspaceMode.GROUP_COMPARISON, "reaction", color_metric, f"Reactions, {metric}"),
+            (AnalysisWorkspaceMode.GROUP_COMPARISON, "gene", color_metric, f"Genes, {metric}"),
+        ]
+    for mode, element_type, metric_name, title in families:
+        try:
+            bar = registered_color_bar(
+                registry, mode=mode, element_type=element_type, metric_name=metric_name, title=title
+            )
+        except Exception:
+            # A family with nothing registered draws no bar; the graph is unaffected.
+            bar = None
+        if bar is None:
+            continue
+        # Beside the graph, which is wider than tall: below, the bars would take
+        # its height.
+        bar.height = 140
+        plot.add_layout(bar, "right")
