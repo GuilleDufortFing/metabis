@@ -56,6 +56,18 @@ def test_a_server_free_figure_hands_subsystem_taps_to_the_page():
     assert plot.select(type=TapTool)
 
 
+def test_the_tap_selects_only_what_it_acts_on():
+    """A tap on the network's category circles must not dim them as unselected."""
+    plot, subsystems, _hovers = _plot()
+    circles = ColumnDataSource({"x": [0], "y": [0], "radius": [5]})
+    plot.circle(x="x", y="y", radius="radius", source=circles)
+
+    add_click_behavior(plot, navigation_event="metabis:navigate-subsystem")
+
+    (tap,) = plot.select(type=TapTool)
+    assert [renderer.data_source for renderer in tap.renderers] == [subsystems]
+
+
 def test_a_server_free_figure_reads_hover_downloads_from_a_page_flag():
     plot, _subsystems, hovers = _plot()
 

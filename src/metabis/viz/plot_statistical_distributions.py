@@ -49,8 +49,15 @@ def _get_statistical_results_column_specs(
     widget happened to apply.
     """
     element_title = element_type.capitalize()
+    # A reaction's identifier says little to a reader: its short name sits beside it.
+    name = (
+        [{"field": "name", "title": "Name", "width": 240, "kind": "text"}]
+        if element_type == "reaction"
+        else []
+    )
     return [
         {"field": "display_id", "title": element_title, "width": 180, "kind": "link"},
+        *name,
         *[
             {**metric_spec, "kind": "numeric"}
             for metric_spec in _STATISTICAL_METRIC_SPECS
@@ -89,6 +96,7 @@ def _get_statistical_reference_data(
         return {
             "raw_id": element_id,
             "display_label": element_id,
+            "short_name": element_id,
             "external_url": "",
         }
 
@@ -100,6 +108,7 @@ def _get_statistical_reference_data(
     return {
         "raw_id": reference_data.get("raw_id", element_id),
         "display_label": reference_data.get("display_label", element_id),
+        "short_name": reference_data.get("short_name", reference_data.get("display_label", element_id)),
         "external_url": reference_data.get("external_url", ""),
     }
 
@@ -143,6 +152,7 @@ def _build_statistical_table_rows(
         rows.append(
             {
                 "display_id": reference_data["display_label"],
+                "name": "" if for_genes else reference_data["short_name"],
                 "ensembl_id": reference_data["raw_id"] if for_genes else "",
                 "external_url": reference_data["external_url"],
                 "adjusted_pval": result_row.get("adjusted_pval"),
@@ -223,9 +233,10 @@ def statistical_results_rows(
     )
 
 
-# Two greys for the p-value histogram, either side of its threshold: it has no
-# direction, so it takes no part of the red-blue gradient.
-P_SIGNIFICANT_GREY = "#999999"  # the client's --label-grey
+# The p-value histogram either side of its threshold: it has no direction, so it
+# takes no part of the red-blue gradient. Purple past the threshold, light grey
+# before it, so a significant bar never reads as a not-significant grey.
+P_SIGNIFICANT = theme.SIGNIFICANT_PVAL
 P_OTHER_GREY = "#dddddd"  # the client's --card-grey
 STRONGEST_NAMED = 6
 STAT_PLOT_HEIGHT = 300
@@ -289,7 +300,8 @@ def _name_points(plot, data, rows: List[int], x_col: str, y_col: str) -> None:
         return
     x_values = np.asarray(data[x_col], dtype=float)
     y_values = np.asarray(data[y_col], dtype=float)
-    names = list(data["display_label"])
+    # A reaction by its short name, a gene by its symbol.
+    names = list(data.get("short_name") or data["display_label"])
     xs = x_values[np.isfinite(x_values)]
     ys = y_values[np.isfinite(y_values)]
     x_low, x_span = float(xs.min()), float(xs.max() - xs.min()) or 1.0
@@ -388,8 +400,8 @@ def _create_scatter_figure(
         size=6,
         fill_color=color_col,
         fill_alpha=0.9,
-        line_color="#ffffff",
-        line_width=0.3,
+        line_color=theme.MARK_EDGE,
+        line_width=theme.MARK_EDGE_WIDTH,
     )
     scatter_fig.add_tools(HoverTool(renderers=[others, marked], tooltips="@desc{safe}"))
 
@@ -513,8 +525,8 @@ def _significance_histogram(
 
     Bins cover the 0.5th to the 99.5th percentile, so one extreme value cannot
     flatten every bar; the few values beyond fall in the edge bins. With
-    ``color_for`` None (a p-value, which has no direction) the bars are grey,
-    darker past the threshold.
+    ``color_for`` None (a p-value, which has no direction) the bars are light
+    grey, and purple past the threshold.
     """
     numbers = pd.to_numeric(values, errors="coerce").to_numpy(dtype=float)
     finite = np.isfinite(numbers)
@@ -550,18 +562,18 @@ def _significance_histogram(
     }
     if color_for is None:
         data["fill"] = [
-            P_SIGNIFICANT_GREY if threshold is not None and centre >= threshold else P_OTHER_GREY
+            P_SIGNIFICANT if threshold is not None and centre >= threshold else P_OTHER_GREY
             for centre in centres
         ]
         source = ColumnDataSource(data)
         bars = [
-            plot.quad(left="left", right="right", bottom=0, top="total", fill_color="fill", line_color="#ffffff", source=source)
+            plot.quad(left="left", right="right", bottom=0, top="total", fill_color="fill", line_color=theme.MARK_EDGE, line_width=theme.MARK_EDGE_WIDTH, source=source)
         ]
     else:
         data["fill"] = [color_for(centre) for centre in centres]
         source = ColumnDataSource(data)
         bars = [
-            plot.quad(left="left", right="right", bottom=0, top="marked", fill_color="fill", line_color="#ffffff", source=source),
+            plot.quad(left="left", right="right", bottom=0, top="marked", fill_color="fill", line_color=theme.MARK_EDGE, line_width=theme.MARK_EDGE_WIDTH, source=source),
             plot.quad(
                 left="left",
                 right="right",
@@ -569,7 +581,8 @@ def _significance_histogram(
                 top="total",
                 fill_color=theme.NOT_SIGNIFICANT,
                 fill_alpha=0.6,
-                line_color="#ffffff",
+                line_color=theme.MARK_EDGE,
+                line_width=theme.MARK_EDGE_WIDTH,
                 source=source,
             ),
         ]
@@ -772,6 +785,7 @@ def _prepare_scatter_source(
         "index": test_results.index,
         "element_id": list(test_results.index),
         "display_label": [],
+        "short_name": [],
         "external_url": [],
         "pval": test_results["adjusted_pval"],
         "neg_log_pval": test_results["neg_log_pval"],
@@ -789,6 +803,7 @@ def _prepare_scatter_source(
             element_type,
         )
         data["display_label"].append(reference_data["display_label"])
+        data["short_name"].append(reference_data.get("short_name", reference_data["display_label"]))
         data["external_url"].append(reference_data["external_url"])
 
     # Generate colors for each metric

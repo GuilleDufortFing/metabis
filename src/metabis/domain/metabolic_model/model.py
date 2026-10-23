@@ -54,6 +54,7 @@ from .loaders import (
     TRANSPORT_WITHIN,
     _clean_subsystem_name,
 )
+from .reaction_names import short_reaction_name
 
 # The subsystems the divided transport is drawn from (loaders.transport_part).
 TRANSPORT_PART_IDS = frozenset(
@@ -1332,6 +1333,7 @@ class MetabolicModel(MetabolicModelInterface):
                 "raw_id": reaction_id,
                 "primary_id": reaction_id,
                 "display_label": reaction_id,
+                "short_name": reaction_id,
                 "external_url": "",
                 "external_source": "",
                 "external_id": "",
@@ -1348,6 +1350,8 @@ class MetabolicModel(MetabolicModelInterface):
             "raw_id": raw_id,
             "primary_id": reaction.id,
             "display_label": raw_id,
+            # What a figure labels the reaction with (reaction_names).
+            "short_name": short_reaction_name(reaction.name, reaction.equation) or raw_id,
             "external_url": external_url,
             "external_source": "Metabolic Atlas",
             "external_id": external_id,

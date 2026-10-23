@@ -73,8 +73,10 @@ def test_rows_follow_the_bokeh_table_schema_smallest_adjusted_p_first():
     columns = statistical_results_columns("reaction")
     rows = statistical_results_rows(workspace)
 
+    # A reaction's short name sits beside its identifier; a gene has its symbol.
     assert [column["field"] for column in columns] == [
         "display_id",
+        "name",
         "adjusted_pval",
         "pval",
         "cohens_d",
@@ -82,11 +84,12 @@ def test_rows_follow_the_bokeh_table_schema_smallest_adjusted_p_first():
         "mean_difference",
         "subsystems",
     ]
-    assert columns[0]["kind"] == "link" and columns[1]["kind"] == "numeric"
+    assert "name" not in [column["field"] for column in statistical_results_columns("gene")]
+    assert columns[0]["kind"] == "link" and columns[2]["kind"] == "numeric"
     # A missing p-value sorts last, as in the Bokeh table.
     assert [row["display_id"] for row in rows] == ["R1", "R2", "R3"]
     assert rows[0]["cohens_d"] == 1.5
-    assert {"external_url", "ensembl_id"} <= set(rows[0])
+    assert {"external_url", "ensembl_id", "name"} <= set(rows[0])
     assert [
         row["display_id"] for row in statistical_results_rows(workspace, max_rows=1)
     ] == ["R1"]

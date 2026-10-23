@@ -36,12 +36,19 @@ adapted from the following upstream repositories:
 
 - Upstream project: Human-maps
 - Source: https://github.com/SysBioChalmers/Human-maps
-- Upstream license: Creative Commons Attribution 4.0 International
-  (`THIRD_PARTY_LICENSES/CC-BY-4.0.txt`)
-- Metabis use: packaged Human1 graph resources derived from Human-maps.
+- Upstream license: Creative Commons Attribution-ShareAlike 4.0 International,
+  as the map SVG files declare in their metadata
+  (`THIRD_PARTY_LICENSES/CC-BY-SA-4.0.txt`). The repository's own LICENSE file
+  is Creative Commons Attribution 4.0 International.
+- Metabis use: packaged Human1 graph resources derived from Human-maps: the
+  compartment and subsystem layouts (`resources/graphs/*/human1/*.json`), and
+  Metabolic Atlas's link paths and subsystem bands beside them
+  (`*.atlas.json`, written by `scripts/import_atlas_paths.py`). These derived
+  files are shared under CC BY-SA 4.0.
 - Change notice: upstream map assets were converted into Metabis runtime graph
   JSON resources and may include filtering, coordinate extraction,
-  normalization, or curation.
+  normalization, or curation; the link paths and bands are shifted into each
+  layout's frame, and paths to metabolites a layout does not draw are left out.
 
 Use of these Human1-derived materials does not imply endorsement by the
 Human-GEM or Human-maps authors or maintainers.

@@ -155,8 +155,8 @@ def plot_subsystem_ranking_artifact(
         size=7,
         color="color",
         alpha=0.85,
-        line_color="white",
-        line_width=0.5,
+        line_color=theme.MARK_EDGE,
+        line_width=theme.MARK_EDGE_WIDTH,
     )
     hover = plot.select_one(HoverTool)
     hover.tooltips = "@desc{safe}"

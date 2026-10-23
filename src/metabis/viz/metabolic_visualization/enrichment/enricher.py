@@ -31,6 +31,9 @@ class EnrichmentConfig:
     highlight_significant_reactions: bool = False
     highlight_significant_genes: bool = False
     highlight_gene_influence: bool = False
+    # The feature family a subsystem node is coloured and hovered from in a
+    # comparison: "reaction" or "gene", the overview's data overlay.
+    subsystem_family: str = "reaction"
 
     def __post_init__(self) -> None:
         if self.delta_options is not None:
@@ -51,6 +54,7 @@ class EnrichmentConfig:
             "highlight_significant_reactions": self.highlight_significant_reactions,
             "highlight_significant_genes": self.highlight_significant_genes,
             "highlight_gene_influence": self.highlight_gene_influence,
+            "subsystem_family": self.subsystem_family,
         }
 
 
@@ -161,6 +165,7 @@ class GraphEnricher:
                 config_dict["show_hover_color_reference"],
                 focus_instance=focus_instance,
                 graph_type=graph_type,
+                subsystem_family=config_dict["subsystem_family"],
             )
             enriched_glyphs.append(enriched_glyph)
 

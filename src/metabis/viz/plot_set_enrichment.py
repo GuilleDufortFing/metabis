@@ -333,8 +333,8 @@ def plot_set_enrichment_category(
         size=10,
         marker="circle",
         fill_color="dominant_color",
-        line_color="#ffffff",
-        line_width=0.5,
+        line_color=theme.MARK_EDGE,
+        line_width=theme.MARK_EDGE_WIDTH,
         fill_alpha=0.95,
         name="set_enrichment_subsystem_points",
     )

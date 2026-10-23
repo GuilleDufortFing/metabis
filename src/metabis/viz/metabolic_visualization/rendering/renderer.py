@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from time import perf_counter
 from typing import Any, Optional
 
+from ...atlas_paths import atlas_paths
 from ..artifact import GraphArtifact, GraphRunMetadata, PipelinePhaseMetric
 from ..errors import GraphPipelineError
 from .bokeh_plotting import create_bokeh_plot, draw_graph_elements
@@ -185,12 +186,16 @@ def render_graph_artifact(
     """
     started = perf_counter()
     try:
+        auxiliary_data = {key: dict(value) for key, value in artifact.auxiliary.items()}
+        # A Human1 map draws its reactions' links along Metabolic Atlas's paths,
+        # packaged beside its layout (atlas_paths).
+        atlas = atlas_paths(artifact.resource_path)
+        if atlas is not None:
+            auxiliary_data["atlas"] = atlas
         plot = GraphRenderer(config or RenderingConfig()).render(
             enriched_glyphs=list(artifact.nodes),
             enriched_connections=list(artifact.edges),
-            auxiliary_data={
-                key: dict(value) for key, value in artifact.auxiliary.items()
-            },
+            auxiliary_data=auxiliary_data,
             display_title=artifact.display_title,
         )
     except Exception as exc:

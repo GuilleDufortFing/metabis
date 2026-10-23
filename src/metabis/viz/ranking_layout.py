@@ -21,9 +21,15 @@ plot lists its studies:
 
 The network and the ranking also share one selection. Each figure holds a data
 source named :data:`FOCUS_SOURCE` that the page writes (the subsystem in focus,
-and the matches of a search), and redraws its own highlight from it. Pointing at
-a subsystem in either figure dispatches :data:`FOCUS_EVENT` on ``window`` for the
-page to relay to both.
+the matches of a search, and a selected category), and redraws its own highlight
+from it. Pointing at a subsystem in either figure dispatches :data:`FOCUS_EVENT`
+on ``window`` for the page to relay to both. A selected category fills its
+heading's hexagon and frames its rows in the logo's blue, as the network does.
+
+A ranking comes in two views. The full one (:func:`ranking_layout`) is the names
+panel, with each subsystem's summary score on a narrow axis, beside the dots of
+its reactions or genes. The summary one (:func:`summary_ranking`) is the names
+panel alone, the score on a wider axis, so the network can take more of the row.
 """
 
 from __future__ import annotations
@@ -70,6 +76,11 @@ FOCUSED_ROWS = "metabis-ranking-focused"
 RANKING_PLOT = "metabis-ranking"
 RANKING_DOTS = "metabis-ranking-dots"
 RANKING_NAMES = "metabis-ranking-names"
+# Each category's first heading row, for the page to scroll a selected category to.
+RANKING_HEADINGS_SOURCE = "metabis-ranking-headings"
+# The category the shared selection names, which frames and headings follow.
+CHOSEN_CATEGORY = "metabis-ranking-category"
+FRAME_PREFIX = "metabis-frame:"
 
 # Beside the network the ranking has 450 to 700 px: names wrap onto a second line
 # past this many characters, so the name column stays near 170 px, and every row
@@ -77,11 +88,12 @@ RANKING_NAMES = "metabis-ranking-names"
 NAME_LENGTH = 28
 ROW_HEIGHT = 30
 ROW_SHADE = theme.ROW_SHADE  # the client's --sheet, about DataTables' stripe
-FOCUS_SHADE = "#d6ecff"  # the client's link blue, #0162b7, at 16% on white
+FOCUS_SHADE = "#dceeff"  # the logo's blue, #4facfe, at 20% on white
 MATCH_SHADE = "#fff7bf"  # GOV.UK's yellow tag, the client's --warning-bg
 SUMMARY_COLOR = theme.INK
 FRAME_LINE = "#b1b4b6"  # the network's category circles (DEFAULT_CATEGORY_LINE_COLOR)
 FRAME_LINE_WIDTH = 1.2
+CHOSEN_LINE_WIDTH = 2.5  # a selected category's frame, in the logo's blue
 SPREAD = 0.56  # the share of a row the dots spread over
 
 # Pixels, about, per character of the 11 px names and the 13 px bold headings
@@ -91,7 +103,10 @@ HEADING_CHARACTER_WIDTH = 6.9
 HEADING_FONT_SIZE = "13px"
 NAME_FONT_SIZE = "11px"
 BADGE_WIDTH = 26  # from the panel's edge to a heading's first letter
+HEXAGON_SIZE = 19  # pixels across a heading's hexagon, the network's category mark
 SUMMARY_FRAME_WIDTH = 84  # the Delta score's own axis, right of the names
+SUMMARY_TAB_WIDTH = 190  # the same axis in the summary view, which has no dots
+DIAMOND_EDGE = "#000000"
 NAMES_MIN_WIDTH = 240  # room for a heading of about 30 characters on one line
 
 
@@ -156,9 +171,9 @@ def wrapped_name(name: str, length: int = NAME_LENGTH) -> str:
     return "\n".join([balanced[0], " ".join(balanced[1:])])
 
 
-def panel_width(names_width: int, scores: bool) -> int:
+def panel_width(names_width: int, scores: bool, summary_width: int = SUMMARY_FRAME_WIDTH) -> int:
     """The names panel's width: the names, and the Delta score's axis when it has one."""
-    return max(names_width + (SUMMARY_FRAME_WIDTH if scores else 0), NAMES_MIN_WIDTH)
+    return max(names_width + (summary_width if scores else 0), NAMES_MIN_WIDTH)
 
 
 def order_rows(
@@ -330,6 +345,7 @@ def frame_categories(plot, rows: RankingRows, *, zero_line: bool = True) -> None
                 line_width=FRAME_LINE_WIDTH,
                 level="underlay",
                 editable=False,
+                name=FRAME_PREFIX + category,
             )
         )
         zero["x"].append(0.0)
@@ -358,6 +374,8 @@ def names_panel(
     title: str,
     x_label: str,
     navigation_event: Optional[str] = None,
+    colors: Optional[Mapping[str, str]] = None,
+    summary_width: int = SUMMARY_FRAME_WIDTH,
 ):
     """The row names and category headings, beside the dots, and each Delta score.
 
@@ -365,14 +383,16 @@ def names_panel(
     dots' rows. A summary score is on its own scale (a Delta score runs from -1 to
     +1 under the sign transform), so given ``scores`` the panel also marks it, on
     its own axis right of the names, rather than as a second axis over the dots.
-    Without them, the axes stay for the space they take, so the two panels' rows
-    line up, but draw nothing.
+    Each score is a diamond with a black edge, filled with ``colors`` (its node's
+    colour in the network) where given. Without scores, the axes stay for the space
+    they take, so the two panels' rows line up, but draw nothing. With ``plot``
+    ``None`` the panel stands alone, as the summary view (:func:`summary_ranking`).
     """
-    width = panel_width(rows.names_width, scores is not None)
+    width = panel_width(rows.names_width, scores is not None, summary_width)
     if scores is not None:
         reach = max([1.0, *(abs(float(v)) for v in scores.values())]) * 1.08
-        names = width - SUMMARY_FRAME_WIDTH
-        start = -reach - 2 * reach * names / SUMMARY_FRAME_WIDTH
+        names = width - summary_width
+        start = -reach - 2 * reach * names / summary_width
         x_range = Range1d(start, reach)
         names_right = -reach
     else:
@@ -380,6 +400,7 @@ def names_panel(
         start = 0.0
         names_right = float(width)
 
+    alone = plot is None
     panel = ranking_figure(
         rows,
         title=title,
@@ -388,13 +409,17 @@ def names_panel(
         width=width,
         sizing_mode=None,
         tools="save",
-        name=RANKING_NAMES,
+        name=RANKING_PLOT if alone else RANKING_NAMES,
         zero_line=scores is not None,
     )
     panel.min_border_left = 0
     panel.min_border_right = 0
-    panel.toolbar_location = None
-    panel.y_range = plot.y_range
+    if alone:
+        add_focus_link(panel, rows, navigation_event=navigation_event)
+        plot = panel
+    else:
+        panel.toolbar_location = None
+        panel.y_range = plot.y_range
     if scores is None:
         for axis in panel.xaxis:
             axis.ticker = FixedTicker(ticks=[width / 2])
@@ -410,12 +435,13 @@ def names_panel(
         # Zero is each frame's dashed line; a grid line there would cover it.
         panel.xgrid.ticker = FixedTicker(ticks=[-reach_tick, reach_tick])
 
-    matched = plot.select_one({"name": MATCHED_ROWS})
-    focused = plot.select_one({"name": FOCUSED_ROWS})
-    if matched is not None and focused is not None:
-        highlight_rows(panel, matched, focused)
-    if rows.factor_of:
-        _row_bands(panel, rows, navigation_event)
+    if not alone:
+        matched = plot.select_one({"name": MATCHED_ROWS})
+        focused = plot.select_one({"name": FOCUSED_ROWS})
+        if matched is not None and focused is not None:
+            highlight_rows(panel, matched, focused)
+        if rows.factor_of:
+            _row_bands(panel, rows, navigation_event)
 
     font = value(theme.FONT)
     panel.text(
@@ -443,6 +469,10 @@ def names_panel(
             "y": anchors,
             "text": [heading.text for heading in rows.headings],
             "number": [str(heading.number) for heading in rows.headings],
+            "category": [heading.category for heading in rows.headings],
+            "x": [start + BADGE_WIDTH / 2 * (x_range.end - x_range.start) / width] * len(anchors),
+            "fill": [theme.INK_NODE] * len(anchors),
+            "ink": ["#ffffff"] * len(anchors),
         }
     )
     panel.text(
@@ -459,23 +489,34 @@ def names_panel(
         text_color=theme.INK,
         text_line_height=1.1,
     )
-    # The category's number, as the network draws it on the category's rim.
+    # The category's number in the hexagon the network draws on the category's
+    # rim, as the side menu numbers the steps.
+    panel.scatter(
+        x="x",
+        y="y",
+        source=headings,
+        marker="hex",
+        angle=math.pi / 6,
+        size=HEXAGON_SIZE,
+        fill_color="fill",
+        line_color=theme.SELECTED,
+        line_width=1.5,
+    )
     panel.text(
-        x=start,
+        x="x",
         y="y",
         text="number",
         source=headings,
-        x_offset=BADGE_WIDTH / 2,
         text_align="center",
         text_baseline="middle",
         text_font=font,
         text_font_size="10px",
         text_font_style="bold",
-        text_color="#ffffff",
-        outline_shape="circle",
-        background_fill_color=theme.INK,
-        padding=2,
+        text_color="ink",
     )
+    chosen = plot.select_one({"name": CHOSEN_CATEGORY})
+    if chosen is not None:
+        follow_category(panel, chosen, headings)
 
     if scores is not None:
         ids = [sid for sid in rows.factor_of if sid in scores]
@@ -487,12 +528,13 @@ def names_panel(
                     "score": [float(scores[sid]) for sid in ids],
                     "y": [rows.factor_of[sid] for sid in ids],
                     "name": [rows.name_of.get(sid, rows.factor_of[sid]) for sid in ids],
+                    "color": [(colors or {}).get(sid) or SUMMARY_COLOR for sid in ids],
                 }
             ),
             marker="diamond",
             size=13,
-            fill_color=SUMMARY_COLOR,
-            line_color="#ffffff",
+            fill_color="color",
+            line_color=DIAMOND_EDGE,
             line_width=1,
         )
         panel.add_tools(
@@ -513,14 +555,22 @@ def add_focus_link(
     ids = list(rows.factor_of)
     factors = [rows.factor_of[sid] for sid in ids]
     lookup = ColumnDataSource({"id": ids, "factor": factors}, name=RANKING_ROWS_SOURCE)
+    headings = ColumnDataSource(
+        {
+            "category": [heading.category for heading in rows.headings],
+            "factor": [heading.factors[0] for heading in rows.headings],
+        },
+        name=RANKING_HEADINGS_SOURCE,
+    )
     focus = focus_source()
     matched = ColumnDataSource({"y": []}, name=MATCHED_ROWS)
     focused = ColumnDataSource({"y": []}, name=FOCUSED_ROWS)
+    chosen = ColumnDataSource({"category": []}, name=CHOSEN_CATEGORY)
     highlight_rows(plot, matched, focused)
     focus.js_on_change(
         "data",
         CustomJS(
-            args=dict(focus=focus, lookup=lookup, matched=matched, focused=focused),
+            args=dict(focus=focus, lookup=lookup, matched=matched, focused=focused, chosen=chosen),
             code="""
             const factor = new Map(lookup.data.id.map((id, i) => [id, lookup.data.factor[i]]))
             const pick = (kind) => focus.data.id
@@ -528,12 +578,59 @@ def add_focus_link(
               .map((id) => factor.get(id))
             matched.data = {y: pick('match')}
             focused.data = {y: pick('focus')}
+            const category = focus.data.id.filter((id, i) => focus.data.kind[i] === 'category')
+            if (String(category) !== String(chosen.data.category)) chosen.data = {category}
             """,
         ),
     )
+    follow_category(plot, chosen)
     _row_bands(plot, rows, navigation_event)
     attach(plot, focus)
+    attach(plot, lookup)
+    attach(plot, headings)
+    attach(plot, chosen)
     return focus
+
+
+def follow_category(plot, chosen: ColumnDataSource, headings: Optional[ColumnDataSource] = None) -> None:
+    """Frame the chosen category's rows, and fill its heading's hexagon, in the logo's blue."""
+    frames = [
+        box
+        for box in plot.select(type=BoxAnnotation)
+        if isinstance(box.name, str) and box.name.startswith(FRAME_PREFIX)
+    ]
+    chosen.js_on_change(
+        "data",
+        CustomJS(
+            args=dict(
+                chosen=chosen,
+                frames=frames,
+                headings=headings,
+                prefix=FRAME_PREFIX,
+                selected=theme.SELECTED,
+                tint=theme.SELECTED_TINT,
+                line=FRAME_LINE,
+                width=FRAME_LINE_WIDTH,
+                chosen_width=CHOSEN_LINE_WIDTH,
+                ink=theme.INK_NODE,
+            ),
+            code="""
+            const category = chosen.data.category[0] ?? null
+            for (const frame of frames) {
+              const on = frame.name === prefix + category
+              frame.line_color = on ? selected : line
+              frame.line_width = on ? chosen_width : width
+              frame.fill_color = tint
+              frame.fill_alpha = on ? 0.6 : 0
+            }
+            if (headings) {
+              headings.data.fill = headings.data.category.map((name) => name === category ? selected : ink)
+              headings.data.ink = headings.data.category.map((name) => name === category ? ink : '#ffffff')
+              headings.change.emit()
+            }
+            """,
+        ),
+    )
 
 
 def _row_bands(plot, rows: RankingRows, navigation_event: Optional[str]) -> None:
@@ -578,6 +675,32 @@ def highlight_rows(plot, matched: ColumnDataSource, focused: ColumnDataSource) -
         )
 
 
+def summary_ranking(
+    rows: RankingRows,
+    scores: Mapping[str, float],
+    *,
+    title: str,
+    x_label: str,
+    colors: Optional[Mapping[str, str]] = None,
+    navigation_event: Optional[str] = None,
+):
+    """The names panel alone, each subsystem's score on a wider axis and no dots.
+
+    It holds the same selection as the full ranking, so the page links it to the
+    network the same way.
+    """
+    return names_panel(
+        rows,
+        None,
+        scores,
+        title=title,
+        x_label=x_label,
+        navigation_event=navigation_event,
+        colors=colors,
+        summary_width=SUMMARY_TAB_WIDTH,
+    )
+
+
 def ranking_layout(names, plot):
     """The names panel and the dots side by side, sharing their rows.
 
@@ -601,13 +724,16 @@ __all__ = [
     "FOCUS_EVENT",
     "FOCUS_SOURCE",
     "Heading",
+    "CHOSEN_CATEGORY",
     "RANKING_DOTS",
+    "RANKING_HEADINGS_SOURCE",
     "RANKING_NAMES",
     "RANKING_PLOT",
     "RANKING_ROWS_SOURCE",
     "RankedSubsystem",
     "RankingRows",
     "add_focus_link",
+    "follow_category",
     "frame_categories",
     "names_panel",
     "order_rows",
@@ -615,4 +741,5 @@ __all__ = [
     "ranking_layout",
     "shade_rows",
     "spread_offset",
+    "summary_ranking",
 ]

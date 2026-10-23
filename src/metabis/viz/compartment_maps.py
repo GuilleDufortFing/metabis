@@ -18,6 +18,11 @@ graph and the maps of its compartments:
 * **Find.** :func:`add_map_find` rings the reactions, genes and metabolites whose
   name holds the query the page writes into its source, and centres the view on
   the first, dispatching :data:`MAP_FIND_EVENT` with what it found.
+* **Subsystems.** :func:`add_map_bands` lays Metabolic Atlas's band under one
+  subsystem's links at a time, in the logo's blue: the subsystem the map was
+  opened from, one the page names, or that of the reaction under the pointer.
+
+A map draws its links along Metabolic Atlas's own paths (:mod:`.atlas_paths`).
 """
 
 from __future__ import annotations
@@ -29,16 +34,23 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Dict, Iterable, List, Mapping, Optional, Tuple
 
-from bokeh.models import ColumnDataSource, CustomJS, Range1d, TapTool
+from bokeh.models import ColumnDataSource, CustomJS, HoverTool, Range1d, TapTool
 
+from ..visual_config import theme
+from .atlas_paths import atlas_paths
 from .subsystem_link import attach
 
 MAPS_DIRECTORY = Path(__file__).resolve().parent.parent / "resources/graphs/compartment/human1"
 MAP_REACTION_EVENT = "metabis:map-reaction"
 MAP_FIND_EVENT = "metabis:map-find"
 MAP_FIND_SOURCE = "metabis-map-find"
-FIND_RING_COLOR = "#0162b7"  # the client's link blue, as the overview's ring
+# The subsystem whose band a map shows, which the page writes.
+MAP_BAND_SOURCE = "metabis-map-band"
+FIND_RING_COLOR = theme.SELECTED  # the logo's blue, as the overview's ring
 FADED = 0.08  # what is left of a faded glyph's alpha
+# Metabolic Atlas's bands: 80 map units wide and half transparent, under the links.
+BAND_WIDTH = 80.0
+BAND_ALPHA = 0.45
 # The formats, besides Human1's own, that the maps' reaction identifiers use.
 MAP_REACTION_FORMATS = ("rxnRecon3DID", "rxnBiGGID", "rxnHMR2ID")
 
@@ -169,6 +181,11 @@ def _is_reactions(data: Mapping) -> bool:
     return "angle" in data and "element_id" in data
 
 
+def _is_routed_links(data: Mapping) -> bool:
+    """A reaction's links along Metabolic Atlas's paths, one row per path."""
+    return "reaction_id" in data and "xs" in data
+
+
 def highlight_reactions(plot, drawn_ids: Iterable[str], *, padding: float = 600.0) -> int:
     """Keep ``drawn_ids``' reactions in a map, fade everything else, and frame them.
 
@@ -194,6 +211,16 @@ def highlight_reactions(plot, drawn_ids: Iterable[str], *, padding: float = 600.
                 alpha if str(element).removesuffix("_back") in keep else alpha * FADED
                 for alpha, element in zip(data["alpha"], data["element_id"])
             ]
+        elif _is_routed_links(data):
+            # A kept reaction's links stay; the rest fade with their reactions.
+            for field in ("line_alpha", "glow_alpha"):
+                if field in data:
+                    data[field] = [
+                        alpha if str(reaction) in keep else alpha * FADED
+                        for alpha, reaction in zip(data[field], data["reaction_id"])
+                    ]
+            source.data = data
+            continue
         elif "alpha" in data and count:
             data["alpha"] = [alpha * 0.25 for alpha in data["alpha"]]
         if "line_alpha" in data and count and not _is_reactions(data):
@@ -324,14 +351,120 @@ def add_map_find(plot) -> Optional[ColumnDataSource]:
     return find
 
 
+def map_bands(map_id: str) -> Dict[str, list]:
+    """Each subsystem's band in a packaged map, by Metabolic Atlas's name for it."""
+    atlas = atlas_paths(str(MAPS_DIRECTORY / f"{map_id}.json"))
+    return dict(atlas.get("subsystems") or {}) if atlas else {}
+
+
+def band_name(bands: Iterable[str], subsystem_name: Optional[str]) -> Optional[str]:
+    """The band a subsystem has in a map, matched to its name ignoring case."""
+    if not subsystem_name:
+        return None
+    wanted = str(subsystem_name).strip().lower()
+    return next((name for name in bands if name.strip().lower() == wanted), None)
+
+
+def add_map_bands(plot, map_id: str, shown: Optional[str] = None) -> Optional[ColumnDataSource]:
+    """Lay Metabolic Atlas's band under one subsystem's links, in the logo's blue.
+
+    ``shown`` is the band shown first, by its name in :func:`map_bands`. The page
+    writes another name, or none, into the returned source (:data:`MAP_BAND_SOURCE`,
+    ``{"name": [...]}``); pointing at a reaction shows its subsystem's band until
+    the pointer leaves it. The band keeps Metabolic Atlas's width in map units at
+    every zoom. Returns ``None`` for a map without bands.
+    """
+    bands = map_bands(map_id)
+    if not bands:
+        return None
+    every = {"name": [], "xs": [], "ys": []}
+    for name, lines in bands.items():
+        for flat in lines:
+            every["name"].append(name)
+            every["xs"].append(flat[0::2])
+            every["ys"].append(flat[1::2])
+    every = ColumnDataSource(every)
+    drawn = ColumnDataSource({"xs": [], "ys": []})
+    band = plot.multi_line(
+        xs="xs",
+        ys="ys",
+        source=drawn,
+        line_color=theme.SELECTED,
+        line_alpha=BAND_ALPHA,
+        line_width=1,
+        line_cap="round",
+        line_join="round",
+        level="underlay",
+    )
+    chosen = ColumnDataSource({"name": [shown] if shown in bands else []}, name=MAP_BAND_SOURCE)
+    show = CustomJS(
+        args=dict(every=every, drawn=drawn, chosen=chosen),
+        code="""
+        // A reaction under the pointer names its own subsystem's band for a moment.
+        const pointed = (window.__metabisPointedBand ?? {})[chosen.id] ?? null
+        const name = (pointed ?? chosen.data.name[0] ?? '').toLowerCase()
+        const rows = every.data.name.map((band, i) => band.toLowerCase() === name ? i : -1).filter((i) => i >= 0)
+        drawn.data = {xs: rows.map((i) => every.data.xs[i]), ys: rows.map((i) => every.data.ys[i])}
+        """,
+    )
+    chosen.js_on_change("data", show)
+    # Metabolic Atlas's width in map units, whatever the zoom.
+    width = CustomJS(
+        args=dict(plot=plot, band=band, units=BAND_WIDTH),
+        code="""
+        let pixels
+        try { pixels = plot.inner_width } catch { return }
+        const span = Math.abs(plot.x_range.end - plot.x_range.start)
+        if (pixels > 0 && span > 0) band.glyph.line_width = Math.max(1, units * pixels / span)
+        """,
+    )
+    for attribute in ("start", "end"):
+        plot.x_range.js_on_change(attribute, width)
+    plot.js_on_change("inner_width", width)
+    for renderer, source in _sources(plot):
+        if not (_is_reactions(source.data) and "subsystem" in source.data):
+            continue
+        plot.add_tools(
+            HoverTool(
+                renderers=[renderer],
+                tooltips=None,
+                callback=CustomJS(
+                    args=dict(source=source, chosen=chosen),
+                    code="""
+                    const index = cb_data.index.indices[0]
+                    const pointed = index === undefined ? null : String(source.data.subsystem[index] || '') || null
+                    const state = (window.__metabisPointedBand ??= {})
+                    if ((state[chosen.id] ?? null) === pointed) return
+                    state[chosen.id] = pointed
+                    // The same choice again, which redraws the band.
+                    chosen.data = {name: [...chosen.data.name]}
+                    """,
+                ),
+            )
+        )
+    # The band shown first, drawn once the page has laid the plot out.
+    drawn.data = {
+        "xs": [xs for name, xs in zip(every.data["name"], every.data["xs"]) if name == shown],
+        "ys": [ys for name, ys in zip(every.data["name"], every.data["ys"]) if name == shown],
+    }
+    attach(plot, every)
+    attach(plot, chosen)
+    return chosen
+
+
 __all__ = [
+    "BAND_WIDTH",
     "COMPARTMENT_MAPS",
     "CompartmentMap",
+    "MAP_BAND_SOURCE",
     "MAP_FIND_EVENT",
     "MAP_FIND_SOURCE",
     "MAP_REACTION_EVENT",
     "MAPS_BY_ID",
+    "add_map_bands",
     "add_map_find",
+    "band_name",
+    "map_bands",
     "add_map_links",
     "highlight_reactions",
     "map_ids_for_reactions",

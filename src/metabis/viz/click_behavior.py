@@ -327,9 +327,12 @@ def get_external_reference_data(
             "external_url": "",
         }
 
+    display_label = reference_data.get("display_label", element_id_str)
     return {
         "element_id": reference_data.get("raw_id", element_id_str),
-        "display_label": reference_data.get("display_label", element_id_str),
+        "display_label": display_label,
+        # A reaction's short name (reaction_names); other elements, their label.
+        "short_name": reference_data.get("short_name", display_label),
         "external_url": reference_data.get("external_url", ""),
     }
 
@@ -401,8 +404,18 @@ def add_click_behavior(
         if not eligible_sources:
             continue
 
+        # The tap selects only what it acts on, so a tap on the network's category
+        # circles leaves them as drawn (subsystem_link selects categories itself).
         if not plot.select(type=TapTool):
-            plot.add_tools(TapTool())
+            plot.add_tools(
+                TapTool(
+                    renderers=[
+                        renderer
+                        for renderer in plot.renderers
+                        if getattr(renderer, "data_source", None) in eligible_sources
+                    ]
+                )
+            )
 
         for source in eligible_sources:
             existing_tags = list(getattr(source, "tags", []) or [])

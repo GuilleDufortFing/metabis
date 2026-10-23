@@ -407,7 +407,8 @@ def _reduction_feature_presentations(
         presentations.append(
             ReductionFeaturePresentation(
                 feature_id=feature_id,
-                display_label=str(reference["display_label"]),
+                # A reaction by its short name; its identifier stays in the hover.
+                display_label=str(reference.get("short_name") or reference["display_label"]),
                 hover_html=hover_html,
                 external_url=str(reference["external_url"]),
             )

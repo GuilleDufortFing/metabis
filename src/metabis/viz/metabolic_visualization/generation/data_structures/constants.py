@@ -329,8 +329,10 @@ class VisualizationConstants:
     DEFAULT_CATEGORY_LINE_DASH = "solid"  # Solid lines for categories
     DEFAULT_CATEGORY_FILL_ALPHA = 1.0
     CATEGORY_LABEL_COLOR = "#152030"
-    # A subsystem with no data is neutral grey, as Supplementary Section 1.5 says.
-    SUBSYSTEM_NO_DATA_COLOR = "#c7c7c7"
+    # A subsystem with no measured feature: white, and dashed, so it is told apart
+    # from a measured score near zero, which is white too.
+    SUBSYSTEM_NO_DATA_COLOR = "#ffffff"
+    SUBSYSTEM_NO_DATA_LINE_DASH = "dashed"
     CATEGORY_LABEL_ALPHA = 0.8  # Slightly transparent category labels
 
     # Category boundary sizing
@@ -342,6 +344,8 @@ class VisualizationConstants:
     # Category font styling
     FONT_SIZE_CATEGORY = "10px"  # Category names, where a graph draws them
     FONT_SIZE_CATEGORY_NUMBER = "10px"  # The number on a category's rim (spaced_network)
+    CATEGORY_HEXAGON_SIZE = 21  # Pixels across the hexagon that number sits in
+    NO_DATA_LINE_WIDTH = 1.4  # The dashed edge of a subsystem node with no data
     FONT_FAMILY = "Arial"  # As the React client
 
     # Subsystem name text wrapping

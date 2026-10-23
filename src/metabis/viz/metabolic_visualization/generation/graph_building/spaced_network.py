@@ -464,7 +464,10 @@ def space_network(
 
     for glyph in subsystems:
         x, y, radius = nodes[glyph["id"]]
-        glyph.update(x=x, y=y, radius=radius, width=2 * radius, height=2 * radius)
+        glyph.update(
+            x=x, y=y, radius=radius, width=2 * radius, height=2 * radius,
+            category=category_of[glyph["id"]],
+        )
     ordered: List[Dict[str, Any]] = []
     for category, x, y, radius, count in circles:
         ordered.append(

@@ -9,7 +9,8 @@ from bokeh.plotting import figure
 
 # Import visualization constants
 from ..generation.data_structures.constants import VisualizationConstants
-from ...subsystem_link import attach, focus_source
+from ....visual_config import theme
+from ...subsystem_link import CATEGORY_CIRCLES, CATEGORY_HEXES, attach, focus_source
 from .js_callbacks import (
     NETWORK_LABEL_CHARACTER_WIDTH,
     NETWORK_LABEL_LINE_HEIGHT,
@@ -292,7 +293,11 @@ def draw_graph_elements(
     # Draw all glyph types
     _draw_enriched_nodes(plot, grouped_glyphs, auxiliary_data.get("influence_circles"))
 
-    # Draw all connection types
+    # Draw all connection types; where Metabolic Atlas routes a reaction's links,
+    # along its paths.
+    atlas = auxiliary_data.get("atlas")
+    if atlas:
+        enriched_connections = _draw_atlas_links(plot, atlas, enriched_connections)
     _draw_enriched_connections(plot, enriched_connections)
 
     # Draw auxiliary visualizations
@@ -768,6 +773,11 @@ def _draw_enriched_subsystems(plot, subsystem_glyphs):
 
     # Convert enriched glyphs to ColumnDataSource format
     data = _convert_glyphs_to_bokeh_data(subsystem_glyphs)
+    # A node with no data is white with a dashed edge, drawn a little heavier
+    # so the dashes read at the overview's size.
+    data["line_width"] = [
+        1.0 if dash == "solid" else VisualizationConstants.NO_DATA_LINE_WIDTH for dash in data["line_dash"]
+    ]
     source = ColumnDataSource(data)
     renderer = plot.circle(
         x="x",
@@ -777,6 +787,7 @@ def _draw_enriched_subsystems(plot, subsystem_glyphs):
         fill_alpha="alpha",
         line_color=VisualizationConstants.GLOBAL_BORDER_COLOR,
         line_alpha="alpha",
+        line_width="line_width",
         line_dash="line_dash",
         level="glyph",
         source=source,
@@ -800,7 +811,7 @@ def _draw_enriched_subsystems(plot, subsystem_glyphs):
     # the page points at (js_callbacks.add_fitting_label_callback). The labels'
     # source holds only what they draw, so a page looking for the subsystems'
     # own source by its fields never takes it for that.
-    label_data = {key: data[key] for key in ("x", "y", "element_id", "radius", "display_label")}
+    label_data = {key: data[key] for key in ("x", "y", "element_id", "radius", "category")}
     lines = [
         textwrap.wrap(
             str(name),
@@ -808,7 +819,7 @@ def _draw_enriched_subsystems(plot, subsystem_glyphs):
             break_long_words=False,
         )
         or [""]
-        for name in label_data["display_label"]
+        for name in data["name"]
     ]
     label_data["label_text"] = ["\n".join(name) for name in lines]
     label_data["label_width"] = [
@@ -1074,6 +1085,87 @@ def _draw_metabolic_connections_with_arrowheads(plot, metabolic_connections):
     return renderers
 
 
+def _draw_atlas_links(plot, atlas, connections):
+    """Each reaction Metabolic Atlas routes, along its own paths, styled as its links.
+
+    A reaction's paths take the colour, fading and dash its straight links had
+    (the glow in its colour under a grey line, as
+    :func:`_draw_metabolic_connections_with_arrowheads` draws them), and its
+    arrowheads are Metabolic Atlas's. Returns the connections left to draw
+    straight: every one but a routed reaction's metabolic links.
+    """
+    links = atlas.get("links") or {}
+    heads = atlas.get("heads") or {}
+    styles = {}
+    remaining = []
+    for connection in connections:
+        source, target = connection.get("source"), connection.get("target")
+        reaction = source if source in links else target if target in links else None
+        if reaction is None or connection.get("connection_class", "metabolic") != "metabolic":
+            remaining.append(connection)
+            continue
+        styles.setdefault(reaction, connection)
+
+    lines = {"xs": [], "ys": [], "color": [], "glow_alpha": [], "line_alpha": [], "line_dash": [], "reaction_id": []}
+    tips = {"xs": [], "ys": [], "line_alpha": [], "reaction_id": []}
+    for reaction, style in styles.items():
+        missing = style.get("is_missing_connection", False)
+        for flat in links[reaction]:
+            lines["xs"].append(flat[0::2])
+            lines["ys"].append(flat[1::2])
+            lines["color"].append(style["color"])
+            lines["glow_alpha"].append(0.0 if missing else VisualizationConstants.EDGE_GLOW_ALPHA)
+            lines["line_alpha"].append(style["line_alpha"])
+            lines["line_dash"].append(style.get("line_dash", "solid"))
+            lines["reaction_id"].append(reaction)
+        for flat in heads.get(reaction, ()):
+            tips["xs"].append(flat[0::2])
+            tips["ys"].append(flat[1::2])
+            tips["line_alpha"].append(style["line_alpha"])
+            tips["reaction_id"].append(reaction)
+    if not lines["xs"]:
+        return remaining
+
+    source = ColumnDataSource(lines)
+    if VisualizationConstants.EDGE_GLOW_ENABLED:
+        plot.multi_line(
+            xs="xs",
+            ys="ys",
+            line_color="color",
+            line_alpha="glow_alpha",
+            line_width=VisualizationConstants.DEFAULT_LINE_WIDTH
+            + VisualizationConstants.EDGE_GLOW_WIDTH_DELTA,
+            line_dash="line_dash",
+            line_cap="round",
+            line_join="round",
+            level="image",
+            source=source,
+        )
+    plot.multi_line(
+        xs="xs",
+        ys="ys",
+        line_color=VisualizationConstants.EDGE_OVERLAY_COLOR,
+        line_alpha="line_alpha",
+        line_width=VisualizationConstants.DEFAULT_LINE_WIDTH,
+        line_dash="line_dash",
+        line_join="round",
+        level="image",
+        source=source,
+    )
+    if tips["xs"]:
+        plot.multi_line(
+            xs="xs",
+            ys="ys",
+            line_color=VisualizationConstants.EDGE_OVERLAY_COLOR,
+            line_alpha="line_alpha",
+            line_width=VisualizationConstants.DEFAULT_LINE_WIDTH + 0.5,
+            line_join="round",
+            level="image",
+            source=ColumnDataSource(tips),
+        )
+    return remaining
+
+
 def _draw_simple_connections(plot, connections):
     """Draw simple connections without arrowheads."""
     line_data = {
@@ -1270,31 +1362,62 @@ def _draw_enriched_subsystem_categories(plot, category_glyphs):
         source=source,
     )
 
-    # Each category's number on its rim, up and to the left, as the rankings head
-    # the category with the same number; pointing at it names the category.
-    badges = plot.text(
-        x="x_badge",
-        y="y_badge",
+    # Each category's number on its rim, up and to the left, in the logo's hexagon as
+    # the side menu numbers the steps; the rankings head the category with the same
+    # number. Pointing at it names the category; clicking it, or the circle's
+    # background, selects the category (subsystem_link.add_network_focus_link).
+    hexes = ColumnDataSource(
+        {
+            "x": data["x_badge"],
+            "y": data["y_badge"],
+            "badge": data["badge"],
+            "category": data["category"],
+            "name": data["display_label"],
+            "fill": [theme.INK_NODE] * len(data["x"]),
+            "text": ["#ffffff"] * len(data["x"]),
+            "alpha": [1.0] * len(data["x"]),
+        },
+        name=CATEGORY_HEXES,
+    )
+    marks = plot.scatter(
+        x="x",
+        y="y",
+        source=hexes,
+        marker="hex",
+        angle=math.pi / 6,
+        size=VisualizationConstants.CATEGORY_HEXAGON_SIZE,
+        fill_color="fill",
+        fill_alpha="alpha",
+        line_color=theme.SELECTED,
+        line_alpha="alpha",
+        line_width=1.5,
+        level="annotation",
+    )
+    plot.text(
+        x="x",
+        y="y",
         text="badge",
-        text_color="#ffffff",
+        source=hexes,
+        text_color="text",
+        text_alpha="alpha",
         text_font=value(VisualizationConstants.FONT_FAMILY),
         text_font_size=VisualizationConstants.FONT_SIZE_CATEGORY_NUMBER,
         text_font_style="bold",
         text_align="center",
         text_baseline="middle",
-        outline_shape="circle",
-        background_fill_color="text_color",
-        padding=2,
         level="annotation",
-        source=source,
     )
     plot.add_tools(
         HoverTool(
-            renderers=[badges],
-            tooltips="<b>@badge</b> @display_label",
+            renderers=[marks],
+            tooltips="<b>@badge</b> @name",
             attachment="right",
         )
     )
+    source.name = CATEGORY_CIRCLES
+    source.data["base_color"] = list(data["color"])
+    source.data["base_line_color"] = list(data["line_color"])
+    source.data["base_line_width"] = list(data["line_width"])
 
     return renderer
 
@@ -1348,6 +1471,8 @@ def _convert_glyphs_to_bokeh_data(glyphs):
         data["reaction_count"] = [g.get("reaction_count", 0) for g in glyphs]
         data["metabolite_count"] = [g.get("metabolite_count", 0) for g in glyphs]
         data["is_subsystem"] = [g.get("is_subsystem", False) for g in glyphs]
+        data["name"] = [str(g.get("name") or g["display_label"]) for g in glyphs]
+        data["category"] = [str(g.get("category", "")) for g in glyphs]
         # Add radius for dynamic sizing
         data["radius"] = [g.get("radius", 20) for g in glyphs]
         # Add hover text
@@ -1365,6 +1490,7 @@ def _convert_glyphs_to_bokeh_data(glyphs):
         data["x_badge"] = [g["x"] - g["radius"] * math.sqrt(0.5) for g in glyphs]
         data["y_badge"] = [g["y"] - g["radius"] * math.sqrt(0.5) for g in glyphs]
         data["badge"] = [str(g.get("number", "")) for g in glyphs]
+        data["category"] = [str(g.get("label") or g["display_label"]) for g in glyphs]
         # Add hover text
         data["hover"] = [
             g.get("hover", f"Category: {g['display_label']}") for g in glyphs

@@ -330,7 +330,8 @@ def add_fitting_label_callback(plot, label_source, focus):
     ``focus`` (the page's shared selection, :mod:`metabis.viz.subsystem_link`), and
     a search's few matches, are named whatever their size, on a white backing; near
     either side of the view, such a name starts or ends at its node's edge, so the
-    frame does not cut it.
+    frame does not cut it. While a category is selected, every one of its
+    subsystems is named, centred on its node, and no other subsystem is.
     """
     callback = CustomJS(
         args=dict(
@@ -350,6 +351,7 @@ def add_fitting_label_callback(plot, label_source, focus):
         const matches = focus.data.id.filter((id, i) => kinds[i] === 'match')
         const named = new Set(focus.data.id.filter((id, i) => kinds[i] === 'focus'))
         if (matches.length <= named_matches) matches.forEach((id) => named.add(id))
+        const category = focus.data.id.find((id, i) => kinds[i] === 'category') ?? null
         const alpha = []
         const backing = []
         const align = []
@@ -358,13 +360,17 @@ def add_fitting_label_callback(plot, label_source, focus):
         for (let i = 0; i < data.element_id.length; i++) {
           const room = 2 * data.radius[i] * scale * 0.9
           const fits = data.label_width[i] <= room && data.label_height[i] <= room
-          const shown = named.has(data.element_id[i])
-          alpha.push(fits || shown ? 1 : 0)
+          const member = category !== null && data.category[i] === category
+          const shown = named.has(data.element_id[i]) || member
+          alpha.push(shown || (fits && category === null) ? 1 : 0)
           backing.push(shown && !fits ? 0.85 : 0)
           // Where the node sits across the view, from 0 at the left to 1 at the right.
           const across = (data.x[i] - start) * scale / width
           const edge = data.radius[i] * scale
-          if (shown && !fits && across < 0.3) {
+          if (member) {
+            align.push('center')
+            offset.push(0)
+          } else if (shown && !fits && across < 0.3) {
             align.push('left')
             offset.push(-edge)
           } else if (shown && !fits && across > 0.7) {
