@@ -299,7 +299,7 @@ def plot_set_enrichment_category(
         )
         for _, row in frame.iterrows()
     ]
-    rows = order_rows(entries, numbers=category_numbers, scores=False)
+    rows = order_rows(entries, numbers=category_numbers)
     frame["y_factor"] = [rows.factor_of[str(sid)] for sid in frame.get("subsystem_id", [])]
 
     values = [
@@ -356,11 +356,10 @@ def plot_set_enrichment_category(
     names = names_panel(
         rows,
         plot,
-        title="Subsystem",
         x_label="Signed log2(enrichment ratio), Target-lower to Target-higher",
         navigation_event=navigation_event,
     )
-    layout = ranking_layout(names, plot)
+    layout = ranking_layout(rows, names, plot)
     layout.tags.append(
         {
             "artifact_id": artifact.metadata.artifact_id,

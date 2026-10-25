@@ -346,6 +346,10 @@ class VisualizationConstants:
     FONT_SIZE_CATEGORY_NUMBER = "10px"  # The number on a category's rim (spaced_network)
     CATEGORY_HEXAGON_SIZE = 21  # Pixels across the hexagon that number sits in
     NO_DATA_LINE_WIDTH = 1.4  # The dashed edge of a subsystem node with no data
+    # A map's straight link longer than this, in map units (about nine times the
+    # median link), ends at a copy of its far node this far from the near one.
+    LOCAL_COPY_DISTANCE = 1500.0
+    LOCAL_COPY_STUB = 160.0
     FONT_FAMILY = "Arial"  # As the React client
 
     # Subsystem name text wrapping

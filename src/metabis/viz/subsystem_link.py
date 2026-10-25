@@ -21,16 +21,18 @@ from typing import Optional
 
 from bokeh.models import ColumnDataSource, CustomJS, HoverTool
 
-from ..visual_config import theme
+from .brand import GRADIENT_JS, OUTLINE_WIDTH, SELECTED_HEXAGON
 
 FOCUS_EVENT = "metabis:subsystem-focus"
 FOCUS_SOURCE = "metabis-subsystem-focus"
-FOCUS_RING_COLOR = "#4facfe"  # the logo's blue (visual_config.theme.SELECTED)
 CATEGORY_EVENT = "metabis:category-focus"
-# The network's category circles and their numbered hexagons, which a selected
-# category restyles (bokeh_plotting._draw_enriched_subsystem_categories).
+# The network's category circles, their numbered hexagons, and the logo's hexagon
+# a selected one takes (bokeh_plotting._draw_enriched_subsystem_categories).
 CATEGORY_CIRCLES = "metabis-category-circles"
 CATEGORY_HEXES = "metabis-category-hexes"
+CATEGORY_BADGE = "metabis-category-badge"
+# The network's outlines of what is selected, in the logo's gradient.
+NETWORK_OUTLINE = "metabis-network-outline"
 # Pixels round a hexagon's centre that a tap counts as on it.
 CATEGORY_HEX_REACH = 12
 
@@ -83,10 +85,12 @@ def add_network_focus_link(plot, nodes: Optional[ColumnDataSource] = None) -> Op
     """Ring the subsystem in focus, fade what a search does not match, and select categories.
 
     ``nodes`` is the subsystem glyphs' source, found in ``plot`` when omitted: the
-    renderer whose source marks ``is_subsystem``. A selected category outlines its
-    circle and fills its hexagon in the logo's blue, fades the rest of the network
-    and zooms to the category; clearing it returns to the view it was selected
-    from. Its subsystems are named by js_callbacks.add_fitting_label_callback.
+    renderer whose source marks ``is_subsystem``. The ring round the subsystem in
+    focus, and round a selected category, is outlined in the logo's gradient and
+    never filled, so it cannot be read as a score. A selected category's number
+    takes the logo's hexagon, the rest of the network fades and the view zooms to
+    the category; clearing it returns to the view it was selected from. Its
+    subsystems are named by js_callbacks.add_fitting_label_callback.
     """
     if nodes is None:
         for renderer in plot.renderers:
@@ -103,14 +107,17 @@ def add_network_focus_link(plot, nodes: Optional[ColumnDataSource] = None) -> Op
     if focus is None:
         focus = focus_source()
         attach(plot, focus)
-    ring = ColumnDataSource({"x": [], "y": [], "radius": []})
-    plot.circle(
-        x="x",
-        y="y",
-        radius="radius",
-        fill_alpha=0,
-        line_color=FOCUS_RING_COLOR,
-        line_width=3,
+    # The ring round the subsystem in focus and round a selected category, outlined
+    # in the logo's gradient as short segments (brand.GRADIENT_JS).
+    ring = ColumnDataSource({"x0": [], "y0": [], "x1": [], "y1": [], "color": []}, name=NETWORK_OUTLINE)
+    plot.segment(
+        x0="x0",
+        y0="y0",
+        x1="x1",
+        y1="y1",
+        line_color="color",
+        line_width=OUTLINE_WIDTH,
+        line_cap="round",
         level="overlay",
         source=ring,
     )
@@ -125,6 +132,7 @@ def add_network_focus_link(plot, nodes: Optional[ColumnDataSource] = None) -> Op
         edges.data["base_line_alpha"] = list(edges.data["line_alpha"])
     circles = _named_source(plot, CATEGORY_CIRCLES)
     hexes = _named_source(plot, CATEGORY_HEXES)
+    badge = _named_source(plot, CATEGORY_BADGE)
     if circles is not None:
         circles.data["base_alpha"] = list(circles.data["alpha"])
     focus.js_on_change(
@@ -138,11 +146,11 @@ def add_network_focus_link(plot, nodes: Optional[ColumnDataSource] = None) -> Op
                 edges=edges,
                 circles=circles,
                 hexes=hexes,
-                selected=theme.SELECTED,
-                tint=theme.SELECTED_TINT,
-                ink=theme.INK_NODE,
+                badge=badge,
+                hexagon=SELECTED_HEXAGON,
             ),
-            code="""
+            code=GRADIENT_JS
+            + """
             const ids = nodes.data.element_id
             const kinds = focus.data.kind
             const focused = focus.data.id.filter((id, i) => kinds[i] === 'focus')
@@ -150,9 +158,11 @@ def add_network_focus_link(plot, nodes: Optional[ColumnDataSource] = None) -> Op
             const matches = new Set(focus.data.id.filter((id, i) => kinds[i] === 'match'))
             const category = focus.data.id.find((id, i) => kinds[i] === 'category') ?? null
             const index = focused.length ? ids.indexOf(focused[0]) : -1
-            ring.data = index < 0
-              ? {x: [], y: [], radius: []}
-              : {x: [nodes.data.x[index]], y: [nodes.data.y[index]], radius: [nodes.data.radius[index] * 1.25 + 40]}
+            const down = plot.y_range.start > plot.y_range.end ? 1 : -1
+            const outline = {x0: [], y0: [], x1: [], y1: [], color: []}
+            if (index >= 0) {
+              metabisRing(outline, nodes.data.x[index], nodes.data.y[index], nodes.data.radius[index] * 1.25 + 40, down)
+            }
             const base = nodes.data.base_alpha
             const members = nodes.data.category ?? []
             nodes.data.alpha = ids.map((id, i) => {
@@ -162,19 +172,23 @@ def add_network_focus_link(plot, nodes: Optional[ColumnDataSource] = None) -> Op
             nodes.change.emit()
             const chosen = circles && category !== null ? circles.data.category.indexOf(category) : -1
             if (circles) {
+              // Outlined, never filled, so the selection is not read as a score.
               const c = circles.data
               c.alpha = c.base_alpha.map((alpha, i) => category !== null && i !== chosen ? alpha * 0.3 : alpha)
-              c.color = c.base_color.map((color, i) => i === chosen ? tint : color)
-              c.line_color = c.base_line_color.map((color, i) => i === chosen ? selected : color)
-              c.line_width = c.base_line_width.map((width, i) => i === chosen ? 3 : width)
               circles.change.emit()
+              if (chosen >= 0) metabisRing(outline, c.x[chosen], c.y[chosen], c.radius[chosen], down, 192)
             }
+            ring.data = outline
             if (hexes) {
               const h = hexes.data
-              h.fill = h.category.map((name) => name === category ? selected : ink)
-              h.text = h.category.map((name) => name === category ? ink : '#ffffff')
-              h.alpha = h.category.map((name) => category !== null && name !== category ? 0.3 : 1)
+              // The selected number's own hexagon gives way to the logo's.
+              h.alpha = h.category.map((name) => name === category ? 0 : category !== null ? 0.3 : 1)
+              h.text_alpha = h.category.map((name) => category !== null && name !== category ? 0.3 : 1)
               hexes.change.emit()
+              if (badge) {
+                const i = h.category.indexOf(category)
+                badge.data = i < 0 ? {url: [], x: [], y: []} : {url: [hexagon], x: [h.x[i]], y: [h.y[i]]}
+              }
             }
             if (edges) {
               const e = edges.data
@@ -283,12 +297,14 @@ def attach(plot, source: ColumnDataSource) -> None:
 
 
 __all__ = [
+    "CATEGORY_BADGE",
     "CATEGORY_CIRCLES",
     "CATEGORY_EVENT",
     "CATEGORY_HEXES",
     "FOCUS_EVENT",
     "attach",
     "FOCUS_SOURCE",
+    "NETWORK_OUTLINE",
     "add_network_focus_link",
     "focus_dispatch",
     "focus_source",

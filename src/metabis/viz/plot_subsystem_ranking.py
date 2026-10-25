@@ -33,8 +33,8 @@ from .ranking_layout import (
     order_rows,
     ranking_figure,
     ranking_layout,
+    score_panel,
     spread_offset,
-    summary_ranking,
 )
 
 
@@ -161,7 +161,6 @@ def plot_subsystem_comparison(
     groups: Optional[Dict[str, List[str]]] = None,
     category_numbers: Optional[Dict[str, int]] = None,
     delta_options: Optional[Dict[str, Any]] = None,
-    summary: bool = False,
 ):
     """Each subsystem's reactions (or genes) on the metric's axis, beside its delta score.
 
@@ -191,12 +190,9 @@ def plot_subsystem_comparison(
             network's numbers for the model's categories.
         delta_options: The Delta configuration the network was coloured with;
             each Delta score diamond takes its node's colour from it.
-        summary: Draw the summary view instead: the names and each Delta score
-            on a wider axis, without the elements' dots.
-
     Returns:
-        The two panels as one grid (or the summary view) if return_plot is True,
-        else None.
+        The names, the Delta score and the elements as one grid if return_plot is
+        True, else None; the page shows the score, the elements or both.
     """
     if entries is None and (subsystem_stats is None or subsystem_stats.empty):
         print("No subsystem statistics available.")
@@ -216,7 +212,6 @@ def plot_subsystem_comparison(
     rows = order_rows(
         entries,
         numbers=category_numbers or model_category_numbers(data_manager),
-        scores=True,
     )
     scores = {entry.subsystem_id: entry.score for entry in entries}
     colors = node_colors(
@@ -226,16 +221,6 @@ def plot_subsystem_comparison(
         metric,
         delta_options,
     )
-    if summary:
-        names = summary_ranking(
-            rows,
-            scores,
-            title=title or "Delta score",
-            x_label="Delta score",
-            colors=colors,
-            navigation_event=navigation_event,
-        )
-        return _finish(names, return_plot)
 
     significant_set = artifact.get_significant_elements(for_genes=for_genes)
     element_type = "gene" if for_genes else "reaction"
@@ -307,16 +292,17 @@ def plot_subsystem_comparison(
     dots = _draw_points(plot, all_data)
     plot.add_tools(HoverTool(renderers=[dots], tooltips="@desc{safe}"))
 
-    names = names_panel(
+    names = names_panel(rows, plot, navigation_event=navigation_event)
+    score = score_panel(
         rows,
         plot,
         scores,
         title="Delta score",
         x_label="Delta score",
-        navigation_event=navigation_event,
         colors=colors,
+        navigation_event=navigation_event,
     )
-    layout = ranking_layout(names, plot)
+    layout = ranking_layout(rows, names, plot, score)
     add_click_behavior(
         layout,
         filename_prefix=click_filename_prefix,
@@ -399,7 +385,6 @@ def plot_subsystem_activity_ranking(
     entries: Optional[List[RankedSubsystem]] = None,
     groups: Optional[Dict[str, List[str]]] = None,
     category_numbers: Optional[Dict[str, int]] = None,
-    summary: bool = False,
 ):
     """Rank subsystems by single-group activity, grouped by metabolic category.
 
@@ -408,8 +393,8 @@ def plot_subsystem_activity_ranking(
     being compared and nothing is significant. This plot ranks subsystems by their
     activity score (the median of measured member scores) and plots every measured
     member's relative activity score, with coverage reported in the hover. The
-    subsystem's score is on the same scale as its members, so its diamond sits
-    among them.
+    subsystem's own score takes a panel of its own, on the same scale as its
+    members, as the comparison's Delta score does.
 
     Args:
         data_manager: The AnalysisWorkspace object.
@@ -425,12 +410,9 @@ def plot_subsystem_activity_ranking(
         groups: The reactions (or genes) of each row in ``entries``, by its id.
         category_numbers: The numbers the rows' headings carry; by default the
             network's numbers for the model's categories.
-        summary: Draw the summary view instead: the names and each subsystem's
-            activity score on an axis of its own, without the members' dots.
-
     Returns:
-        The names panel and the dots as one grid (or the summary view) if
-        return_plot is True, else None.
+        The names, the activity score and the members as one grid if return_plot
+        is True, else None; the page shows the score, the members or both.
     """
     family = ActivityOverlay(
         overlay
@@ -455,21 +437,10 @@ def plot_subsystem_activity_ranking(
     rows = order_rows(
         entries,
         numbers=category_numbers or model_category_numbers(data_manager),
-        scores=summary,
     )
     activity_metric = activity_artifact.metric_key_for(family)
     scores_by_subsystem = {entry.subsystem_id: entry.score for entry in entries}
-    colors = node_colors(data_manager, list(scores_by_subsystem), "subsystem", activity_metric)
-    if summary:
-        names = summary_ranking(
-            rows,
-            scores_by_subsystem,
-            title=title or "Activity score",
-            x_label="Subsystem activity score",
-            colors=colors,
-            navigation_event=navigation_event,
-        )
-        return _finish(names, return_plot)
+    node_fills = node_colors(data_manager, list(scores_by_subsystem), "subsystem", activity_metric)
 
     all_data = _empty_points()
     all_metric_values: List[float] = []
@@ -575,11 +546,8 @@ def plot_subsystem_activity_ranking(
     x_range = Range1d(lower - padding, upper + padding)
 
     if title is None:
-        element_label = "reaction" if is_reaction_overlay else "gene"
-        title = (
-            f"Subsystem activity ranking - {activity_artifact.group_id} "
-            f"({element_label} overlay)"
-        )
+        element_label = "Reaction" if is_reaction_overlay else "Gene"
+        title = f"{element_label} activity in {activity_artifact.group_id}"
 
     axis_label = "Normalized group summary"
     if clamped:
@@ -603,33 +571,22 @@ def plot_subsystem_activity_ranking(
     add_focus_link(plot, rows, navigation_event=navigation_event)
     dots = _draw_points(plot, all_data)
     plot.add_tools(HoverTool(renderers=[dots], tooltips=hover_tooltip))
-    # The subsystem's own score, the median of its members, on their scale, in
-    # its node's colour.
+    # The subsystem's own score, the median of its members, on their scale, in its
+    # node's colour, in a panel of its own.
+    names = names_panel(rows, plot, navigation_event=navigation_event)
     ranked = [entry for entry in entries if entry.subsystem_id in rows.factor_of]
-    plot.scatter(
-        x="x",
-        y="y",
-        source=ColumnDataSource(
-            {
-                "x": [min(max(entry.score, lower), upper) for entry in ranked],
-                "y": [rows.factor_of[entry.subsystem_id] for entry in ranked],
-                "fill": [colors.get(entry.subsystem_id, theme.INK) for entry in ranked],
-            }
-        ),
-        marker="diamond",
-        size=13,
-        fill_color="fill",
-        line_color="#000000",
-        line_width=1,
-    )
-    names = names_panel(
+    score = score_panel(
         rows,
         plot,
-        title="Subsystem",
-        x_label=axis_label,
+        {entry.subsystem_id: min(max(entry.score, lower), upper) for entry in ranked},
+        title="Activity score",
+        x_label="Subsystem activity score",
+        colors=node_fills,
         navigation_event=navigation_event,
+        # Wider than the members' own, so a diamond at either end is drawn whole.
+        x_range=Range1d(lower - 2.5 * padding, upper + 2.5 * padding),
     )
-    layout = ranking_layout(names, plot)
+    layout = ranking_layout(rows, names, plot, score)
 
     add_click_behavior(
         layout,

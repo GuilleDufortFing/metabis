@@ -10,16 +10,16 @@ graph and the maps of its compartments:
   part is named by its largest pathways.
 * **Membership.** Most of a map's reactions carry Human1's own identifiers; the
   rest carry Recon3D's or BiGG's, which the model translates back.
-* **Into a map.** :func:`highlight_reactions` keeps a subsystem's reactions and
-  fades the rest of the map, then frames them.
+* **Into a map.** :func:`highlight_reactions` frames a subsystem's reactions,
+  and :func:`add_map_bands` lays its band under them.
 * **Out of a map.** :func:`add_map_links` names each reaction's subsystem, and a
   tap on a reaction dispatches :data:`MAP_REACTION_EVENT` on ``window`` with it,
   for the page to offer that subsystem's graph.
 * **Find.** :func:`add_map_find` rings the reactions, genes and metabolites whose
   name holds the query the page writes into its source, and centres the view on
   the first, dispatching :data:`MAP_FIND_EVENT` with what it found.
-* **Subsystems.** :func:`add_map_bands` lays Metabolic Atlas's band under one
-  subsystem's links at a time, in the logo's blue: the subsystem the map was
+* **Subsystems.** :func:`add_map_bands` outlines Metabolic Atlas's band under one
+  subsystem's links at a time, in the logo's gradient: the subsystem the map was
   opened from, one the page names, or that of the reaction under the pointer.
 
 A map draws its links along Metabolic Atlas's own paths (:mod:`.atlas_paths`).
@@ -34,10 +34,11 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Dict, Iterable, List, Mapping, Optional, Tuple
 
-from bokeh.models import ColumnDataSource, CustomJS, HoverTool, Range1d, TapTool
+from bokeh.models import ColumnDataSource, CustomJS, HoverTool, TapTool
 
 from ..visual_config import theme
 from .atlas_paths import atlas_paths
+from .brand import OUTLINE_WIDTH, gradient_segments
 from .subsystem_link import attach
 
 MAPS_DIRECTORY = Path(__file__).resolve().parent.parent / "resources/graphs/compartment/human1"
@@ -47,10 +48,10 @@ MAP_FIND_SOURCE = "metabis-map-find"
 # The subsystem whose band a map shows, which the page writes.
 MAP_BAND_SOURCE = "metabis-map-band"
 FIND_RING_COLOR = theme.SELECTED  # the logo's blue, as the overview's ring
-FADED = 0.08  # what is left of a faded glyph's alpha
-# Metabolic Atlas's bands: 80 map units wide and half transparent, under the links.
+# Metabolic Atlas's bands are 80 map units wide, under the links.
 BAND_WIDTH = 80.0
-BAND_ALPHA = 0.45
+# Map units per segment of a band's outline, short enough for its gradient.
+BAND_PIECE = 120.0
 # The formats, besides Human1's own, that the maps' reaction identifiers use.
 MAP_REACTION_FORMATS = ("rxnRecon3DID", "rxnBiGGID", "rxnHMR2ID")
 
@@ -181,15 +182,12 @@ def _is_reactions(data: Mapping) -> bool:
     return "angle" in data and "element_id" in data
 
 
-def _is_routed_links(data: Mapping) -> bool:
-    """A reaction's links along Metabolic Atlas's paths, one row per path."""
-    return "reaction_id" in data and "xs" in data
-
-
 def highlight_reactions(plot, drawn_ids: Iterable[str], *, padding: float = 600.0) -> int:
-    """Keep ``drawn_ids``' reactions in a map, fade everything else, and frame them.
+    """Frame ``drawn_ids``' reactions in a map, leaving every glyph as drawn.
 
-    Returns how many reactions it kept. With none, the map is left as drawn.
+    The view moves to them at the map's own proportions; the plot keeps its range
+    objects, which its names and its band follow as it zooms. Returns how many
+    reactions it framed. With none, the map is left as drawn.
     """
     keep = {str(drawn).removesuffix("_back") for drawn in drawn_ids}
     xs: List[float] = []
@@ -203,31 +201,6 @@ def highlight_reactions(plot, drawn_ids: Iterable[str], *, padding: float = 600.
                     ys.append(float(y))
     if not xs:
         return 0
-    for _renderer, source in _sources(plot):
-        data = dict(source.data)
-        count = len(next(iter(data.values())))
-        if _is_reactions(data):
-            data["alpha"] = [
-                alpha if str(element).removesuffix("_back") in keep else alpha * FADED
-                for alpha, element in zip(data["alpha"], data["element_id"])
-            ]
-        elif _is_routed_links(data):
-            # A kept reaction's links stay; the rest fade with their reactions.
-            for field in ("line_alpha", "glow_alpha"):
-                if field in data:
-                    data[field] = [
-                        alpha if str(reaction) in keep else alpha * FADED
-                        for alpha, reaction in zip(data[field], data["reaction_id"])
-                    ]
-            source.data = data
-            continue
-        elif "alpha" in data and count:
-            data["alpha"] = [alpha * 0.25 for alpha in data["alpha"]]
-        if "line_alpha" in data and count and not _is_reactions(data):
-            data["line_alpha"] = [alpha * 0.25 for alpha in data["line_alpha"]]
-        if "text_alpha" in data and count:
-            data["text_alpha"] = [alpha * 0.3 for alpha in data["text_alpha"]]
-        source.data = data
     # Frame them at the map's own proportions, so nothing is stretched.
     left, right = min(xs) - padding, max(xs) + padding
     top, bottom = min(ys) - padding, max(ys) + padding
@@ -240,9 +213,9 @@ def highlight_reactions(plot, drawn_ids: Iterable[str], *, padding: float = 600.
     else:
         height = width / aspect
     cx, cy = (left + right) / 2, (top + bottom) / 2
-    plot.x_range = Range1d(cx - width / 2, cx + width / 2)
+    plot.x_range.start, plot.x_range.end = cx - width / 2, cx + width / 2
     # The map's y-range runs downwards, as its layout does.
-    plot.y_range = Range1d(cy + height / 2, cy - height / 2)
+    plot.y_range.start, plot.y_range.end = cy + height / 2, cy - height / 2
     return len(xs)
 
 
@@ -335,6 +308,10 @@ def add_map_find(plot) -> Optional[ColumnDataSource]:
             if (first !== null) {
               const xr = plot.x_range
               const yr = plot.y_range
+              // As a zoom tool does, so a data range keeps the view rather than
+              // computing it again from the data.
+              xr.have_updated_interactively = true
+              yr.have_updated_interactively = true
               const width = Math.min(Math.abs(xr.end - xr.start), full_width / 5)
               const height = width * Math.abs(yr.end - yr.start) / Math.abs(xr.end - xr.start)
               xr.setv({start: first.x - width / 2, end: first.x + width / 2})
@@ -366,36 +343,45 @@ def band_name(bands: Iterable[str], subsystem_name: Optional[str]) -> Optional[s
 
 
 def add_map_bands(plot, map_id: str, shown: Optional[str] = None) -> Optional[ColumnDataSource]:
-    """Lay Metabolic Atlas's band under one subsystem's links, in the logo's blue.
+    """Outline Metabolic Atlas's band under one subsystem's links, in the logo's gradient.
 
     ``shown`` is the band shown first, by its name in :func:`map_bands`. The page
     writes another name, or none, into the returned source (:data:`MAP_BAND_SOURCE`,
     ``{"name": [...]}``); pointing at a reaction shows its subsystem's band until
-    the pointer leaves it. The band keeps Metabolic Atlas's width in map units at
-    every zoom. Returns ``None`` for a map without bands.
+    the pointer leaves it. A band keeps Metabolic Atlas's width in map units at
+    every zoom. It is outlined, never filled, so it is not read as a score: a
+    stroke in the gradient, and over it a white stroke narrower by the outline on
+    each side, both opaque, so where a band crosses itself the outlines merge
+    rather than darken. Both lie under everything but the compartments. Returns
+    ``None`` for a map without bands.
     """
     bands = map_bands(map_id)
     if not bands:
         return None
-    every = {"name": [], "xs": [], "ys": []}
+    every: dict = {"name": [], "x0": [], "y0": [], "x1": [], "y1": [], "color": []}
     for name, lines in bands.items():
-        for flat in lines:
-            every["name"].append(name)
-            every["xs"].append(flat[0::2])
-            every["ys"].append(flat[1::2])
+        # Each band runs the whole gradient across its own extent.
+        pieces = gradient_segments(lines, piece=BAND_PIECE)
+        every["name"].extend([name] * len(pieces["x0"]))
+        for key, values in pieces.items():
+            every[key].extend(values)
     every = ColumnDataSource(every)
-    drawn = ColumnDataSource({"xs": [], "ys": []})
-    band = plot.multi_line(
-        xs="xs",
-        ys="ys",
-        source=drawn,
-        line_color=theme.SELECTED,
-        line_alpha=BAND_ALPHA,
-        line_width=1,
-        line_cap="round",
-        line_join="round",
-        level="underlay",
+    drawn = ColumnDataSource({key: [] for key in ("x0", "y0", "x1", "y1", "color")})
+    common = dict(x0="x0", y0="y0", x1="x1", y1="y1", line_cap="round", level="underlay", source=drawn)
+    outline = plot.segment(line_color="color", line_width=1, **common)
+    core = plot.segment(line_color="#ffffff", line_width=0, **common)
+    # Under the links and the nodes, and over the compartments only.
+    renderers = [renderer for renderer in plot.renderers if renderer not in (outline, core)]
+    after = max(
+        (
+            index + 1
+            for index, renderer in enumerate(renderers)
+            if "x_label" in (getattr(getattr(renderer, "data_source", None), "data", None) or {})
+        ),
+        default=0,
     )
+    plot.renderers = renderers[:after] + [outline, core] + renderers[after:]
+
     chosen = ColumnDataSource({"name": [shown] if shown in bands else []}, name=MAP_BAND_SOURCE)
     show = CustomJS(
         args=dict(every=every, drawn=drawn, chosen=chosen),
@@ -404,18 +390,23 @@ def add_map_bands(plot, map_id: str, shown: Optional[str] = None) -> Optional[Co
         const pointed = (window.__metabisPointedBand ?? {})[chosen.id] ?? null
         const name = (pointed ?? chosen.data.name[0] ?? '').toLowerCase()
         const rows = every.data.name.map((band, i) => band.toLowerCase() === name ? i : -1).filter((i) => i >= 0)
-        drawn.data = {xs: rows.map((i) => every.data.xs[i]), ys: rows.map((i) => every.data.ys[i])}
+        const pick = (key) => rows.map((i) => every.data[key][i])
+        drawn.data = {x0: pick('x0'), y0: pick('y0'), x1: pick('x1'), y1: pick('y1'), color: pick('color')}
         """,
     )
     chosen.js_on_change("data", show)
-    # Metabolic Atlas's width in map units, whatever the zoom.
+    # Metabolic Atlas's width in map units, whatever the zoom; the outline stays
+    # a fixed width on screen.
     width = CustomJS(
-        args=dict(plot=plot, band=band, units=BAND_WIDTH),
+        args=dict(plot=plot, outline=outline, core=core, units=BAND_WIDTH, edge=OUTLINE_WIDTH),
         code="""
         let pixels
         try { pixels = plot.inner_width } catch { return }
         const span = Math.abs(plot.x_range.end - plot.x_range.start)
-        if (pixels > 0 && span > 0) band.glyph.line_width = Math.max(1, units * pixels / span)
+        if (!(pixels > 0 && span > 0)) return
+        const across = Math.max(2 * edge, units * pixels / span)
+        outline.glyph.line_width = across
+        core.glyph.line_width = across - 2 * edge
         """,
     )
     for attribute in ("start", "end"):
@@ -442,11 +433,9 @@ def add_map_bands(plot, map_id: str, shown: Optional[str] = None) -> Optional[Co
                 ),
             )
         )
-    # The band shown first, drawn once the page has laid the plot out.
-    drawn.data = {
-        "xs": [xs for name, xs in zip(every.data["name"], every.data["xs"]) if name == shown],
-        "ys": [ys for name, ys in zip(every.data["name"], every.data["ys"]) if name == shown],
-    }
+    # The band shown first.
+    rows = [i for i, name in enumerate(every.data["name"]) if name == shown]
+    drawn.data = {key: [every.data[key][i] for i in rows] for key in ("x0", "y0", "x1", "y1", "color")}
     attach(plot, every)
     attach(plot, chosen)
     return chosen

@@ -7,10 +7,22 @@ from bokeh.core.properties import value
 from bokeh.models import ColumnDataSource, HoverTool, LabelSet
 from bokeh.plotting import figure
 
-# Import visualization constants
-from ..generation.data_structures.constants import VisualizationConstants
 from ....visual_config import theme
-from ...subsystem_link import CATEGORY_CIRCLES, CATEGORY_HEXES, attach, focus_source
+from ...brand import SELECTED_HEXAGON_SIZE
+from ...subsystem_link import (
+    CATEGORY_BADGE,
+    CATEGORY_CIRCLES,
+    CATEGORY_HEXES,
+    attach,
+    focus_source,
+)
+
+# Import visualization constants
+from ..enrichment.utilities import (
+    calculate_arrowhead_vertices,
+    get_connection_coordinates,
+)
+from ..generation.data_structures.constants import VisualizationConstants
 from .js_callbacks import (
     NETWORK_LABEL_CHARACTER_WIDTH,
     NETWORK_LABEL_LINE_HEIGHT,
@@ -20,6 +32,8 @@ from .js_callbacks import (
 
 # The network's subsystem names, which the page's shared selection also names.
 NETWORK_LABELS = "metabis-network-labels"
+# A diamond's width over its height, as Bokeh's diamond marker draws it.
+REACTION_DIAMOND_WIDTH = 2 / 3
 
 
 def _include_point(bounds, x_value, y_value):
@@ -287,6 +301,14 @@ def draw_graph_elements(
         enriched_connections: List of enriched connection dictionaries
         auxiliary_data: Dict with influence_lines, influence_circles, etc.
     """
+    # A Human1 map draws its links as Metabolic Atlas does: along its paths, and to
+    # a nearby copy of a far node rather than across the map.
+    atlas = auxiliary_data.get("atlas")
+    if atlas:
+        enriched_glyphs, enriched_connections = _local_copies(
+            enriched_glyphs, enriched_connections, atlas
+        )
+
     # Group glyphs by type for efficient processing
     grouped_glyphs = _group_glyphs_by_type(enriched_glyphs)
 
@@ -295,7 +317,6 @@ def draw_graph_elements(
 
     # Draw all connection types; where Metabolic Atlas routes a reaction's links,
     # along its paths.
-    atlas = auxiliary_data.get("atlas")
     if atlas:
         enriched_connections = _draw_atlas_links(plot, atlas, enriched_connections)
     _draw_enriched_connections(plot, enriched_connections)
@@ -602,18 +623,23 @@ def _draw_enriched_genes(plot, gene_glyphs):
 
 
 def _draw_enriched_reactions(plot, reaction_glyphs):
-    """Draw reactions using enriched glyph data."""
+    """Draw reactions using enriched glyph data.
+
+    A reaction is a diamond, taller than wide as the key's and the rankings' are,
+    as tall as the square on its point it was drawn as before.
+    """
     data = _convert_glyphs_to_bokeh_data(reaction_glyphs)
+    half_heights = [float(size) / math.sqrt(2) for size in data["size"]]
+    data["xs"] = [
+        [x, x + h * REACTION_DIAMOND_WIDTH, x, x - h * REACTION_DIAMOND_WIDTH]
+        for x, h in zip(data["x"], half_heights)
+    ]
+    data["ys"] = [[y - h, y, y + h, y] for y, h in zip(data["y"], half_heights)]
 
     source = ColumnDataSource(data)
-    renderer = plot.rect(
-        x="x",
-        y="y",
-        height="size",
-        width="size",
-        height_units="data",
-        width_units="data",
-        angle="angle",
+    renderer = plot.patches(
+        xs="xs",
+        ys="ys",
         fill_color="color",
         fill_alpha="alpha",
         line_color=VisualizationConstants.GLOBAL_BORDER_COLOR,
@@ -1085,6 +1111,90 @@ def _draw_metabolic_connections_with_arrowheads(plot, metabolic_connections):
     return renderers
 
 
+def _local_copies(glyphs, connections, atlas):
+    """A far node's copy beside each node it links to across a map, as Metabolic Atlas draws.
+
+    Metabolic Atlas draws a metabolite again beside each reaction far from it; a
+    layout that draws it once links it across the map. A straight link longer than
+    ``LOCAL_COPY_DISTANCE`` that no Atlas path routes ends instead at a copy of
+    its far node: the one of its two ends with more such links, or else its
+    metabolite. The copy keeps the node's identifier, colour, name and hover, and
+    stands ``LOCAL_COPY_STUB`` from the near node, towards the far one.
+    """
+    links = atlas.get("links") or {}
+    far = VisualizationConstants.LOCAL_COPY_DISTANCE
+    by_id = {}
+    for glyph in glyphs:
+        by_id.setdefault(glyph["id"], glyph)
+
+    def length(connection):
+        return math.hypot(connection["x1"] - connection["x0"], connection["y1"] - connection["y0"])
+
+    long_links = [
+        index
+        for index, connection in enumerate(connections)
+        if connection.get("connection_class", "metabolic") == "metabolic"
+        and "x0" in connection
+        and connection.get("source") not in links
+        and connection.get("target") not in links
+        and connection.get("source") in by_id
+        and connection.get("target") in by_id
+        and length(connection) > far
+    ]
+    if not long_links:
+        return glyphs, connections
+    counts = {}
+    for index in long_links:
+        for end in ("source", "target"):
+            counts[connections[index][end]] = counts.get(connections[index][end], 0) + 1
+
+    glyphs = list(glyphs)
+    connections = list(connections)
+    for index in long_links:
+        connection = dict(connections[index])
+        source, target = connection["source"], connection["target"]
+        if counts[source] != counts[target]:
+            hub = source if counts[source] > counts[target] else target
+        else:
+            hub = source if by_id[source]["glyph_class"] == "metabolite" else target
+        near = target if hub == source else source
+        hub_glyph, near_glyph = by_id[hub], by_id[near]
+        dx, dy = hub_glyph["x"] - near_glyph["x"], hub_glyph["y"] - near_glyph["y"]
+        distance = math.hypot(dx, dy)
+        stub = VisualizationConstants.LOCAL_COPY_STUB / distance
+        copy = {
+            **hub_glyph,
+            "x": near_glyph["x"] + dx * stub,
+            "y": near_glyph["y"] + dy * stub,
+            "is_local_copy": True,
+        }
+        glyphs.append(copy)
+        # The end at the far node moves to its copy; an arrowhead there moves with it.
+        (x0, y0), (x1, y1) = (connection["x0"], connection["y0"]), (connection["x1"], connection["y1"])
+        hub_at_end = math.hypot(x1 - hub_glyph["x"], y1 - hub_glyph["y"]) < math.hypot(
+            x0 - hub_glyph["x"], y0 - hub_glyph["y"]
+        )
+        if hub_at_end:
+            (connection["x0"], connection["y0"]), (connection["x1"], connection["y1"]) = (
+                get_connection_coordinates(near_glyph, copy)
+            )
+            xs, ys = calculate_arrowhead_vertices(
+                connection["x0"], connection["y0"], connection["x1"], connection["y1"]
+            )
+            connection["arrowhead_xs"], connection["arrowhead_ys"] = xs, ys
+        else:
+            (connection["x0"], connection["y0"]), (connection["x1"], connection["y1"]) = (
+                get_connection_coordinates(copy, near_glyph)
+            )
+            if connection.get("arrowhead_xs"):
+                xs, ys = calculate_arrowhead_vertices(
+                    connection["x0"], connection["y0"], connection["x1"], connection["y1"]
+                )
+                connection["arrowhead_xs"], connection["arrowhead_ys"] = xs, ys
+        connections[index] = connection
+    return glyphs, connections
+
+
 def _draw_atlas_links(plot, atlas, connections):
     """Each reaction Metabolic Atlas routes, along its own paths, styled as its links.
 
@@ -1376,6 +1486,7 @@ def _draw_enriched_subsystem_categories(plot, category_glyphs):
             "fill": [theme.INK_NODE] * len(data["x"]),
             "text": ["#ffffff"] * len(data["x"]),
             "alpha": [1.0] * len(data["x"]),
+            "text_alpha": [1.0] * len(data["x"]),
         },
         name=CATEGORY_HEXES,
     )
@@ -1393,13 +1504,27 @@ def _draw_enriched_subsystem_categories(plot, category_glyphs):
         line_width=1.5,
         level="annotation",
     )
+    # A selected category's number takes the logo's own hexagon, stroked in its
+    # gradient, under the number (subsystem_link.add_network_focus_link fills it).
+    plot.image_url(
+        url="url",
+        x="x",
+        y="y",
+        w=SELECTED_HEXAGON_SIZE,
+        h=SELECTED_HEXAGON_SIZE,
+        w_units="screen",
+        h_units="screen",
+        anchor="center",
+        source=ColumnDataSource({"url": [], "x": [], "y": []}, name=CATEGORY_BADGE),
+        level="annotation",
+    )
     plot.text(
         x="x",
         y="y",
         text="badge",
         source=hexes,
         text_color="text",
-        text_alpha="alpha",
+        text_alpha="text_alpha",
         text_font=value(VisualizationConstants.FONT_FAMILY),
         text_font_size=VisualizationConstants.FONT_SIZE_CATEGORY_NUMBER,
         text_font_style="bold",
@@ -1415,9 +1540,6 @@ def _draw_enriched_subsystem_categories(plot, category_glyphs):
         )
     )
     source.name = CATEGORY_CIRCLES
-    source.data["base_color"] = list(data["color"])
-    source.data["base_line_color"] = list(data["line_color"])
-    source.data["base_line_width"] = list(data["line_width"])
 
     return renderer
 

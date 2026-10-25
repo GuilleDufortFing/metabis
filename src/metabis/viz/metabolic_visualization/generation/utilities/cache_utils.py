@@ -204,11 +204,31 @@ def load_graph_resource(
     try:
         glyphs, connections = load_visualization_cache(resource_file)
         if glyphs is not None and connections is not None:
-            return glyphs, connections
+            return _with_atlas_metabolites(resource_file, glyphs), connections
     except Exception as e:
         print(f"⚠ Error loading packaged graph resource {resource_file}: {e}")
 
     return None, None
+
+
+def _with_atlas_metabolites(resource_file: str, glyphs: List[Glyph]) -> List[Glyph]:
+    """A Human1 layout's metabolites that it classes as reactions, drawn as metabolites.
+
+    Some layouts class metabolites with Recon3D identifiers as reactions; Metabolic
+    Atlas draws them as metabolites, and its paths file lists them (atlas_paths).
+    """
+    from ....atlas_paths import atlas_paths
+
+    atlas = atlas_paths(resource_file)
+    metabolites = set((atlas or {}).get("metabolites") or ())
+    if not metabolites:
+        return glyphs
+    return [
+        {**glyph, "glyph_class": "metabolite", "subtype": "main"}
+        if glyph.get("glyph_class") == "reaction" and str(glyph.get("id")) in metabolites
+        else glyph
+        for glyph in glyphs
+    ]
 
 
 def save_to_cache(

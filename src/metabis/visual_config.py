@@ -42,7 +42,7 @@ class VisualTheme:
     # Whatever is selected on the overview: the logo's blue, as the side menu marks
     # the current step (web/src/index.css --logo-blue).
     SELECTED: str = "#4facfe"
-    SELECTED_TINT: str = "#eaf5ff"  # the logo's blue at about 10% on white
+    SELECTED_END: str = "#00f2fe"  # the logo's gradient runs from SELECTED to this
     INK_NODE: str = "#0b1118"  # the logo's node fill, the side menu's step hexagons
 
     # Plot Elements

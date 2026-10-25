@@ -85,13 +85,16 @@ def _map_plot():
     return plot, reactions, metabolites
 
 
-def test_a_subsystems_reactions_stay_in_view_and_the_rest_fades():
+def test_a_subsystems_reactions_are_framed_and_nothing_fades():
     plot, reactions, metabolites = _map_plot()
+    x_range, y_range = plot.x_range, plot.y_range
 
     assert highlight_reactions(plot, ["MAR2", "MAR3"], padding=100) == 2
-    assert reactions.data["alpha"][0] < 0.1 and reactions.data["alpha"][1:] == [1.0, 1.0]
-    assert metabolites.data["alpha"] == [0.25]
-    # Framed at the map's proportions, the y-range still running downwards.
+    assert reactions.data["alpha"] == [1.0, 1.0, 1.0]
+    assert metabolites.data["alpha"] == [1.0]
+    # Framed at the map's proportions, the y-range still running downwards, on the
+    # plot's own range objects, which its names and band follow as it zooms.
+    assert plot.x_range is x_range and plot.y_range is y_range
     assert (plot.x_range.start, plot.x_range.end) == (400.0, 1000.0)
     assert plot.y_range.start > plot.y_range.end
     assert highlight_reactions(_map_plot()[0], ["elsewhere"]) == 0
@@ -139,25 +142,6 @@ def test_every_human1_map_carries_metabolic_atlas_paths():
     assert atlas_paths(str(graphs / "subsystem" / "standard" / "nowhere.json")) is None
 
 
-def test_routed_links_fade_with_their_reactions():
-    plot, reactions, _ = _map_plot()
-    links = ColumnDataSource(
-        {
-            "xs": [[100.0, 200.0], [900.0, 800.0]],
-            "ys": [[100.0, 200.0], [900.0, 800.0]],
-            "line_alpha": [1.0, 1.0],
-            "glow_alpha": [0.7, 0.7],
-            "reaction_id": ["MAR1", "MAR3"],
-        }
-    )
-    plot.multi_line(xs="xs", ys="ys", source=links)
-
-    highlight_reactions(plot, ["MAR3"], padding=100)
-
-    assert links.data["line_alpha"][0] < 0.1 and links.data["line_alpha"][1] == 1.0
-    assert links.data["glow_alpha"][0] < 0.1 and links.data["glow_alpha"][1] == 0.7
-
-
 def test_one_subsystems_band_at_a_time():
     bands = map_bands("mitochondria")
     shown = band_name(bands, "tricarboxylic acid cycle and glyoxylate/dicarboxylate metabolism")
@@ -169,9 +153,14 @@ def test_one_subsystems_band_at_a_time():
 
     assert chosen.name == MAP_BAND_SOURCE and chosen.data["name"] == [shown]
     assert chosen in plot.tags
-    drawn = [r.data_source for r in plot.renderers if set(r.data_source.data) == {"xs", "ys"}]
-    (band,) = drawn
-    assert len(band.data["xs"]) == len(bands[shown])
+    # Outlined in the gradient over a white core, both drawn from one source,
+    # under everything else the map draws.
+    outline, core = plot.renderers[:2]
+    assert outline.data_source is core.data_source
+    assert core.glyph.line_color == "#ffffff" and outline.glyph.line_color == "color"
+    band = outline.data_source.data
+    assert band["x0"] and len(set(band["color"])) > 3
+    assert all(color.startswith("#") for color in band["color"])
     # Pointing at a reaction names its own subsystem's band.
     from bokeh.models import HoverTool
 

@@ -48,7 +48,9 @@ adapted from the following upstream repositories:
 - Change notice: upstream map assets were converted into Metabis runtime graph
   JSON resources and may include filtering, coordinate extraction,
   normalization, or curation; the link paths and bands are shifted into each
-  layout's frame, and paths to metabolites a layout does not draw are left out.
+  layout's frame, paths to metabolites a layout does not draw are left out, and
+  the glyphs a layout classes as reactions where Metabolic Atlas draws
+  metabolites are listed, so the maps draw them as metabolites.
 
 Use of these Human1-derived materials does not imply endorsement by the
 Human-GEM or Human-maps authors or maintainers.

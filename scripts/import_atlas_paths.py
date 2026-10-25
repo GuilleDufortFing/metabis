@@ -15,15 +15,20 @@ them and writes, beside each layout ``<map>.json``, a ``<map>.atlas.json``::
       "offset": [dx, dy],
       "links": {"MAR03577": [[x0, y0, x1, y1, ...], ...]},
       "heads": {"MAR03577": [[x0, y0, ...], ...]},
-      "subsystems": {"Tricarboxylic acid cycle and ...": [[x0, y0, ...], ...]}
+      "subsystems": {"Tricarboxylic acid cycle and ...": [[x0, y0, ...], ...]},
+      "metabolites": ["dolp_U_r", ...]
     }
 
 with every coordinate in the layout's own frame, to a tenth of a unit. A
 reaction's paths are kept only where the layout draws it exactly where Metabolic
-Atlas does; any other reaction keeps its straight links. Metabolic Atlas also
-draws some metabolites the layout leaves out (those outside Human1, such as
-``Rtotal_c``); a path whose end is nearest one of those is left out with it.
-Usage::
+Atlas does; any other reaction keeps its straight links. Where the layout names a
+reaction otherwise (a Recon3D identifier, say) but draws it exactly where
+Metabolic Atlas draws one reaction, it takes that reaction's paths. Metabolic
+Atlas also draws some metabolites the layout leaves out (those outside Human1,
+such as ``Rtotal_c``); a path whose end is nearest one of those is left out with
+it. ``metabolites`` lists the layout's glyphs classed as reactions that sit
+exactly where Metabolic Atlas draws a metabolite and no reaction: metabolites
+with Recon3D identifiers, which the map draws as metabolites. Usage::
 
     python -I scripts/import_atlas_paths.py SVG_DIRECTORY [--check]
 
@@ -166,12 +171,40 @@ def import_map(svg_path: Path, layout_path: Path, kind: str) -> Tuple[dict, dict
         round(statistics.median(shift[1] for shift in shifts), 3),
     )
     shifted = lambda place: (place[0] + offset[0], place[1] + offset[1])  # noqa: E731
+    atlas_metabolites = [shifted((float(x), float(y))) for _classes, x, y in METABOLITE.findall(svg)]
+    atlas_reactions = [shifted(place) for places in atlas.values() for place in places]
+
+    # Glyphs the layout classes as reactions that Metabolic Atlas draws as metabolites.
+    drawn_as_metabolites = sorted(
+        reaction
+        for reaction, places in ours.items()
+        if all(_near(place, atlas_metabolites) and not _near(place, atlas_reactions) for place in places)
+    )
+    for reaction in drawn_as_metabolites:
+        metabolites.extend(ours.pop(reaction))
+
+    # A reaction named otherwise in the layout takes the paths of the one reaction
+    # Metabolic Atlas draws exactly where the layout draws it.
+    single = {reaction: shifted(places[0]) for reaction, places in atlas.items() if len(places) == 1}
+    alias: Dict[str, str] = {}
+    for reaction, places in ours.items():
+        if reaction in atlas:
+            continue
+        found = {
+            other
+            for place in places
+            for other, there in single.items()
+            if other not in ours and _near(place, [there])
+        }
+        if len(found) == 1 and len(places) == 1:
+            alias[found.pop()] = reaction
 
     # A reaction keeps its paths where it sits exactly where Metabolic Atlas draws it.
     misplaced = {
         reaction
         for reaction, places in atlas.items()
-        if reaction not in ours or not all(_near(shifted(place), ours[reaction]) for place in places)
+        if reaction not in alias
+        and (reaction not in ours or not all(_near(shifted(place), ours[reaction]) for place in places))
     }
     # Each reaction's metabolites in the SVG, and whether the layout draws each.
     partners: Dict[str, List[Tuple[Point, bool]]] = defaultdict(list)
@@ -202,7 +235,7 @@ def import_map(svg_path: Path, layout_path: Path, kind: str) -> Tuple[dict, dict
         target = links if kind_of_path == "fe" else heads
         for line in polylines(d):
             if reaches_a_drawn_metabolite(reaction, line):
-                target[reaction].append(_flat(line, offset))
+                target[alias.get(reaction, reaction)].append(_flat(line, offset))
             else:
                 dropped += 1
 
@@ -219,14 +252,17 @@ def import_map(svg_path: Path, layout_path: Path, kind: str) -> Tuple[dict, dict
         "links": dict(sorted(links.items())),
         "heads": dict(sorted(heads.items())),
         "subsystems": subsystems,
+        "metabolites": drawn_as_metabolites,
     }
     report = {
         "map": f"{kind}/{name}",
         "reactions": len(ours),
         "routed": len(links),
+        "routed_by_place": len(set(alias.values()) & set(links)),
         "kept_straight": len(set(ours) - set(links)),
         "dropped": dropped,
         "subsystems": len(subsystems),
+        "metabolites": len(drawn_as_metabolites),
     }
     return data, report
 
@@ -249,8 +285,10 @@ def main(argv=None) -> int:
             target = layout_path.with_name(f"{layout_path.stem}.atlas.json")
             text = json.dumps(data, separators=(",", ":"))
             print(
-                f"{report['map']}: {report['routed']} of {report['reactions']} reactions routed, "
+                f"{report['map']}: {report['routed']} of {report['reactions']} reactions routed "
+                f"({report['routed_by_place']} by place), "
                 f"{report['dropped']} paths to undrawn metabolites left out, "
+                f"{report['metabolites']} metabolites drawn as reactions, "
                 f"{report['subsystems']} subsystem bands, {len(text) / 1e6:.2f} MB"
             )
             if not args.check:

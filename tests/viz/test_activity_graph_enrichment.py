@@ -18,8 +18,13 @@ from metabis import (
     plot_subsystem_activity_ranking,
 )
 from metabis.viz.metabolic_visualization import EnrichmentConfig
-from metabis.viz.ranking_layout import RANKING_DOTS, RANKING_NAMES, RANKING_PLOT
 from metabis.viz.plot_subsystem_ranking import _saturating_axis_bounds
+from metabis.viz.ranking_layout import (
+    RANKING_DOTS,
+    RANKING_NAMES,
+    RANKING_PLOT,
+    RANKING_SCORE,
+)
 
 SUBSYSTEM_ID = "galactose_metabolism"
 
@@ -158,9 +163,10 @@ def test_activity_ranking_plots_measured_members_without_a_significance_filter(
     assert layout.select_one({"name": RANKING_NAMES}) is not None
     # The bottom axis carries the label; the title names the top one.
     assert plot.below[0].axis_label.startswith("Normalized group summary")
-    assert "Subsystem activity ranking - A" in plot.title.text
-    # Points pinned to the bounded axis are drawn as triangles, not silently moved;
-    # the diamond is the subsystem's own score.
+    assert plot.title.text == "Reaction activity in A"
+    # The subsystem's own score, as a diamond, takes a panel of its own.
+    assert layout.select_one({"name": RANKING_SCORE}) is not None
+    # Points pinned to the bounded axis are drawn as triangles, not silently moved.
     markers = set(plot.select_one({"name": RANKING_DOTS}).data_source.data["marker"])
     assert markers <= {"circle", "triangle"}
 

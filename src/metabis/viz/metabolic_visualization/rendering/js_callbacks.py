@@ -34,8 +34,8 @@ def _resolve_zoom_alpha_parameters(alpha_min, alpha_max, zoom_min, zoom_max):
 
 def _calculate_zoom_based_alpha(plot, alpha_min, alpha_max, zoom_min, zoom_max):
     """Compute the current label alpha from the plot viewport."""
-    x_span = plot.x_range.end - plot.x_range.start
-    y_span = plot.y_range.end - plot.y_range.start
+    x_span = abs(plot.x_range.end - plot.x_range.start)
+    y_span = abs(plot.y_range.end - plot.y_range.start)
     zoom_level = min(1.0, max(0.1, 1000.0 / max(x_span, y_span, 1e-9)))
 
     if zoom_level <= zoom_min:
@@ -131,8 +131,9 @@ def add_zoom_based_alpha_callback(
 
         // Calculate zoom level based on the range span
         // Smaller range = more zoomed in, larger range = more zoomed out
-        const x_span = x_range.end - x_range.start;
-        const y_span = y_range.end - y_range.start;
+        // A map's y-range runs downwards, so its span is negative.
+        const x_span = Math.abs(x_range.end - x_range.start);
+        const y_span = Math.abs(y_range.end - y_range.start);
         const zoom_level = Math.min(1.0, Math.max(0.1,
             1000.0 / Math.max(x_span, y_span, 1e-9)));
 
@@ -163,11 +164,13 @@ def add_zoom_based_alpha_callback(
         """,
     )
 
-    # Attach the callback to the plot's range changes
+    # Attach the callback to the plot's range changes, and to its first layout,
+    # for a view set after the labels were (compartment_maps.highlight_reactions).
     plot.x_range.js_on_change("start", callback)
     plot.x_range.js_on_change("end", callback)
     plot.y_range.js_on_change("start", callback)
     plot.y_range.js_on_change("end", callback)
+    plot.js_on_change("inner_width", callback)
 
 
 def add_factor_range_zoom_alpha_callback(

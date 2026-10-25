@@ -10,7 +10,6 @@ from bokeh.plotting import figure
 from metabis.viz.plot_subsystem_ranking import plot_subsystem_comparison
 from metabis.viz.ranking_layout import RANKING_ROWS_SOURCE
 from metabis.viz.subsystem_link import FOCUS_EVENT, FOCUS_SOURCE, add_network_focus_link
-
 from tests.viz.test_subsystem_ranking_hover import METRIC, SUBSYSTEM, _Workspace
 
 NAVIGATE = "metabis:navigate-subsystem"
@@ -70,10 +69,15 @@ def test_the_ranking_bands_its_rows_and_names_a_tapped_one():
     (band,) = taps[0].renderers
     (callback,) = band.data_source.selected.js_property_callbacks["change:indices"]
     assert callback.args["event"] == NAVIGATE
-    # Both panels band the focused row, from the same source.
+    # Every panel bands a search's matches from the same source, and outlines the
+    # row in focus, never filling it.
+    matched = layout.select_one({"name": "metabis-ranking-matched"})
+    drawn_by = [r for r in layout.select({"type": GlyphRenderer}) if getattr(r, "data_source", None) is matched]
+    assert len(drawn_by) == 3
     focused = layout.select_one({"name": "metabis-ranking-focused"})
-    drawn_by = [r for r in layout.select({"type": GlyphRenderer}) if getattr(r, "data_source", None) is focused]
-    assert len(drawn_by) == 2
+    assert not [r for r in layout.select({"type": GlyphRenderer}) if getattr(r, "data_source", None) is focused]
+    (outline,) = focused.js_property_callbacks["change:data"]
+    assert len(outline.args["panels"]) == 3 and "metabisGradient" in outline.code
 
 
 def test_only_the_networks_nodes_carry_its_subsystem_fields():
@@ -129,7 +133,12 @@ def _categories(plot):
 
 
 def test_a_tap_on_a_category_selects_it_and_the_network_follows():
-    from metabis.viz.subsystem_link import CATEGORY_CIRCLES, CATEGORY_EVENT, CATEGORY_HEXES
+    from metabis.viz.subsystem_link import (
+        CATEGORY_BADGE,
+        CATEGORY_CIRCLES,
+        CATEGORY_EVENT,
+        CATEGORY_HEXES,
+    )
 
     plot, _ = _network()
     _categories(plot)
@@ -143,6 +152,11 @@ def test_a_tap_on_a_category_selects_it_and_the_network_follows():
     assert circles.data["base_alpha"] == [0.4]
     (callback,) = focus.js_property_callbacks["change:data"]
     assert callback.args["circles"] is circles and callback.args["hexes"] is hexes
+    # The selected number takes the logo's hexagon, and the rings are outlined in
+    # its gradient as segments, never filled.
+    assert callback.args["badge"] is plot.select_one({"name": CATEGORY_BADGE})
+    assert set(callback.args["ring"].data) == {"x0", "y0", "x1", "y1", "color"}
+    assert "metabisRing" in callback.code and "tint" not in callback.code
     (tap,) = plot.js_event_callbacks["tap"]
     assert tap.args["event"] == CATEGORY_EVENT and tap.args["nodes"] is not None
 
@@ -183,9 +197,8 @@ def test_a_selected_categorys_subsystems_are_named_by_category():
     assert nodes.data["line_width"] == [1.4]
 
 
-def test_the_ranking_frames_and_heads_the_selected_category():
-    from bokeh.models import BoxAnnotation
-
+def test_the_ranking_outlines_and_heads_the_selected_category():
+    from metabis.viz.brand import SELECTED_HEXAGON
     from metabis.viz.ranking_layout import CHOSEN_CATEGORY, RANKING_HEADINGS_SOURCE
 
     stats = pd.DataFrame({"subsystem": [SUBSYSTEM], "delta_score": [1.4]})
@@ -201,40 +214,38 @@ def test_the_ranking_frames_and_heads_the_selected_category():
     (category,) = headings.data["category"]
     assert headings.data["factor"][0].startswith("heading:")
     chosen = layout.select_one({"name": CHOSEN_CATEGORY})
-    frames = [box for box in layout.select({"type": BoxAnnotation}) if box.name == f"metabis-frame:{category}"]
-    # A frame in each panel, and the names panel's hexagons, follow the chosen category.
-    followed = [
-        model
-        for callback in chosen.js_property_callbacks["change:data"]
-        for model in [*callback.args["frames"], callback.args["headings"]]
-        if model is not None
-    ]
-    assert all(frame in followed for frame in frames) and len(frames) == 2
-    assert any(
-        isinstance(model, ColumnDataSource) and "fill" in model.data for model in followed
-    )
+    callbacks = chosen.js_property_callbacks["change:data"]
+    # The heading takes the logo's hexagon; the rows are outlined across the panels
+    # by their category's edges.
+    heading = next(c for c in callbacks if "badge" in c.args)
+    assert heading.args["hexagon"] == SELECTED_HEXAGON
+    outline = next(c for c in callbacks if "edges" in c.args)
+    assert list(outline.args["edges"]) == [category]
 
 
-def test_the_summary_view_stands_alone_and_shares_the_selection():
-    from metabis.viz.ranking_layout import RANKING_HEADINGS_SOURCE, RANKING_PLOT
+def test_the_page_chooses_the_score_the_elements_or_both():
+    from metabis.viz.ranking_layout import RANKING_PARTS, RANKING_SCORE
 
     stats = pd.DataFrame({"subsystem": [SUBSYSTEM], "delta_score": [1.4]})
-    summary = plot_subsystem_comparison(
+    layout = plot_subsystem_comparison(
         data_manager=_Workspace(),
         subsystem_stats=stats,
         metric=METRIC,
         return_plot=True,
         navigation_event=NAVIGATE,
-        summary=True,
     )
-    text = _serialized_names(summary)
 
-    # The page scrolls and highlights it as it does the full ranking.
-    assert summary.name == RANKING_PLOT
-    assert FOCUS_SOURCE in text and RANKING_ROWS_SOURCE in text and RANKING_HEADINGS_SOURCE in text
+    parts = layout.select_one({"name": RANKING_PARTS})
+    assert parts.data == {"score": [True], "elements": [True]}
+    assert RANKING_PARTS in _serialized_names(layout)
+    (callback,) = parts.js_property_callbacks["change:data"]
+    assert callback.args["grid"] is layout
+    assert callback.args["score"] is layout.select_one({"name": RANKING_SCORE})
+    # Each diamond is drawn whole: the score axis reaches past the largest score.
+    score = callback.args["score"]
+    assert score.x_range.end >= 1.4 * 1.25 and score.x_range.start == -score.x_range.end
     diamonds = [
-        r for r in summary.select({"type": GlyphRenderer}) if "score" in getattr(r.data_source, "data", {})
+        r for r in score.select({"type": GlyphRenderer}) if "score" in getattr(r.data_source, "data", {})
     ]
     (diamond,) = diamonds
     assert diamond.glyph.line_color == "#000000"
-    assert diamond.data_source.data["score"] == [1.4]

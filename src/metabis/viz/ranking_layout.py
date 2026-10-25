@@ -4,8 +4,11 @@ A ranking lists every subsystem in its own row, grouped by category, as a forest
 plot lists its studies:
 
 * **Names in a panel of their own.** Each row's name is drawn right-aligned in a
-  panel beside the dots, which never pans with the data and, in the comparison
-  ranking, also holds each subsystem's Delta score.
+  panel of its own (:func:`names_panel`), which never pans with the data.
+* **Two parts beside them.** A summary score panel (:func:`score_panel`) marks each
+  subsystem's own score, such as its Delta score, as a diamond; an elements panel
+  spreads the row's reactions or genes as dots. The page shows either or both
+  (:func:`ranking_layout`), and the panels shown always fill the ranking's width.
 * **Categories as the network draws them.** Each category opens with its number
   from the network and its name, flush left and bold, and its rows sit in a frame
   with the border of the network's category circles, with a space before the next.
@@ -17,19 +20,16 @@ plot lists its studies:
   category is found in the same place, under the same number, in both; within one,
   the strongest score comes first.
 * **Axes at both ends.** The value axis is drawn above and below, so it is in view
-  wherever the column is scrolled.
+  wherever the column is scrolled; each panel's title stands over its zero.
 
 The network and the ranking also share one selection. Each figure holds a data
 source named :data:`FOCUS_SOURCE` that the page writes (the subsystem in focus,
 the matches of a search, and a selected category), and redraws its own highlight
 from it. Pointing at a subsystem in either figure dispatches :data:`FOCUS_EVENT`
-on ``window`` for the page to relay to both. A selected category fills its
-heading's hexagon and frames its rows in the logo's blue, as the network does.
-
-A ranking comes in two views. The full one (:func:`ranking_layout`) is the names
-panel, with each subsystem's summary score on a narrow axis, beside the dots of
-its reactions or genes. The summary one (:func:`summary_ranking`) is the names
-panel alone, the score on a wider axis, so the network can take more of the row.
+on ``window`` for the page to relay to both. The row in focus, and a selected
+category's rows, are outlined in the logo's gradient across the panels shown,
+never filled, and a selected category's number takes the logo's hexagon, as in
+the network.
 """
 
 from __future__ import annotations
@@ -55,6 +55,12 @@ from bokeh.models import (
 from bokeh.plotting import figure
 
 from ..visual_config import theme
+from .brand import GRADIENT_JS, OUTLINE_WIDTH, SELECTED_HEXAGON, SELECTED_HEXAGON_SIZE
+from .metabolic_visualization.generation.graph_building.spaced_network import (
+    category_numbers,
+    category_sort_key,
+)
+from .plot_utils import apply_academic_style
 from .subsystem_link import (
     FOCUS_EVENT,
     FOCUS_SOURCE,
@@ -63,11 +69,6 @@ from .subsystem_link import (
     focus_source,
     navigation_dispatch,
 )
-from .metabolic_visualization.generation.graph_building.spaced_network import (
-    category_numbers,
-    category_sort_key,
-)
-from .plot_utils import apply_academic_style
 
 # The page reads these to find a subsystem's row (web/src/bokeh/subsystemLink.ts).
 RANKING_ROWS_SOURCE = "metabis-ranking-rows"
@@ -78,7 +79,10 @@ RANKING_DOTS = "metabis-ranking-dots"
 RANKING_NAMES = "metabis-ranking-names"
 # Each category's first heading row, for the page to scroll a selected category to.
 RANKING_HEADINGS_SOURCE = "metabis-ranking-headings"
-# The category the shared selection names, which frames and headings follow.
+RANKING_SCORE = "metabis-ranking-score"
+# Which of the score and elements panels the page shows: {"score": [bool], "elements": [bool]}.
+RANKING_PARTS = "metabis-ranking-parts"
+# The category the shared selection names, which the outline and headings follow.
 CHOSEN_CATEGORY = "metabis-ranking-category"
 FRAME_PREFIX = "metabis-frame:"
 
@@ -88,12 +92,10 @@ FRAME_PREFIX = "metabis-frame:"
 NAME_LENGTH = 28
 ROW_HEIGHT = 30
 ROW_SHADE = theme.ROW_SHADE  # the client's --sheet, about DataTables' stripe
-FOCUS_SHADE = "#dceeff"  # the logo's blue, #4facfe, at 20% on white
 MATCH_SHADE = "#fff7bf"  # GOV.UK's yellow tag, the client's --warning-bg
 SUMMARY_COLOR = theme.INK
 FRAME_LINE = "#b1b4b6"  # the network's category circles (DEFAULT_CATEGORY_LINE_COLOR)
 FRAME_LINE_WIDTH = 1.2
-CHOSEN_LINE_WIDTH = 2.5  # a selected category's frame, in the logo's blue
 SPREAD = 0.56  # the share of a row the dots spread over
 
 # Pixels, about, per character of the 11 px names and the 13 px bold headings
@@ -104,8 +106,10 @@ HEADING_FONT_SIZE = "13px"
 NAME_FONT_SIZE = "11px"
 BADGE_WIDTH = 26  # from the panel's edge to a heading's first letter
 HEXAGON_SIZE = 19  # pixels across a heading's hexagon, the network's category mark
-SUMMARY_FRAME_WIDTH = 84  # the Delta score's own axis, right of the names
-SUMMARY_TAB_WIDTH = 190  # the same axis in the summary view, which has no dots
+SCORE_WIDTH = 120  # the score panel beside the elements; alone it takes the width
+# The score axis reaches past the largest score by this share, so a diamond at
+# either end is drawn whole inside the frame.
+SCORE_REACH = 1.25
 DIAMOND_EDGE = "#000000"
 NAMES_MIN_WIDTH = 240  # room for a heading of about 30 characters on one line
 
@@ -171,24 +175,21 @@ def wrapped_name(name: str, length: int = NAME_LENGTH) -> str:
     return "\n".join([balanced[0], " ".join(balanced[1:])])
 
 
-def panel_width(names_width: int, scores: bool, summary_width: int = SUMMARY_FRAME_WIDTH) -> int:
-    """The names panel's width: the names, and the Delta score's axis when it has one."""
-    return max(names_width + (summary_width if scores else 0), NAMES_MIN_WIDTH)
+def panel_width(names_width: int) -> int:
+    """The names panel's width: the longest name line, or room for a heading."""
+    return max(names_width, NAMES_MIN_WIDTH)
 
 
 def order_rows(
     entries: Iterable[RankedSubsystem],
     *,
     numbers: Optional[Mapping[str, int]] = None,
-    scores: bool = True,
 ) -> RankingRows:
     """Categories in the network's order; within one, the strongest score first.
 
     ``numbers`` are the network's category numbers (:func:`category_numbers` over
     every category in use), so a ranking that lists only some categories keeps
-    their numbers; without them the categories listed are numbered. ``scores``
-    says whether the names panel also holds a score, which sets its width and so
-    where a heading wraps.
+    their numbers; without them the categories listed are numbered.
     """
     by_category: Dict[str, List[RankedSubsystem]] = {}
     for entry in entries:
@@ -226,7 +227,7 @@ def order_rows(
         )
         * NAME_CHARACTER_WIDTH
     ) + 20
-    heading_room = panel_width(rows.names_width, scores) - BADGE_WIDTH - 8
+    heading_room = panel_width(rows.names_width) - BADGE_WIDTH - 8
     heading_length = max(12, int(heading_room / HEADING_CHARACTER_WIDTH))
 
     for index, (category, members) in enumerate(ordered.items()):
@@ -369,38 +370,18 @@ def frame_categories(plot, rows: RankingRows, *, zero_line: bool = True) -> None
 def names_panel(
     rows: RankingRows,
     plot,
-    scores: Optional[Mapping[str, float]] = None,
     *,
-    title: str,
-    x_label: str,
+    title: str = "",
+    x_label: str = "",
     navigation_event: Optional[str] = None,
-    colors: Optional[Mapping[str, str]] = None,
-    summary_width: int = SUMMARY_FRAME_WIDTH,
 ):
-    """The row names and category headings, beside the dots, and each Delta score.
+    """The row names and category headings, sharing ``plot``'s rows.
 
-    The names never pan with the dots: they take a panel of their own, sharing the
-    dots' rows. A summary score is on its own scale (a Delta score runs from -1 to
-    +1 under the sign transform), so given ``scores`` the panel also marks it, on
-    its own axis right of the names, rather than as a second axis over the dots.
-    Each score is a diamond with a black edge, filled with ``colors`` (its node's
-    colour in the network) where given. Without scores, the axes stay for the space
-    they take, so the two panels' rows line up, but draw nothing. With ``plot``
-    ``None`` the panel stands alone, as the summary view (:func:`summary_ranking`).
+    The names never pan with the data: they take a panel of their own. Its axes
+    stay for the space they take, so the panels' rows line up, but draw nothing.
     """
-    width = panel_width(rows.names_width, scores is not None, summary_width)
-    if scores is not None:
-        reach = max([1.0, *(abs(float(v)) for v in scores.values())]) * 1.08
-        names = width - summary_width
-        start = -reach - 2 * reach * names / summary_width
-        x_range = Range1d(start, reach)
-        names_right = -reach
-    else:
-        x_range = Range1d(0, width)
-        start = 0.0
-        names_right = float(width)
-
-    alone = plot is None
+    width = panel_width(rows.names_width)
+    x_range = Range1d(0, width)
     panel = ranking_figure(
         rows,
         title=title,
@@ -409,43 +390,25 @@ def names_panel(
         width=width,
         sizing_mode=None,
         tools="save",
-        name=RANKING_PLOT if alone else RANKING_NAMES,
-        zero_line=scores is not None,
+        name=RANKING_NAMES,
+        zero_line=False,
     )
     panel.min_border_left = 0
     panel.min_border_right = 0
-    if alone:
-        add_focus_link(panel, rows, navigation_event=navigation_event)
-        plot = panel
-    else:
-        panel.toolbar_location = None
-        panel.y_range = plot.y_range
-    if scores is None:
-        for axis in panel.xaxis:
-            axis.ticker = FixedTicker(ticks=[width / 2])
-            axis.major_label_text_alpha = 0
-            axis.major_tick_line_color = None
-            axis.axis_line_color = None
-            axis.axis_label_text_alpha = 0
-        panel.xgrid.grid_line_color = None
-    else:
-        reach_tick = round(reach / 1.08, 2)
-        for axis in panel.xaxis:
-            axis.ticker = FixedTicker(ticks=[-reach_tick, 0.0, reach_tick])
-        # Zero is each frame's dashed line; a grid line there would cover it.
-        panel.xgrid.ticker = FixedTicker(ticks=[-reach_tick, reach_tick])
-
-    if not alone:
-        matched = plot.select_one({"name": MATCHED_ROWS})
-        focused = plot.select_one({"name": FOCUSED_ROWS})
-        if matched is not None and focused is not None:
-            highlight_rows(panel, matched, focused)
-        if rows.factor_of:
-            _row_bands(panel, rows, navigation_event)
+    panel.toolbar_location = None
+    panel.y_range = plot.y_range
+    for axis in panel.xaxis:
+        axis.ticker = FixedTicker(ticks=[width / 2])
+        axis.major_label_text_alpha = 0
+        axis.major_tick_line_color = None
+        axis.axis_line_color = None
+        axis.axis_label_text_alpha = 0
+    panel.xgrid.grid_line_color = None
+    _share_highlights(panel, plot, rows, navigation_event)
 
     font = value(theme.FONT)
     panel.text(
-        x=names_right,
+        x=float(width),
         y="y",
         text="text",
         source=ColumnDataSource(
@@ -470,13 +433,12 @@ def names_panel(
             "text": [heading.text for heading in rows.headings],
             "number": [str(heading.number) for heading in rows.headings],
             "category": [heading.category for heading in rows.headings],
-            "x": [start + BADGE_WIDTH / 2 * (x_range.end - x_range.start) / width] * len(anchors),
-            "fill": [theme.INK_NODE] * len(anchors),
-            "ink": ["#ffffff"] * len(anchors),
+            "x": [BADGE_WIDTH / 2] * len(anchors),
+            "alpha": [1.0] * len(anchors),
         }
     )
     panel.text(
-        x=start,
+        x=0.0,
         y="y",
         text="text",
         source=headings,
@@ -490,7 +452,7 @@ def names_panel(
         text_line_height=1.1,
     )
     # The category's number in the hexagon the network draws on the category's
-    # rim, as the side menu numbers the steps.
+    # rim, as the side menu numbers the steps; once selected, in the logo's.
     panel.scatter(
         x="x",
         y="y",
@@ -498,9 +460,23 @@ def names_panel(
         marker="hex",
         angle=math.pi / 6,
         size=HEXAGON_SIZE,
-        fill_color="fill",
+        fill_color=theme.INK_NODE,
+        fill_alpha="alpha",
         line_color=theme.SELECTED,
+        line_alpha="alpha",
         line_width=1.5,
+    )
+    badge = ColumnDataSource({"url": [], "x": [], "y": []})
+    panel.image_url(
+        url="url",
+        x="x",
+        y="y",
+        w=SELECTED_HEXAGON_SIZE,
+        h=SELECTED_HEXAGON_SIZE,
+        w_units="screen",
+        h_units="screen",
+        anchor="center",
+        source=badge,
     )
     panel.text(
         x="x",
@@ -512,35 +488,114 @@ def names_panel(
         text_font=font,
         text_font_size="10px",
         text_font_style="bold",
-        text_color="ink",
+        text_color="#ffffff",
     )
     chosen = plot.select_one({"name": CHOSEN_CATEGORY})
     if chosen is not None:
-        follow_category(panel, chosen, headings)
-
-    if scores is not None:
-        ids = [sid for sid in rows.factor_of if sid in scores]
-        diamonds = panel.scatter(
-            x="score",
-            y="y",
-            source=ColumnDataSource(
-                {
-                    "score": [float(scores[sid]) for sid in ids],
-                    "y": [rows.factor_of[sid] for sid in ids],
-                    "name": [rows.name_of.get(sid, rows.factor_of[sid]) for sid in ids],
-                    "color": [(colors or {}).get(sid) or SUMMARY_COLOR for sid in ids],
-                }
-            ),
-            marker="diamond",
-            size=13,
-            fill_color="color",
-            line_color=DIAMOND_EDGE,
-            line_width=1,
-        )
-        panel.add_tools(
-            HoverTool(renderers=[diamonds], tooltips=[("", "@name"), (title, "@score{0.00}")])
-        )
+        follow_category(chosen, headings, badge)
     return panel
+
+
+def score_panel(
+    rows: RankingRows,
+    plot,
+    scores: Mapping[str, float],
+    *,
+    title: str,
+    x_label: str,
+    colors: Optional[Mapping[str, str]] = None,
+    navigation_event: Optional[str] = None,
+    x_range: Optional[Range1d] = None,
+):
+    """Each subsystem's own score as a diamond, on an axis of its own, sharing ``plot``'s rows.
+
+    A summary score is on its own scale (a Delta score runs from -1 to +1 under
+    the sign transform), so it takes a panel of its own rather than a second axis
+    over the elements. Each diamond has a black edge and is filled with
+    ``colors`` (its node's colour in the network) where given. By default the axis
+    is symmetric and reaches past the largest score, so a diamond at either end
+    is drawn whole; ``x_range`` sets another, such as the members' own.
+    """
+    largest = max([1.0, *(abs(float(v)) for v in scores.values())])
+    reach = largest * SCORE_REACH
+    panel = ranking_figure(
+        rows,
+        title=title,
+        x_range=x_range if x_range is not None else Range1d(-reach, reach),
+        x_label=x_label,
+        width=SCORE_WIDTH,
+        sizing_mode="stretch_width",
+        tools="save",
+        name=RANKING_SCORE,
+    )
+    panel.toolbar_location = None
+    panel.y_range = plot.y_range
+    if x_range is None:
+        tick = round(largest, 2)
+        for axis in panel.xaxis:
+            axis.ticker = FixedTicker(ticks=[-tick, 0.0, tick])
+        # Zero is each frame's dashed line; a grid line there would cover it.
+        panel.xgrid.ticker = FixedTicker(ticks=[-tick, tick])
+    _share_highlights(panel, plot, rows, navigation_event)
+    ids = [sid for sid in rows.factor_of if sid in scores]
+    diamonds = panel.scatter(
+        x="score",
+        y="y",
+        source=ColumnDataSource(
+            {
+                "score": [float(scores[sid]) for sid in ids],
+                "y": [rows.factor_of[sid] for sid in ids],
+                "name": [rows.name_of.get(sid, rows.factor_of[sid]) for sid in ids],
+                "color": [(colors or {}).get(sid) or SUMMARY_COLOR for sid in ids],
+            }
+        ),
+        marker="diamond",
+        size=13,
+        fill_color="color",
+        line_color=DIAMOND_EDGE,
+        line_width=1,
+    )
+    panel.add_tools(
+        HoverTool(renderers=[diamonds], tooltips=[("", "@name"), (title, "@score{0.00}")])
+    )
+    center_title_on_zero(panel)
+    return panel
+
+
+def _share_highlights(panel, plot, rows: RankingRows, navigation_event: Optional[str]) -> None:
+    """A panel beside ``plot`` bands a search's matches as ``plot`` does, and takes its pointing."""
+    matched = plot.select_one({"name": MATCHED_ROWS})
+    if matched is not None:
+        highlight_rows(panel, matched)
+    if rows.factor_of:
+        _row_bands(panel, rows, navigation_event)
+
+
+def center_title_on_zero(plot) -> None:
+    """Stand the title over the axis' zero, as near as the frame allows.
+
+    Bokeh ignores a centred title's offset, so the title stays left-aligned and
+    moves by its own measured width.
+    """
+    plot.title.align = "left"
+    callback = CustomJS(
+        args=dict(plot=plot),
+        code="""
+        let width
+        try { width = plot.inner_width } catch { return }
+        const {start, end} = plot.x_range
+        if (!(width > 0) || end === start) return
+        const title = plot.title
+        const context = document.createElement('canvas').getContext('2d')
+        context.font = `${title.text_font_style} ${title.text_font_size} ${title.text_font}`
+        const text = context.measureText(title.text).width
+        const zero = (0 - start) / (end - start) * width
+        title.offset = Math.round(Math.min(Math.max(zero - text / 2, 0), Math.max(width - text, 0)))
+        """,
+    )
+    for attribute in ("start", "end"):
+        plot.x_range.js_on_change(attribute, callback)
+    plot.js_on_change("inner_width", callback)
 
 
 def add_focus_link(
@@ -550,7 +605,7 @@ def add_focus_link(
 
     Pointing at a row dispatches :data:`FOCUS_EVENT`, and tapping it dispatches
     ``navigation_event`` when given; the page writes the shared selection into the
-    returned source, and the bands follow it.
+    returned source, and the bands and outlines follow it.
     """
     ids = list(rows.factor_of)
     factors = [rows.factor_of[sid] for sid in ids]
@@ -566,7 +621,7 @@ def add_focus_link(
     matched = ColumnDataSource({"y": []}, name=MATCHED_ROWS)
     focused = ColumnDataSource({"y": []}, name=FOCUSED_ROWS)
     chosen = ColumnDataSource({"category": []}, name=CHOSEN_CATEGORY)
-    highlight_rows(plot, matched, focused)
+    highlight_rows(plot, matched)
     focus.js_on_change(
         "data",
         CustomJS(
@@ -583,7 +638,6 @@ def add_focus_link(
             """,
         ),
     )
-    follow_category(plot, chosen)
     _row_bands(plot, rows, navigation_event)
     attach(plot, focus)
     attach(plot, lookup)
@@ -592,45 +646,106 @@ def add_focus_link(
     return focus
 
 
-def follow_category(plot, chosen: ColumnDataSource, headings: Optional[ColumnDataSource] = None) -> None:
-    """Frame the chosen category's rows, and fill its heading's hexagon, in the logo's blue."""
-    frames = [
-        box
-        for box in plot.select(type=BoxAnnotation)
-        if isinstance(box.name, str) and box.name.startswith(FRAME_PREFIX)
-    ]
+def follow_category(chosen: ColumnDataSource, headings: ColumnDataSource, badge: ColumnDataSource) -> None:
+    """Give the chosen category's heading the logo's hexagon, as the network gives its number."""
     chosen.js_on_change(
         "data",
         CustomJS(
-            args=dict(
-                chosen=chosen,
-                frames=frames,
-                headings=headings,
-                prefix=FRAME_PREFIX,
-                selected=theme.SELECTED,
-                tint=theme.SELECTED_TINT,
-                line=FRAME_LINE,
-                width=FRAME_LINE_WIDTH,
-                chosen_width=CHOSEN_LINE_WIDTH,
-                ink=theme.INK_NODE,
-            ),
+            args=dict(chosen=chosen, headings=headings, badge=badge, hexagon=SELECTED_HEXAGON),
             code="""
             const category = chosen.data.category[0] ?? null
-            for (const frame of frames) {
-              const on = frame.name === prefix + category
-              frame.line_color = on ? selected : line
-              frame.line_width = on ? chosen_width : width
-              frame.fill_color = tint
-              frame.fill_alpha = on ? 0.6 : 0
-            }
-            if (headings) {
-              headings.data.fill = headings.data.category.map((name) => name === category ? selected : ink)
-              headings.data.ink = headings.data.category.map((name) => name === category ? ink : '#ffffff')
-              headings.change.emit()
-            }
+            const h = headings.data
+            h.alpha = h.category.map((name) => name === category ? 0 : 1)
+            headings.change.emit()
+            const i = h.category.indexOf(category)
+            badge.data = i < 0 ? {url: [], x: [], y: []} : {url: [hexagon], x: [h.x[i]], y: [h.y[i]]}
             """,
         ),
     )
+
+
+def outline_selection(panels: List, rows: RankingRows, chosen: ColumnDataSource, focused: ColumnDataSource) -> None:
+    """Outline the row in focus, and a selected category's rows, in the logo's gradient.
+
+    Each shown panel draws its part of the outline, a box round the rows; the
+    gradient runs from the first shown panel's left to the last one's right, as if
+    they were one.
+    """
+    sources = []
+    for panel in panels:
+        source = ColumnDataSource({key: [] for key in ("x0", "y0", "x1", "y1", "color")})
+        panel.segment(
+            x0="x0",
+            y0="y0",
+            x1="x1",
+            y1="y1",
+            line_color="color",
+            line_width=OUTLINE_WIDTH,
+            line_cap="round",
+            level="annotation",
+            source=source,
+        )
+        sources.append(source)
+    edges = {category: list(rows.edges(category)) for category in rows.members}
+    callback = CustomJS(
+        args=dict(panels=panels, sources=sources, chosen=chosen, focused=focused, edges=edges, edge=OUTLINE_WIDTH),
+        code=GRADIENT_JS
+        + """
+        const shown = panels.map((panel) => panel.visible !== false)
+        let widths
+        try { widths = panels.map((panel, k) => shown[k] ? panel.inner_width : 0) } catch { return }
+        const total = widths.reduce((a, b) => a + b, 0)
+        if (!(total > 0)) return
+        const boxes = []
+        const category = chosen.data.category[0]
+        if (category != null && edges[category]) boxes.push(edges[category])
+        const factors = panels[0].y_range.factors
+        for (const factor of focused.data.y) {
+          const i = factors.indexOf(factor)
+          if (i >= 0) boxes.push([i, i + 1])
+        }
+        let offset = 0
+        panels.forEach((panel, k) => {
+          const out = {x0: [], y0: [], x1: [], y1: [], color: []}
+          const width = widths[k]
+          if (shown[k] && width > 0 && boxes.length) {
+            const start = Math.min(panel.x_range.start, panel.x_range.end)
+            const end = Math.max(panel.x_range.start, panel.x_range.end)
+            // Inset by half the outline, so the frame does not cut its sides.
+            const inset = edge / 2 * (end - start) / width
+            const left = start + inset
+            const right = end - inset
+            const at = (f) => metabisGradient((offset + f * width) / total)
+            const pieces = 16
+            for (const [bottom, top] of boxes) {
+              for (const y of [bottom, top]) {
+                for (let i = 0; i < pieces; i++) {
+                  out.x0.push(left + (right - left) * i / pieces)
+                  out.x1.push(left + (right - left) * (i + 1) / pieces)
+                  out.y0.push(y)
+                  out.y1.push(y)
+                  out.color.push(at((i + 0.5) / pieces))
+                }
+              }
+              out.x0.push(left, right)
+              out.x1.push(left, right)
+              out.y0.push(bottom, bottom)
+              out.y1.push(top, top)
+              out.color.push(at(0), at(1))
+            }
+          }
+          if (shown[k]) offset += width
+          sources[k].data = out
+        })
+        """,
+    )
+    chosen.js_on_change("data", callback)
+    focused.js_on_change("data", callback)
+    for panel in panels:
+        panel.js_on_change("inner_width", callback)
+        panel.js_on_change("visible", callback)
+        for attribute in ("start", "end"):
+            panel.x_range.js_on_change(attribute, callback)
 
 
 def _row_bands(plot, rows: RankingRows, navigation_event: Optional[str]) -> None:
@@ -659,64 +774,67 @@ def _row_bands(plot, rows: RankingRows, navigation_event: Optional[str]) -> None
         hits.selected.js_on_change("indices", navigation_dispatch(hits, navigation_event))
 
 
-def highlight_rows(plot, matched: ColumnDataSource, focused: ColumnDataSource) -> None:
-    """Bands behind a search's matches and the subsystem in focus, across ``plot``."""
+def highlight_rows(plot, matched: ColumnDataSource) -> None:
+    """Bands behind a search's matches, across ``plot``, in GOV.UK's yellow."""
     span = (plot.x_range.start - 1e6, plot.x_range.end + 1e6)
-    for source, color in ((matched, MATCH_SHADE), (focused, FOCUS_SHADE)):
-        plot.hbar(
-            y="y",
-            left=span[0],
-            right=span[1],
-            height=1.0,
-            fill_color=color,
-            line_color=None,
-            level="underlay",
-            source=source,
-        )
-
-
-def summary_ranking(
-    rows: RankingRows,
-    scores: Mapping[str, float],
-    *,
-    title: str,
-    x_label: str,
-    colors: Optional[Mapping[str, str]] = None,
-    navigation_event: Optional[str] = None,
-):
-    """The names panel alone, each subsystem's score on a wider axis and no dots.
-
-    It holds the same selection as the full ranking, so the page links it to the
-    network the same way.
-    """
-    return names_panel(
-        rows,
-        None,
-        scores,
-        title=title,
-        x_label=x_label,
-        navigation_event=navigation_event,
-        colors=colors,
-        summary_width=SUMMARY_TAB_WIDTH,
+    plot.hbar(
+        y="y",
+        left=span[0],
+        right=span[1],
+        height=1.0,
+        fill_color=MATCH_SHADE,
+        line_color=None,
+        level="underlay",
+        source=matched,
     )
 
 
-def ranking_layout(names, plot):
-    """The names panel and the dots side by side, sharing their rows.
+def ranking_layout(rows: RankingRows, names, plot, score=None):
+    """The names panel, the score panel when there is one, and the elements, sharing their rows.
 
-    One toolbar serves both, and its save button exports the whole grid, names
-    included: BokehJS's SaveTool exports the view that owns its toolbar.
+    One toolbar serves them all, and its save button exports the whole grid, names
+    included: BokehJS's SaveTool exports the view that owns its toolbar. With a
+    score panel, the page shows the score, the elements, or both, by writing
+    :data:`RANKING_PARTS`; the panels shown always fill the width, the elements
+    taking what the names and a narrow score leave, or the score all of it.
     """
     from bokeh.layouts import gridplot
 
+    panels = [names, *([score] if score is not None else []), plot]
     grid = gridplot(
-        [[names, plot]],
+        [panels],
         merge_tools=True,
         toolbar_location="above",
         sizing_mode="stretch_width",
     )
-    # The names keep their width; the dots take the rest.
-    grid.cols = [f"{names.width}px", "1fr"]
+    # The names keep their width; the elements take the rest.
+    grid.cols = [f"{names.width}px", *([f"{SCORE_WIDTH}px"] if score is not None else []), "1fr"]
+    center_title_on_zero(plot)
+    chosen = plot.select_one({"name": CHOSEN_CATEGORY})
+    focused = plot.select_one({"name": FOCUSED_ROWS})
+    if chosen is not None and focused is not None:
+        outline_selection(panels, rows, chosen, focused)
+    if score is not None:
+        parts = ColumnDataSource({"score": [True], "elements": [True]}, name=RANKING_PARTS)
+        parts.js_on_change(
+            "data",
+            CustomJS(
+                args=dict(parts=parts, grid=grid, names=names, score=score, elements=plot, width=SCORE_WIDTH),
+                code="""
+                const showScore = parts.data.score[0] !== false
+                // One part is always shown.
+                const showElements = parts.data.elements[0] !== false || !showScore
+                score.visible = showScore
+                elements.visible = showElements
+                grid.cols = [
+                  `${names.width}px`,
+                  showScore ? (showElements ? `${width}px` : '1fr') : '0px',
+                  showElements ? '1fr' : '0px',
+                ]
+                """,
+            ),
+        )
+        attach(plot, parts)
     return grid
 
 
@@ -728,18 +846,22 @@ __all__ = [
     "RANKING_DOTS",
     "RANKING_HEADINGS_SOURCE",
     "RANKING_NAMES",
+    "RANKING_PARTS",
     "RANKING_PLOT",
     "RANKING_ROWS_SOURCE",
+    "RANKING_SCORE",
     "RankedSubsystem",
     "RankingRows",
     "add_focus_link",
+    "center_title_on_zero",
     "follow_category",
     "frame_categories",
     "names_panel",
     "order_rows",
+    "outline_selection",
     "ranking_figure",
     "ranking_layout",
+    "score_panel",
     "shade_rows",
     "spread_offset",
-    "summary_ranking",
 ]

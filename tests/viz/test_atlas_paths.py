@@ -101,3 +101,118 @@ def test_a_routed_reaction_is_drawn_along_its_paths_in_its_links_style():
     assert lines.data["color"] == ["#ff0000"] and lines.data["reaction_id"] == ["R1"]
     heads = next(s for s in sources if "glow_alpha" not in s.data)
     assert heads.data["xs"] == [[10.0, 9.0]]
+
+
+def test_a_glyph_on_an_atlas_metabolite_is_a_metabolite_and_a_renamed_reaction_takes_its_paths(tmp_path):
+    svg = tmp_path / "golgi.svg"
+    svg.write_text(
+        SVG.replace('<path class="fe R2" d="M310 300l40 0"/>', '<path class="fe MAR9" d="M710 700l40 0"/>')
+        .replace('<g id="R5" class="rea">', '<g id="MAR9" class="rea">')
+        + '<g class="met dolp_U_r R1" transform="matrix(1,0,0,1,300.0,100.0)"><circle/></g>'
+    )
+    layout = tmp_path / "golgi.json"
+    layout.write_text(
+        json.dumps(
+            {
+                "glyphs": [
+                    {"id": "R1", "glyph_class": "reaction", "x": 105.0, "y": 107.0},
+                    {"id": "R2", "glyph_class": "reaction", "x": 305.0, "y": 307.0},
+                    {"id": "R4", "glyph_class": "reaction", "x": 505.0, "y": 507.0},
+                    # Recon3D names for a reaction drawn where MAR9 is, and a metabolite.
+                    {"id": "DOLPMT_U", "glyph_class": "reaction", "x": 705.0, "y": 707.0},
+                    {"id": "dolp_U_r", "glyph_class": "reaction", "x": 305.0, "y": 107.0},
+                    {"id": "m1", "glyph_class": "metabolite", "x": 165.0, "y": 107.0},
+                ],
+                "connections": [],
+            }
+        )
+    )
+    data, report = _importer().import_map(svg, layout, "compartment")
+
+    assert data["metabolites"] == ["dolp_U_r"]
+    assert data["links"]["DOLPMT_U"] == [[715.0, 707.0, 755.0, 707.0]]
+    assert report["routed_by_place"] == 1
+
+
+def test_a_layouts_metabolites_drawn_as_reactions_load_as_metabolites():
+    from metabis.viz.metabolic_visualization.generation.utilities.cache_utils import (
+        load_graph_resource,
+    )
+
+    layout = (
+        Path(__file__).resolve().parents[2]
+        / "src/metabis/resources/graphs/compartment/human1/endoplasmic_reticulum.json"
+    )
+    glyphs, _connections = load_graph_resource(str(layout))
+    classes = {glyph["id"]: glyph["glyph_class"] for glyph in glyphs}
+
+    assert classes["dolp_U_r"] == "metabolite" and classes["DOLPMT_U"] == "reaction"
+
+
+def test_a_long_straight_link_ends_at_a_copy_of_its_far_node():
+    from metabis.viz.metabolic_visualization.generation.data_structures.constants import (
+        VisualizationConstants,
+    )
+    from metabis.viz.metabolic_visualization.rendering.bokeh_plotting import (
+        _local_copies,
+    )
+
+    glyphs = [
+        {"id": "hub", "glyph_class": "metabolite", "x": 0.0, "y": 0.0, "display_label": "dolichyl phosphate"},
+        {"id": "R1", "glyph_class": "reaction", "x": 5000.0, "y": 0.0},
+        {"id": "R2", "glyph_class": "reaction", "x": 0.0, "y": 5000.0},
+        {"id": "R3", "glyph_class": "reaction", "x": 100.0, "y": 0.0},
+    ]
+    link = dict(connection_class="metabolic", color="#ff0000", line_alpha=1.0, arrowhead_xs=[1], arrowhead_ys=[1])
+    connections = [
+        {**link, "source": "R1", "target": "hub", "x0": 5000.0, "y0": 0.0, "x1": 0.0, "y1": 0.0},
+        {**link, "source": "R2", "target": "hub", "x0": 0.0, "y0": 5000.0, "x1": 0.0, "y1": 0.0},
+        {**link, "source": "R3", "target": "hub", "x0": 100.0, "y0": 0.0, "x1": 0.0, "y1": 0.0},
+    ]
+
+    glyphs, connections = _local_copies(glyphs, connections, {"links": {}})
+
+    copies = [glyph for glyph in glyphs if glyph.get("is_local_copy")]
+    stub = VisualizationConstants.LOCAL_COPY_STUB
+    assert [(c["id"], c["x"], c["y"]) for c in copies] == [("hub", 5000.0 - stub, 0.0), ("hub", 0.0, 5000.0 - stub)]
+    assert all(c["display_label"] == "dolichyl phosphate" for c in copies)
+    # The links end at the copies, their arrowheads with them; the short one stays.
+    assert all(abs(c["x1"] - c["x0"]) + abs(c["y1"] - c["y0"]) <= stub for c in connections[:2])
+    assert connections[0]["arrowhead_xs"][0] == connections[0]["x1"]
+    assert connections[2]["x0"] == 100.0
+
+
+def test_a_reaction_is_a_diamond_taller_than_wide():
+    from bokeh.models import Patches
+
+    from metabis.viz.metabolic_visualization.rendering.bokeh_plotting import (
+        _draw_enriched_reactions,
+    )
+
+    plot = figure()
+    glyph = {
+        "id": "MAR04370",
+        "glyph_class": "reaction",
+        "x": 0.0,
+        "y": 0.0,
+        "alpha": 1.0,
+        "display_label": "MAR04370",
+        "color": "#ff0000",
+        "size": 40.0,
+    }
+    _draw_enriched_reactions(plot, [glyph])
+    (diamond,) = [r for r in plot.renderers if isinstance(r.glyph, Patches)]
+    xs, ys = diamond.data_source.data["xs"][0], diamond.data_source.data["ys"][0]
+
+    assert (max(ys) - min(ys)) / (max(xs) - min(xs)) == 1.5
+    # As the source keeps each reaction's place, a map still finds and frames it.
+    assert diamond.data_source.data["x"] == [0.0] and "angle" in diamond.data_source.data
+
+
+def test_the_logos_gradient_runs_from_its_blue_to_its_cyan():
+    from metabis.viz.brand import gradient_color, gradient_segments
+
+    assert gradient_color(0) == "#4facfe" and gradient_color(1) == "#00f2fe"
+    pieces = gradient_segments([[0.0, 0.0, 300.0, 0.0]], piece=100.0)
+    assert len(pieces["x0"]) == 3
+    assert pieces["color"][0] != pieces["color"][-1]
