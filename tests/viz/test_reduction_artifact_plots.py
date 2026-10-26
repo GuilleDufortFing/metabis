@@ -207,32 +207,45 @@ def test_variance_uses_exact_artifact_values_and_selected_component_limit():
     assert "first 2 of 3 PCs" in plot.title.text
 
 
-def test_loadings_name_the_strongest_of_each_sign_per_component():
-    plot = plot_pca_loadings_artifact(artifact(), presentation())
+def _cells(plot):
     source = source_with(plot, "loading")
-    rows = list(reversed(plot.y_range.factors))
-
-    # Two components, each a header row then its strongest positive and negative.
-    assert rows[0] == "PC1 (60.0%)"
-    assert "PC2 (30.0%)" in rows
-    by_component = {
-        (pc, feature): loading
-        for pc, feature, loading in zip(
-            source.data["PC"], source.data["feature_id"], source.data["loading"]
+    return {
+        (feature, component.split(" ")[0]): loading
+        for feature, component, loading in zip(
+            source.data["feature_id"], source.data["component"], source.data["loading"]
         )
     }
-    assert by_component == {
-        ("PC1", "R1"): 0.9,
-        ("PC1", "R3"): -0.1,
-        ("PC2", "R3"): 0.4,
-        ("PC2", "R2"): -0.8,
-    }
-    assert all(label.startswith("Display ") for label in source.data["display_label"])
-    assert all("Hover R" in hover for hover in source.data["hover"])
-    assert "first 2 PCs" in plot.title.text
 
 
-def test_identical_loadings_share_one_bar_that_counts_its_twins():
+def test_loadings_are_a_heatmap_of_the_strongest_features_on_the_first_components():
+    from bokeh.models import LinearColorMapper
+
+    plot = plot_pca_loadings_artifact(artifact(), presentation())
+
+    # One column per component with its share of variance, one row per feature.
+    assert list(plot.x_range.factors) == ["PC1 (60.0%)", "PC2 (30.0%)"]
+    assert list(reversed(plot.y_range.factors)) == ["Display R1", "Display R2"]
+    assert _cells(plot) == {("R1", "PC1"): 0.9, ("R1", "PC2"): 0.1, ("R2", "PC1"): 0.2, ("R2", "PC2"): -0.8}
+    # On the app's own scale, blue through white to red, symmetric about zero.
+    mapper = plot.select_one({"type": LinearColorMapper})
+    assert (mapper.low, mapper.high) == (-0.9, 0.9)
+    assert (mapper.palette[0], mapper.palette[-1]) == ("#0000FF", "#FF0000") and "#FFFFFF" in mapper.palette
+    assert "ordered by |PC1|" in plot.title.text
+
+
+def test_loadings_are_ordered_by_one_component_or_by_their_total():
+    by_pc3 = plot_pca_loadings_artifact(artifact(), presentation(loading_sort_component=3))
+    assert list(reversed(by_pc3.y_range.factors)) == ["Display R3", "Display R1"]
+
+    total = plot_pca_loadings_artifact(
+        artifact(), presentation(loading_sort_component=None, loading_component_count=3, loading_feature_count=3)
+    )
+    # Absolute loadings summed over PC1 to PC3: 1.2, 1.1 and 1.2.
+    assert list(reversed(total.y_range.factors)) == ["Display R1", "Display R3", "Display R2"]
+    assert "ordered by their total over these components" in total.title.text
+
+
+def test_identical_loadings_share_one_row_that_counts_its_twins():
     tied = artifact()
     tied = replace(
         tied,
@@ -242,11 +255,10 @@ def test_identical_loadings_share_one_bar_that_counts_its_twins():
         ),
     )
     plot = plot_pca_loadings_artifact(tied, presentation(loading_component_count=1))
-    source = source_with(plot, "loading")
 
-    assert list(source.data["feature_id"]) == ["R1", "R3"]
-    assert source.data["Feature"][0] == "Display R1 and 1 identical"
-    assert source.data["twins"][0] == "Display R2"
+    assert list(reversed(plot.y_range.factors)) == ["Display R1 and 1 alike", "Display R3"]
+    hover = source_with(plot, "loading").data["hover"][0]
+    assert "Loading alike" in hover and "Display R2" in hover
 
 
 def test_biplot_uses_canonical_samples_and_limits_feature_arrows():
@@ -361,11 +373,12 @@ def test_every_reduction_hover_is_the_shared_panel():
     (variance_hover,) = plot_pca_variance_artifact(artifact(), presentation()).select({"type": HoverTool})
     assert variance_hover.tooltips.startswith(opening)
 
-    # A loading is added to its feature's own panel, in place of a second one round it.
+    # A cell's loading is added to its feature's own panel, in place of a second one round it.
     loadings = plot_pca_loadings_artifact(artifact(), presentation())
+    (cell_hover,) = loadings.select({"type": HoverTool})
+    assert cell_hover.tooltips.startswith(opening) and "Loading on @component" in cell_hover.tooltips
     hovers = list(source_with(loadings, "loading").data["hover"])
-    assert hovers and all(hover.startswith(opening) and "Loading on PC" in hover for hover in hovers)
-    assert all(hover.count(opening) == 1 for hover in hovers)
+    assert hovers and all(opening not in hover and "Hover R" in hover for hover in hovers)
 
     biplot = plot_pca_biplot_artifact(artifact(), presentation())
     arrows = list(source_with(biplot, "x_end").data["hover"])

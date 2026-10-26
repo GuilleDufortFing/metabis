@@ -17,22 +17,28 @@ import numpy as np
 import pandas as pd
 from bokeh.models import (
     Arrow,
+    BasicTicker,
+    ColorBar,
     ColumnDataSource,
     CustomJS,
     FactorRange,
     HoverTool,
     LabelSet,
+    LinearColorMapper,
     Range1d,
     Span,
     Title,
     VeeHead,
 )
+from bokeh.transform import transform
 from bokeh.palettes import Category10
 from bokeh.plotting import figure
 
 from ..analysis.dimensionality_reduction import ReductionArtifact
 from ..managers.group_palettes import OKABE_ITO
+from ..managers.color_distributions import gradient_palette
 from ..managers.hover.panel import extend, panel, row, section
+from ..managers.hover.panel import inner as hover_panel_inner
 from ..visual_config import theme
 from .click_behavior import get_external_reference_data
 from .plot_reduced_dimension import (
@@ -48,7 +54,6 @@ LEGACY_CATEGORICAL_PALETTE = Category10[10]
 VARIANCE_MARKS = (0.5, 0.8)  # where the cumulative share is marked
 BIPLOT_SECTORS = 8  # one arrow per 45 degrees
 BIPLOT_MINIMUM_SHARE = 0.15  # of the longest arrow
-LOADING_BAR_COLOR = theme.INK_MUTED  # a loading's sign is a direction, not up or down
 LOADING_ROW_HEIGHT = 20
 
 
@@ -101,8 +106,8 @@ class ReductionPlotPresentation:
     highlight_group_id: str | None = None
     show_separation_metrics: bool = True
     max_variance_components: int = 20
-    loading_component_count: int = 2
-    loading_feature_count: int = 12
+    loading_component_count: int = 8
+    loading_feature_count: int = 50
     loading_sort_component: int | None = None
     biplot_pc_x: int = 1
     biplot_pc_y: int = 2
@@ -439,8 +444,8 @@ def build_reduction_presentation(
     highlight_group_id: str | None = None,
     show_separation_metrics: bool = True,
     max_variance_components: int = 20,
-    loading_component_count: int = 2,
-    loading_feature_count: int = 12,
+    loading_component_count: int = 8,
+    loading_feature_count: int = 50,
     loading_sort_component: int | None = None,
     biplot_pc_x: int = 1,
     biplot_pc_y: int = 2,
@@ -693,72 +698,55 @@ def plot_pca_variance_artifact(
     return _apply_presentation_style(plot, presentation)
 
 
-def _loading_rows(artifact: ReductionArtifact, presentation: ReductionPlotPresentation):
-    """Per component, its strongest loadings of each sign, tied features in one bar.
+def _loading_columns(artifact: ReductionArtifact, presentation: ReductionPlotPresentation):
+    """The strongest features over the shown components, one row per direction.
 
-    Features that load identically (several reactions Compass scores alike, one
-    flux through a chain) share a bar named after the first, with the number of its
-    twins, so the bars show distinct directions rather than one direction repeated.
+    ``loading_sort_component`` orders the features by that component's absolute
+    loadings, or by default by their absolute loadings summed over the shown
+    components. Features that load identically on the shown components (several
+    reactions Compass scores alike, one flux through a chain) share a row named
+    after the first, so the rows show distinct directions rather than one
+    direction repeated. Returns the component count and each row's members.
     """
     assert artifact.pca is not None and artifact.pca.loadings is not None
     loadings = artifact.pca.loadings
     component_count = min(presentation.loading_component_count, loadings.shape[0])
-    per_sign = max(1, presentation.loading_feature_count // 2)
-    feature_lookup = _feature_lookup(presentation)
-    variance = artifact.pca.explained_variance_ratio
-    rows = []
-    for component in range(component_count):
-        values = loadings[component]
-        header = f"PC{component + 1}"
-        if variance is not None and len(variance) > component:
-            header += f" ({variance[component] * 100:.1f}%)"
-        rows.append({"header": header})
-        tied: dict[float, list[int]] = {}
-        for index, value in enumerate(values):
-            tied.setdefault(round(float(value), 9), []).append(index)
-        distinct = sorted(tied, key=lambda value: -value)
-        positives = [value for value in distinct if value > 0][:per_sign]
-        negatives = [value for value in reversed(distinct) if value < 0][:per_sign]
-        for value in positives + list(reversed(negatives)):
-            members = tied[value]
-            first = artifact.feature_names[members[0]]
-            presentation_of = feature_lookup[first]
-            name = presentation_of.display_label
-            if len(members) > 1:
-                name += f" and {len(members) - 1} identical"
-            twins = ", ".join(feature_lookup[artifact.feature_names[i]].display_label for i in members[1:11])
-            loading = float(values[members[0]])
-            # The feature's own panel, as the graphs show it, with its loading added.
-            facts = section(
-                row(f"Loading on PC{component + 1}", f"{loading:.3f}"),
-                row("Loading alike", escape(twins)) if twins else "",
-            )
-            rows.append(
-                {
-                    "PC": f"PC{component + 1}",
-                    "feature_id": first,
-                    "Feature": name,
-                    "loading": loading,
-                    "twins": twins,
-                    "hover": extend(presentation_of.hover_html, facts)
-                    if presentation_of.hover_html
-                    else panel(row("ID", escape(first)), row("Feature", escape(name)), facts),
-                    "external_url": presentation_of.external_url,
-                    "display_label": presentation_of.display_label,
-                }
-            )
-    return component_count, rows
+    shown = loadings[:component_count]
+    sort = presentation.loading_sort_component
+    if sort is not None:
+        if sort > loadings.shape[0]:
+            raise ValueError(f"PC for sorting must be between 1 and {loadings.shape[0]}")
+        strength = np.abs(loadings[sort - 1])
+    else:
+        strength = np.sum(np.abs(shown), axis=0)
+    feature_count = min(presentation.loading_feature_count, loadings.shape[1])
+    members: dict[tuple, list[int]] = {}
+    for index in np.argsort(-strength, kind="stable"):
+        key = tuple(np.round(shown[:, index], 9))
+        if key in members:
+            members[key].append(int(index))
+        elif len(members) < feature_count:
+            members[key] = [int(index)]
+    return component_count, list(members.values())
+
+
+def _loading_palette() -> list[str]:
+    """The app's own scale, blue through white to red, as its Delta and effects are drawn."""
+    half = 128
+    return gradient_palette(theme.DOWN_REGULATED, theme.NEUTRAL, half)[:-1] + gradient_palette(
+        theme.NEUTRAL, theme.UP_REGULATED, half
+    )
 
 
 def plot_pca_loadings_artifact(
     artifact: ReductionArtifact, presentation: ReductionPlotPresentation
 ):
-    """The strongest loadings of each sign, per component, as named bars.
+    """The strongest features' loadings on the first components, as a heatmap.
 
-    ``loading_component_count`` components are drawn, each opening with a header
-    row; ``loading_feature_count`` bars each, half of each sign. The download is
-    the complete matrix. ``loading_sort_component`` no longer applies: each
-    component is ordered by its own loadings.
+    One row per feature (features loading alike share one, see
+    :func:`_loading_columns`), one column per component, each cell coloured by
+    its loading on the app's blue to red scale, symmetric about zero. The
+    download is the complete matrix.
     """
     _validate_inputs(artifact, presentation)
     _require_pca_loadings(artifact)
@@ -766,67 +754,110 @@ def plot_pca_loadings_artifact(
     assert artifact.pca.loadings is not None
     if artifact.pca.loadings.size == 0:
         raise ValueError("Loadings matrix is empty")
-    component_count, rows = _loading_rows(artifact, presentation)
+    component_count, groups = _loading_columns(artifact, presentation)
+    loadings = artifact.pca.loadings
+    feature_lookup = _feature_lookup(presentation)
+    variance = artifact.pca.explained_variance_ratio
+    components = [f"PC{index + 1}" for index in range(component_count)]
+    component_labels = [
+        f"PC{index + 1} ({variance[index] * 100:.1f}%)" if variance is not None and len(variance) > index else f"PC{index + 1}"
+        for index in range(component_count)
+    ]
 
-    factors, headers, used = [], [], set()
-    for row in rows:
-        text = row.get("header") or row["Feature"]
-        # A feature can load on several components; each bar keeps its own row.
-        while text in used:
-            text += "\u200b"
-        used.add(text)
-        factors.append(text)
-        if "header" in row:
-            headers.append(text)
-        else:
-            row["y"] = text
-    bars = [row for row in rows if "header" not in row]
-    reach = max([abs(row["loading"]) for row in bars] + [1e-9]) * 1.08
+    rows, used = [], set()
+    cells = {key: [] for key in ("feature", "component", "loading", "feature_id", "display_label", "hover", "external_url")}
+    for group in groups:
+        first = artifact.feature_names[group[0]]
+        presentation_of = feature_lookup[first]
+        name = presentation_of.display_label
+        if len(group) > 1:
+            name += f" and {len(group) - 1} alike"
+        # A name used twice keeps a row of its own.
+        while name in used:
+            name += "\u200b"
+        used.add(name)
+        rows.append(name)
+        twins = ", ".join(feature_lookup[artifact.feature_names[i]].display_label for i in group[1:11])
+        # The feature's own panel, as the graphs show it; the template adds the
+        # cell's component and loading.
+        hover = (
+            hover_panel_inner(presentation_of.hover_html)
+            if presentation_of.hover_html
+            else row("ID", escape(first)) + row("Feature", escape(presentation_of.display_label))
+        )
+        if twins:
+            hover += section(row("Loading alike", escape(twins)))
+        for component, label in enumerate(component_labels):
+            cells["feature"].append(name)
+            cells["component"].append(label)
+            cells["loading"].append(float(loadings[component, group[0]]))
+            cells["feature_id"].append(first)
+            cells["display_label"].append(presentation_of.display_label)
+            cells["hover"].append(hover)
+            cells["external_url"].append(presentation_of.external_url)
+
+    reach = max([abs(value) for value in cells["loading"]] + [1e-9])
+    mapper = LinearColorMapper(palette=_loading_palette(), low=-reach, high=reach)
+    sort = presentation.loading_sort_component
+    order = f"ordered by |PC{sort}|" if sort is not None else "ordered by their total over these components"
     plot = apply_academic_style(
         figure(
             width=presentation.width,
-            # Every bar keeps a readable row, however many are asked for.
-            height=max(presentation.height, LOADING_ROW_HEIGHT * len(factors) + 90),
-            x_range=Range1d(-reach, reach),
-            y_range=FactorRange(factors=list(reversed(factors)), range_padding=0.0),
+            # Every row keeps a readable height, however many are asked for.
+            height=max(presentation.height, LOADING_ROW_HEIGHT * len(rows) + 120),
+            x_range=FactorRange(factors=component_labels),
+            y_range=FactorRange(factors=list(reversed(rows)), range_padding=0.0),
             title=(
-                f"PCA loadings of {artifact.data_source_name}, the strongest of each sign "
-                f"in the first {component_count} PCs"
+                f"PCA loadings of {artifact.data_source_name}, the {len(rows)} strongest features "
+                f"over {components[0]} to {components[-1]}, {order}"
+                if component_count > 1
+                else f"PCA loadings of {artifact.data_source_name}, the {len(rows)} strongest features on PC1"
             ),
-            tools="xpan,xwheel_zoom,reset,save",
-        )
+            tools="save,pan,box_zoom,wheel_zoom,reset",
+            x_axis_location="above",
+        ),
+        suppress_grid=True,
     )
-    plot.ygrid.grid_line_color = None
-    if headers:
-        plot.hbar(
-            y=headers,
-            left=-reach * 2,
-            right=reach * 2,
-            height=1.0,
-            fill_color="#eeeeee",
-            line_color=None,
-            level="underlay",
-        )
-    source = ColumnDataSource(pd.DataFrame(bars)) if bars else ColumnDataSource(
-        {key: [] for key in ("y", "loading", "PC", "feature_id", "Feature", "twins", "hover", "external_url", "display_label")}
-    )
-    renderer = plot.hbar(
-        y="y",
-        left=0,
-        right="loading",
-        height=0.7,
-        source=source,
-        fill_color=LOADING_BAR_COLOR,
-        line_color=None,
-    )
-    plot.add_layout(Span(location=0, dimension="height", line_color=theme.INK_MUTED, line_width=1))
-    plot.add_tools(HoverTool(renderers=[renderer], tooltips="@hover{safe}"))
+    plot.axis.axis_line_color = None
+    plot.axis.major_tick_line_color = None
     yaxis = plot.yaxis[0]
-    yaxis.axis_line_color = None
-    yaxis.major_tick_line_color = None
     yaxis.major_label_text_font_size = "11px"
     yaxis.major_label_text_color = theme.INK
-    plot.xaxis.axis_label = "Loading"
+    renderer = plot.rect(
+        x="component",
+        y="feature",
+        width=1,
+        height=1,
+        source=ColumnDataSource(cells),
+        fill_color=transform("loading", mapper),
+        line_color="#ffffff",
+        line_width=1,
+    )
+    plot.add_layout(
+        ColorBar(
+            color_mapper=mapper,
+            ticker=BasicTicker(desired_num_ticks=5),
+            label_standoff=8,
+            border_line_color=None,
+            location=(0, 0),
+            major_label_text_font_size="8pt",
+            title="Loading",
+            title_text_font_style="normal",
+            title_text_font_size="9pt",
+            title_standoff=8,
+            width=12,
+        ),
+        "right",
+    )
+    plot.add_tools(
+        HoverTool(
+            renderers=[renderer],
+            tooltips=panel(
+                "@hover{safe}",
+                section(row("Loading on @component", "@loading{0.000}")),
+            ),
+        )
+    )
     return _apply_presentation_style(plot, presentation)
 
 
