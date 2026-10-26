@@ -214,6 +214,32 @@ class DistributionBinner:
         except KeyError:
             return 0
 
+    def bin_for_value(self, value: float) -> int:
+        """The bin a value falls in, as a registered element's does (``_calculate_bins``).
+
+        For a value outside the distribution, such as a transporter family's Delta
+        score on its subsystems' scale; a non-finite value is neutral, bin 0.
+        """
+        try:
+            value = float(value)
+        except (TypeError, ValueError):
+            return 0
+        if not np.isfinite(value):
+            return 0
+        if self.spread_method == "asymmetric_saturating":
+            if value < self.center:
+                z_score = (value - self.center) / (self.lower_spread if self.lower_spread != 0 else 1.0)
+            elif value > self.center:
+                z_score = (value - self.center) / (self.upper_spread if self.upper_spread != 0 else 1.0)
+            else:
+                z_score = 0.0
+        else:
+            z_score = (value - self.center) / (self.spread if self.spread != 0 else 1.0)
+        if not np.isfinite(z_score):
+            return 0
+        step = self.max_z / self.n_bins
+        return int(np.clip(np.round(z_score / step), -self.n_bins, self.n_bins))
+
     def get_all_bins(self) -> pd.Series:
         """Returns the Series of all bin indices."""
         return self.bins

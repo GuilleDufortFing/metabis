@@ -233,6 +233,20 @@ class ColorManager:
             mode, element_type, element_id, metric_name
         )
 
+    def get_color_for_value(
+        self,
+        mode: AnalysisWorkspaceMode,
+        element_type: str,
+        metric_name: str,
+        value: float,
+    ) -> str:
+        """Colour a value as a registered distribution colours an element of it.
+
+        For a value no element holds, such as a transporter family's Delta score
+        on its subsystems' scale.
+        """
+        return self.color_lookup().get_color_for_value(mode, element_type, metric_name, value)
+
     def has_value(
         self,
         mode: AnalysisWorkspaceMode,

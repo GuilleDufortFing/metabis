@@ -93,6 +93,20 @@ class GraphColorLookup:
         bin_colors = dist_info["bin_colors"]
         return bin_colors.get(binner.get_bin(element_id), bin_colors[0])
 
+    def get_color_for_value(
+        self,
+        mode: AnalysisWorkspaceMode,
+        element_type: str,
+        metric_name: str,
+        value: float,
+    ) -> str:
+        """Colour a value as its registered distribution colours an element of it."""
+        dist_info = self.distributions.get((mode, element_type, metric_name))
+        if not dist_info:
+            return self.neutral_color
+        bin_colors = dist_info["bin_colors"]
+        return bin_colors.get(dist_info["binner"].bin_for_value(value), bin_colors[0])
+
     def has_value(
         self,
         mode: AnalysisWorkspaceMode,

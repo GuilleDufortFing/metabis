@@ -195,6 +195,9 @@ def plot_subsystem_comparison(
     groups: Optional[Dict[str, List[str]]] = None,
     category_numbers: Optional[Dict[str, int]] = None,
     delta_options: Optional[Dict[str, Any]] = None,
+    score_colors: Optional[Dict[str, str]] = None,
+    score_hovers: Optional[Dict[str, str]] = None,
+    hover_detail: Optional[str] = None,
 ):
     """Each subsystem's reactions (or genes) on the metric's axis, beside its delta score.
 
@@ -224,6 +227,11 @@ def plot_subsystem_comparison(
             network's numbers for the model's categories.
         delta_options: The Delta configuration the network was coloured with;
             each Delta score diamond takes its node's colour from it.
+        score_colors: Each row's diamond colour, for rows the network has no
+            node for, such as ``entries``' families; by default its node's.
+        score_hovers: Each row's diamond hover, likewise; by default its node's.
+        hover_detail: The graph card's Hover detail, "light", "medium" or
+            "full", for its elements' hovers; by default their statistics.
     Returns:
         The names, the Delta score and the elements as one grid if return_plot is
         True, else None; the page shows the score, the elements or both.
@@ -248,12 +256,16 @@ def plot_subsystem_comparison(
         numbers=category_numbers or model_category_numbers(data_manager),
     )
     scores = {entry.subsystem_id: entry.score for entry in entries}
-    colors = node_colors(
-        data_manager,
-        list(scores),
-        "subsystem_genes" if for_genes else "subsystem",
-        metric,
-        delta_options,
+    colors = (
+        score_colors
+        if score_colors is not None
+        else node_colors(
+            data_manager,
+            list(scores),
+            "subsystem_genes" if for_genes else "subsystem",
+            metric,
+            delta_options,
+        )
     )
 
     significant_set = artifact.get_significant_elements(for_genes=for_genes)
@@ -303,6 +315,7 @@ def plot_subsystem_comparison(
             for_genes=for_genes,
             significant_set=significant_set,
             element_type=element_type,
+            show_plot=hover_detail == "full",
         )
         if prepared:
             for key in all_data:
@@ -323,9 +336,26 @@ def plot_subsystem_comparison(
     )
     plot.background_fill_color = background_fill_color
     add_focus_link(plot, rows, navigation_event=navigation_event)
+    # At the card's medium or full Hover detail, the colour reference of the
+    # metric the dots are painted by, once for them all.
+    hover_tooltip = (
+        _attach_color_reference(
+            all_data,
+            build_reference_from_distribution(
+                getattr(data_manager, "color_manager", None),
+                mode=AnalysisWorkspaceMode.GROUP_COMPARISON,
+                element_type=element_type,
+                element_id=all_data["element_id"][0],
+                metric_name=metric,
+                metric_label=label,
+            ),
+        )
+        if hover_detail in ("medium", "full")
+        else hover_panel.panel("@desc{safe}")
+    )
     dots = _draw_points(plot, all_data)
     # One panel, the nearest element's, where a row's elements crowd.
-    plot.add_tools(HoverTool(renderers=[dots], tooltips=hover_panel.panel("@desc{safe}"), limit=1))
+    plot.add_tools(HoverTool(renderers=[dots], tooltips=hover_tooltip, limit=1))
 
     names = names_panel(rows, plot, navigation_event=navigation_event)
     score = score_panel(
@@ -336,7 +366,9 @@ def plot_subsystem_comparison(
         x_label="Delta score",
         colors=colors,
         navigation_event=navigation_event,
-        hovers=subsystem_hovers(
+        hovers=score_hovers
+        if score_hovers is not None
+        else subsystem_hovers(
             data_manager,
             list(scores),
             "subsystem_genes" if for_genes else "subsystem",
@@ -429,6 +461,9 @@ def plot_subsystem_activity_ranking(
     entries: Optional[List[RankedSubsystem]] = None,
     groups: Optional[Dict[str, List[str]]] = None,
     category_numbers: Optional[Dict[str, int]] = None,
+    score_colors: Optional[Dict[str, str]] = None,
+    score_hovers: Optional[Dict[str, str]] = None,
+    hover_detail: Optional[str] = None,
 ):
     """Rank subsystems by single-group activity, grouped by metabolic category.
 
@@ -454,6 +489,12 @@ def plot_subsystem_activity_ranking(
         groups: The reactions (or genes) of each row in ``entries``, by its id.
         category_numbers: The numbers the rows' headings carry; by default the
             network's numbers for the model's categories.
+        score_colors: Each row's diamond colour, for rows the network has no
+            node for, such as ``entries``' families; by default its node's.
+        score_hovers: Each row's diamond hover, likewise; by default its node's.
+        hover_detail: The graph card's Hover detail, "light", "medium" or
+            "full", for the members' hovers; by default statistics and the
+            colour reference.
     Returns:
         The names, the activity score and the members as one grid if return_plot
         is True, else None; the page shows the score, the members or both.
@@ -484,7 +525,11 @@ def plot_subsystem_activity_ranking(
     )
     activity_metric = activity_artifact.metric_key_for(family)
     scores_by_subsystem = {entry.subsystem_id: entry.score for entry in entries}
-    node_fills = node_colors(data_manager, list(scores_by_subsystem), "subsystem", activity_metric)
+    node_fills = (
+        score_colors
+        if score_colors is not None
+        else node_colors(data_manager, list(scores_by_subsystem), "subsystem", activity_metric)
+    )
 
     all_data = _empty_points()
     all_metric_values: List[float] = []
@@ -553,6 +598,7 @@ def plot_subsystem_activity_ranking(
                         element_id=feature_id,
                         element_type=overlay_name,
                         show_stats=True,
+                        show_plot=hover_detail == "full",
                     )
                 )
             )
@@ -566,16 +612,21 @@ def plot_subsystem_activity_ranking(
     # same color reference as graph hovers. The distribution is shared by every
     # point and only the marker moves.
     # This runs before the axis clamp so a clamped point still marks its true score.
-    hover_tooltip = _attach_color_reference(
-        all_data,
-        build_reference_from_distribution(
-            getattr(data_manager, "color_manager", None),
-            mode=AnalysisWorkspaceMode.EXPERIMENT_ANALYSIS,
-            element_type=overlay_name,
-            element_id=all_data["element_id"][0],
-            metric_name=activity_metric,
-            metric_label="Activity score",
-        ),
+    # Light Hover detail, in the graph card, leaves the reference out.
+    hover_tooltip = (
+        hover_panel.panel("@desc{safe}")
+        if hover_detail == "light"
+        else _attach_color_reference(
+            all_data,
+            build_reference_from_distribution(
+                getattr(data_manager, "color_manager", None),
+                mode=AnalysisWorkspaceMode.EXPERIMENT_ANALYSIS,
+                element_type=overlay_name,
+                element_id=all_data["element_id"][0],
+                metric_name=activity_metric,
+                metric_label="Activity score",
+            ),
+        )
     )
 
     # Bound the axis by the bulk of the data, not by its most extreme point. A
@@ -633,7 +684,9 @@ def plot_subsystem_activity_ranking(
         # Wider than the members' own, so a diamond at either end is drawn whole.
         x_range=Range1d(lower - 2.5 * padding, upper + 2.5 * padding),
         # Its node's hover, which reports the true score of a clamped diamond.
-        hovers=subsystem_hovers(data_manager, [entry.subsystem_id for entry in ranked], "subsystem", activity_metric)
+        hovers=score_hovers
+        if score_hovers is not None
+        else subsystem_hovers(data_manager, [entry.subsystem_id for entry in ranked], "subsystem", activity_metric)
         if groups is None
         else None,
     )
@@ -659,6 +712,7 @@ def _prepare_subsystem_scatter_data_horizontal(
     significant_set: set,
     element_type: str,
     factor: Optional[str] = None,
+    show_plot: bool = False,
 ) -> Optional[Dict[str, list]]:
     """Points for one subsystem's elements, each at a fixed place within its row.
 
@@ -752,7 +806,7 @@ def _prepare_subsystem_scatter_data_horizontal(
 
         # Its panel's content: the tooltip template draws the panel.
         hover_text = data_manager.get_element_hover(
-            element_id=idx, element_type=element_type, show_stats=True
+            element_id=idx, element_type=element_type, show_stats=True, show_plot=show_plot
         )
         hover_texts.append(hover_panel.inner(hover_text))
     data["desc"] = hover_texts

@@ -23,7 +23,11 @@ from __future__ import annotations
 import re
 import statistics
 from dataclasses import dataclass, field
+from html import escape
 from typing import Dict, Iterable, List, Mapping, Optional, Sequence
+
+from ..managers.hover import panel as hover_panel
+from ..managers.hover.sections.subsystem_info import delta_equation
 
 TRANSPORT_SUBSYSTEMS = frozenset(
     {
@@ -201,12 +205,21 @@ def transport_rows(
     return kept
 
 
-def group_delta_score(
+@dataclass(frozen=True)
+class GroupDelta:
+    """A group's Delta score, and how many of its elements were measured and significant."""
+
+    score: float
+    measured: int
+    significant: int
+
+
+def group_delta(
     test_results,
     elements: Sequence[str],
     significant: Iterable[str],
     delta_options: Mapping[str, str],
-) -> Optional[float]:
+) -> Optional[GroupDelta]:
     """A group's Delta score, as a subsystem's is computed (SubsystemAnalysis).
 
     The transformed metric, summed over the numerator's elements, over the count
@@ -225,11 +238,59 @@ def group_delta_score(
     flagged = [index for index in values.index if index in significant]
     denominator = flagged if delta_options.get("denominator_filter") == "significant" else list(values.index)
     if not denominator:
-        return 0.0
+        return GroupDelta(0.0, len(values), len(flagged))
     numerator = flagged if delta_options.get("numerator_filter", "significant") == "significant" else list(values.index)
     transform = delta_options.get("transform", "sign")
     total = sum(SubsystemAnalysis._apply_delta_transform(float(values[index]), transform) for index in numerator)
-    return total / len(denominator)
+    return GroupDelta(total / len(denominator), len(values), len(flagged))
+
+
+def group_delta_score(
+    test_results,
+    elements: Sequence[str],
+    significant: Iterable[str],
+    delta_options: Mapping[str, str],
+) -> Optional[float]:
+    """A group's Delta score alone (:func:`group_delta`)."""
+    delta = group_delta(test_results, elements, significant, delta_options)
+    return None if delta is None else delta.score
+
+
+def _row_label(subsystem_id: str, row: TransportRow) -> str:
+    """What a row is, as its hover names it."""
+    if subsystem_id == EXCHANGE_SUBSYSTEM:
+        return "Metabolite"
+    if row.key in (SEVERAL_FAMILIES, OTHER_GENES, NO_GENE, OTHER_FAMILIES):
+        return "Reactions"
+    return "Transporter family"
+
+
+def _delta_hover(subsystem_id: str, subsystem: str, row: TransportRow, delta: GroupDelta, options, noun: str) -> str:
+    """A row's hover, as a subsystem node's: its name, its significant elements and its Delta score."""
+    share = delta.significant / delta.measured * 100 if delta.measured else 0.0
+    return hover_panel.panel(
+        hover_panel.row(_row_label(subsystem_id, row), escape(row.name)),
+        hover_panel.row("Subsystem", escape(subsystem)),
+        hover_panel.row(
+            f"Significant {noun.capitalize()}",
+            f"{delta.significant} out of {delta.measured} ({share:.1f}%)",
+        ),
+        "<div style='margin-top:4px;'><strong>Delta Score (ΔS):</strong></div>"
+        "<div style='font-size:11px; color:#333; margin-left:10px;'>"
+        f"ΔS = {delta_equation(dict(options), options.get('metric', 'cohens_d'))} = "
+        f"<strong>{delta.score:.3f}</strong></div>",
+    )
+
+
+def _activity_hover(subsystem_id: str, subsystem: str, row: TransportRow, score: float, measured: int, noun: str) -> str:
+    """A row's hover in single-group activity: its name, its score and how many members it is of."""
+    return hover_panel.panel(
+        hover_panel.row(_row_label(subsystem_id, row), escape(row.name)),
+        hover_panel.row("Subsystem", escape(subsystem)),
+        hover_panel.row("Activity score", f"{score:.3f}"),
+        hover_panel.row(f"Measured {noun}", measured),
+        hover_panel.note(f"The median of its measured {noun}' activity scores."),
+    )
 
 
 def plot_transport_view(
@@ -243,13 +304,18 @@ def plot_transport_view(
     overlay=None,
     for_genes: bool = False,
     download_flag: Optional[str] = None,
+    hover_detail: Optional[str] = None,
 ):
     """A transport subsystem's families as rows, each with its score, in one grid.
 
     In a comparison, each row's dots are its reactions (or genes) on ``metric``
     and its score is a Delta score with ``delta_options``; in single-group
-    activity, its dots are activity scores and its score their median.
+    activity, its dots are activity scores and its score their median. A row's
+    score is coloured on its subsystems' scale, as a subsystem's with that score
+    would be, and hovers as a subsystem node does; its elements hover at the
+    graph card's ``hover_detail``.
     """
+    from ..managers.workspace_mode import AnalysisWorkspaceMode
     from .metabolic_visualization.generation.graph_building.spaced_network import (
         category_numbers,
     )
@@ -276,6 +342,8 @@ def plot_transport_view(
         rows = transport_rows(model, subsystem_id, measured=scores.dropna().index)
         groups: Dict[str, List[str]] = {}
         entries = []
+        hovers: Dict[str, str] = {}
+        noun = "reactions" if reaction_overlay else "genes"
         for row in rows:
             members = (
                 [displayed_feature_id(scores, reaction) for reaction in row.reactions]
@@ -286,16 +354,13 @@ def plot_transport_view(
             if not measured:
                 continue
             groups[row.key] = row.reactions if reaction_overlay else row.genes
-            entries.append(
-                RankedSubsystem(
-                    row.key,
-                    row.name,
-                    name,
-                    float(statistics.median(float(scores.loc[m]) for m in measured)),
-                )
-            )
+            score = float(statistics.median(float(scores.loc[m]) for m in measured))
+            entries.append(RankedSubsystem(row.key, row.name, name, score))
+            hovers[row.key] = _activity_hover(subsystem_id, name, row, score, len(measured), noun)
         if not entries:
             return None
+        metric_key = activity_artifact.metric_key_for(family)
+        color_manager = data_manager.color_manager
         return plot_subsystem_activity_ranking(
             data_manager,
             activity_artifact,
@@ -305,6 +370,14 @@ def plot_transport_view(
             entries=entries,
             groups=groups,
             category_numbers=numbers,
+            score_colors={
+                entry.subsystem_id: color_manager.get_color_for_value(
+                    AnalysisWorkspaceMode.EXPERIMENT_ANALYSIS, "subsystem", metric_key, entry.score
+                )
+                for entry in entries
+            },
+            score_hovers=hovers,
+            hover_detail=hover_detail,
         )
 
     artifact = data_manager.get_group_comparison_artifact()
@@ -330,15 +403,21 @@ def plot_transport_view(
     options = dict(delta_options or {"metric": metric})
     groups = {}
     entries = []
+    hovers: Dict[str, str] = {}
     for row in rows:
         elements = row.genes if for_genes else columns(row.reactions)
-        score = group_delta_score(test_results, elements, significant, options)
-        if score is None:
+        delta = group_delta(test_results, elements, significant, options)
+        if delta is None:
             continue
         groups[row.key] = row.genes if for_genes else row.reactions
-        entries.append(RankedSubsystem(row.key, row.name, name, float(score)))
+        entries.append(RankedSubsystem(row.key, row.name, name, float(delta.score)))
+        hovers[row.key] = _delta_hover(subsystem_id, name, row, delta, options, "genes" if for_genes else "reactions")
     if not entries:
         return None
+    # The subsystems' Delta scores, registered as the network colours them (the
+    # subsystem's own colour asks for them), are the scale a family is put on.
+    element_type = "subsystem_genes" if for_genes else "subsystem"
+    data_manager.get_element_color(subsystem_id, element_type, options.get("metric", metric), delta_options=options)
     return plot_subsystem_comparison(
         data_manager,
         None,
@@ -349,13 +428,23 @@ def plot_transport_view(
         entries=entries,
         groups=groups,
         category_numbers=numbers,
+        score_colors={
+            entry.subsystem_id: data_manager.color_manager.get_color_for_value(
+                AnalysisWorkspaceMode.GROUP_COMPARISON, element_type, options.get("metric", metric), entry.score
+            )
+            for entry in entries
+        },
+        score_hovers=hovers,
+        hover_detail=hover_detail,
     )
 
 
 __all__ = [
     "EXCHANGE_SUBSYSTEM",
     "TRANSPORT_SUBSYSTEMS",
+    "GroupDelta",
     "TransportRow",
+    "group_delta",
     "group_delta_score",
     "is_transport_subsystem",
     "plot_transport_view",

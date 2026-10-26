@@ -203,3 +203,29 @@ def test_the_value_axis_is_drawn_above_and_below(ranking):
     dots_panel = layout.children[2][0]
 
     assert len(dots_panel.above) >= 1 and len(dots_panel.below) >= 1
+
+
+@pytest.mark.parametrize(
+    ("detail", "plots", "reference"),
+    [("light", False, False), ("medium", False, True), ("full", True, True)],
+)
+def test_the_elements_hover_at_the_graph_cards_hover_detail(detail, plots, reference):
+    """As a transport subsystem's view draws them: full detail shows each element's distributions."""
+    workspace = _Workspace()
+    asked = []
+
+    def hover(element_id, element_type, **options):
+        asked.append((element_type, options))
+        return f"<div>{element_id} statistics</div>"
+
+    workspace.get_element_hover = hover
+    stats = pd.DataFrame({"subsystem": [SUBSYSTEM], "delta_score": [1.4]})
+    plot = plot_subsystem_comparison(
+        data_manager=workspace, subsystem_stats=stats, metric=METRIC, return_plot=True, hover_detail=detail
+    )
+
+    elements = [options for element_type, options in asked if element_type == "reaction"]
+    assert len(elements) == len(EFFECTS)
+    assert all(options.get("show_plot") is plots for options in elements)
+    # The colour reference, once for every element, inside its panel.
+    assert ("Color Reference:" in _dot_hover(plot).tooltips) is reference

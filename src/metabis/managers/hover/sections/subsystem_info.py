@@ -65,44 +65,7 @@ class SubsystemSection(HoverSection):
         delta_meta = data.get("delta_subsystem_meta", {})
 
         if delta_score is not None and delta_meta.get("computed", False):
-            # Get delta configuration details
-            delta_metric = delta_meta.get("metric", metric)
-            transform = delta_meta.get("transform", "sign")
-            numerator_filter = delta_meta.get("numerator_filter", "all")
-            denominator_filter = delta_meta.get("denominator_filter", "all")
-
-            # Short metric name for equation
-            metric_short_names = {
-                "cohens_d": "Cohen's d",
-                "log2_fc": "Log Fold Change",
-                "mean_difference": "Mean dif.",
-                "pval": "p",
-                "neg_log_pval": "-log(p)",
-                "neg_log_adj_pval": "-log(padj)"
-            }
-            m_sym = metric_short_names.get(delta_metric, delta_metric)
-
-            # Transform notation
-            if transform == "sign":
-                term = f"sgn({m_sym})"
-            elif transform == "abs":
-                term = f"|{m_sym}|"
-            else:
-                term = f"({m_sym})"
-
-            # Summation notation
-            if numerator_filter == "significant":
-                numerator_str = f"Σ_{{sig}} {term}"
-            else:
-                numerator_str = f"Σ {term}"
-
-            # Denominator notation
-            if denominator_filter == "significant":
-                denom_str = "N_sig"
-            else:
-                denom_str = "N_total"
-
-            equation = f"{numerator_str} / {denom_str}"
+            equation = delta_equation(delta_meta, metric)
 
             parts.append(
                 "<div style='margin-top:4px;'><strong>Delta Score (ΔS):</strong></div>"
@@ -119,3 +82,27 @@ class SubsystemSection(HoverSection):
             )
 
         return "".join(parts)
+
+
+def delta_equation(delta_meta: dict, metric: str = "log2_fc") -> str:
+    """How a Delta score was computed, as a hover writes it: ``Σ_{sig} sgn(Cohen's d) / N_total``."""
+    delta_metric = delta_meta.get("metric", metric)
+    transform = delta_meta.get("transform", "sign")
+    metric_short_names = {
+        "cohens_d": "Cohen's d",
+        "log2_fc": "Log Fold Change",
+        "mean_difference": "Mean dif.",
+        "pval": "p",
+        "neg_log_pval": "-log(p)",
+        "neg_log_adj_pval": "-log(padj)",
+    }
+    m_sym = metric_short_names.get(delta_metric, delta_metric)
+    if transform == "sign":
+        term = f"sgn({m_sym})"
+    elif transform == "abs":
+        term = f"|{m_sym}|"
+    else:
+        term = f"({m_sym})"
+    numerator = f"Σ_{{sig}} {term}" if delta_meta.get("numerator_filter", "all") == "significant" else f"Σ {term}"
+    denominator = "N_sig" if delta_meta.get("denominator_filter", "all") == "significant" else "N_total"
+    return f"{numerator} / {denominator}"
