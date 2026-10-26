@@ -16,6 +16,7 @@ from bokeh.palettes import Viridis256
 from bokeh.plotting import figure
 
 from ..analysis.reaction_set_enrichment import ReactionSetEnrichmentArtifact
+from ..managers.hover import panel as hover_panel
 from .plot_utils import apply_academic_style
 
 MAX_PLOT_ROWS = 30
@@ -79,53 +80,27 @@ def _format_ratio(value: object) -> str:
 
 def _hover_html(row, *, adjusted_pvalue_threshold: float) -> str:
     """Build a bounded scientific summary, without provenance or reaction IDs."""
-    significant = bool(row["is_significant"])
-    status_label = "Significant enrichment" if significant else "Not significant"
-    status_color = "#166B4D" if significant else "#52616D"
-    status_background = "#E7F5EF" if significant else "#EEF2F5"
-    subsystem_name = escape(str(row["subsystem_name"]))
     category = escape(str(row.get("category") or "Uncategorised"))
-    direction = escape(str(row["direction"]).capitalize())
-    metric = escape(_format_metric(row["direction_metric"]))
-    correction = escape(_format_correction(row["correction"]))
-    overlap_size = int(row["overlap_size"])
-    subsystem_size = int(row["subsystem_size"])
-    query_size = int(row["query_size"])
-    universe_size = int(row["universe_size"])
-    enrichment_ratio = _format_ratio(row["enrichment_ratio"])
-    adjusted_pvalue = _format_probability(row["adjusted_pval"])
-    threshold = _format_probability(adjusted_pvalue_threshold)
-
-    return (
-        "<div style='font-family:Inter,-apple-system,BlinkMacSystemFont,&quot;Segoe UI&quot;,sans-serif;"
-        "width:340px;max-width:340px;padding:0;color:#1E2A32;background:#FFFFFF;"
-        "border:1px solid #D9E1E8;border-radius:8px;box-shadow:0 4px 18px rgba(0,0,0,0.14);"
-        "font-size:12px;line-height:1.4;overflow:hidden;'>"
-        "<div style='padding:11px 13px 9px;border-bottom:1px solid #D9E1E8;background:#F7F9FB;'>"
-        f"<div style='font-size:14px;font-weight:700;line-height:1.3;color:#20435C;'>{subsystem_name}</div>"
-        f"<div style='margin-top:3px;color:#5C6B76;'>{category}</div>"
-        f"<span style='display:inline-block;margin-top:7px;padding:2px 7px;border-radius:10px;"
-        f"background:{status_background};color:{status_color};font-size:11px;font-weight:650;'>"
-        f"{status_label}</span></div>"
-        "<div style='display:grid;grid-template-columns:1fr 1fr;gap:9px 16px;padding:11px 13px;'>"
-        "<div><div style='color:#6E7D88;font-size:10px;text-transform:uppercase;letter-spacing:.04em;'>"
-        "Adjusted p-value</div>"
-        f"<div style='margin-top:2px;font-weight:650;font-variant-numeric:tabular-nums;'>{adjusted_pvalue}</div></div>"
-        "<div><div style='color:#6E7D88;font-size:10px;text-transform:uppercase;letter-spacing:.04em;'>"
-        "Enrichment ratio</div>"
-        f"<div style='margin-top:2px;font-weight:650;font-variant-numeric:tabular-nums;'>{enrichment_ratio}</div></div>"
-        "<div><div style='color:#6E7D88;font-size:10px;text-transform:uppercase;letter-spacing:.04em;'>"
-        "Subsystem overlap</div>"
-        f"<div style='margin-top:2px;font-weight:650;font-variant-numeric:tabular-nums;'>{overlap_size} of {subsystem_size}</div>"
-        "<div style='color:#6E7D88;font-size:10px;'>significant / measured</div></div>"
-        "<div><div style='color:#6E7D88;font-size:10px;text-transform:uppercase;letter-spacing:.04em;'>"
-        "Analysis query</div>"
-        f"<div style='margin-top:2px;font-weight:650;font-variant-numeric:tabular-nums;'>{query_size} of {universe_size}</div>"
-        "<div style='color:#6E7D88;font-size:10px;'>query / background</div></div></div>"
-        "<div style='padding:9px 13px;border-top:1px solid #E5EBF0;background:#FBFCFD;color:#52616D;'>"
-        f"<div><strong>{direction}</strong> direction · {metric}</div>"
-        f"<div style='margin-top:2px;'>{correction} · significance q ≤ {threshold}</div>"
-        "</div></div>"
+    return hover_panel.panel(
+        hover_panel.row(
+            "Subsystem",
+            f"{escape(str(row['subsystem_name']))} <span style='color:#888;'>({category})</span>",
+        ),
+        hover_panel.row("Analysis", "Reaction-set over-representation analysis"),
+        hover_panel.section(
+            hover_panel.significance(bool(row["is_significant"])),
+            hover_panel.row("Enrichment ratio", _format_ratio(row["enrichment_ratio"])),
+            hover_panel.row("Adjusted p-value", _format_probability(row["adjusted_pval"])),
+            hover_panel.row("Overlap", f"{int(row['overlap_size'])} of {int(row['subsystem_size'])} reactions"),
+            hover_panel.row("Query", f"{int(row['query_size'])} of {int(row['universe_size'])} reactions"),
+            title=f"{escape(str(row['direction']).capitalize())} direction, by {escape(_format_metric(row['direction_metric']))}",
+        ),
+        hover_panel.section(
+            hover_panel.note(
+                f"{escape(_format_correction(row['correction']))}; significant at q ≤ "
+                f"{_format_probability(adjusted_pvalue_threshold)}."
+            )
+        ),
     )
 
 
@@ -188,7 +163,7 @@ def plot_reaction_set_enrichment(
     height = max(360, 100 + 25 * len(factors))
     title = "Reaction-set over-representation analysis"
     if total_rows > len(frame):
-        title += f" · top {len(frame)} of {total_rows} eligible subsystems"
+        title += f", the top {len(frame)} of {total_rows} eligible subsystems"
     plot = figure(
         title=title,
         x_axis_label="−log10(adjusted p-value)",

@@ -7,6 +7,7 @@ from bokeh.core.properties import value
 from bokeh.models import ColumnDataSource, CustomJS, HoverTool, LabelSet
 from bokeh.plotting import figure
 
+from ....managers.hover import panel as hover_panel
 from ....visual_config import theme
 from ...brand import SELECTED_HEXAGON_SIZE
 from ...subsystem_link import (
@@ -32,6 +33,8 @@ from .js_callbacks import (
 
 # The network's subsystem names, which the page's shared selection also names.
 NETWORK_LABELS = "metabis-network-labels"
+# An element's hover where the graph has none of its own: its identifier and name.
+_FALLBACK_TOOLTIP = hover_panel.panel(hover_panel.row("ID", "@id"), hover_panel.row("Name", "@display_label"))
 # A diamond's width over its height, as Bokeh's diamond marker draws it.
 REACTION_DIAMOND_WIDTH = 2 / 3
 
@@ -450,7 +453,7 @@ def _draw_enriched_main_metabolites(plot, metabolite_glyphs):
         renderers=[renderer],
         tooltips="@hover{safe}"
         if any(g.get("hover") for g in metabolite_glyphs)
-        else [("ID", "@id"), ("Label", "@display_label")],
+        else _FALLBACK_TOOLTIP,
     )
     plot.add_tools(hover)
 
@@ -517,7 +520,7 @@ def _draw_enriched_intermediate_metabolites(plot, metabolite_glyphs):
         renderers=[renderer],
         tooltips="@hover{safe}"
         if any(g.get("hover") for g in metabolite_glyphs)
-        else [("ID", "@id"), ("Label", "@display_label")],
+        else _FALLBACK_TOOLTIP,
     )
     plot.add_tools(hover)
 
@@ -584,7 +587,7 @@ def _draw_enriched_genes(plot, gene_glyphs):
         renderers=[renderer],
         tooltips="@hover{safe}"
         if any(g.get("hover") for g in gene_glyphs)
-        else [("ID", "@id"), ("Label", "@display_label")],
+        else _FALLBACK_TOOLTIP,
     )
     plot.add_tools(hover)
 
@@ -659,7 +662,7 @@ def _draw_enriched_reactions(plot, reaction_glyphs):
         renderers=[renderer],
         tooltips="@hover{safe}"
         if any(g.get("hover") for g in reaction_glyphs)
-        else [("ID", "@id"), ("Label", "@display_label")],
+        else _FALLBACK_TOOLTIP,
     )
     plot.add_tools(hover)
 
@@ -829,12 +832,12 @@ def _draw_enriched_subsystems(plot, subsystem_glyphs):
         renderers=[renderer],
         tooltips="@hover{safe}"  # Use rich hover from enriched data
         if any(g.get("hover") for g in subsystem_glyphs)
-        else [
-            ("ID", "@id"),
-            ("Label", "@display_label"),
-            ("Reactions", "@reaction_count"),
-            ("Metabolites", "@metabolite_count"),
-        ],
+        else hover_panel.panel(
+            hover_panel.row("ID", "@id"),
+            hover_panel.row("Subsystem", "@display_label"),
+            hover_panel.row("Reactions", "@reaction_count"),
+            hover_panel.row("Metabolites", "@metabolite_count"),
+        ),
     )
     plot.add_tools(hover)
 
@@ -1569,6 +1572,7 @@ def _draw_enriched_subsystem_categories(plot, category_glyphs):
             "badge": data["badge"],
             "category": data["category"],
             "name": data["display_label"],
+            "count": data["subsystem_count"],
             "fill": [theme.INK_NODE] * len(data["x"]),
             "text": ["#ffffff"] * len(data["x"]),
             "alpha": [1.0] * len(data["x"]),
@@ -1621,7 +1625,11 @@ def _draw_enriched_subsystem_categories(plot, category_glyphs):
     plot.add_tools(
         HoverTool(
             renderers=[marks],
-            tooltips="<b>@badge</b> @name",
+            tooltips=hover_panel.panel(
+                hover_panel.row("Category @badge", "@name"),
+                hover_panel.row("Subsystems", "@count"),
+                hover_panel.note("Click it to select the category."),
+            ),
             attachment="right",
         )
     )

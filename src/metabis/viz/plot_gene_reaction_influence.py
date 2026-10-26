@@ -20,6 +20,7 @@ from bokeh.palettes import (  # Using Viridis for the magnitude color bar
 )
 from bokeh.plotting import figure, show
 
+from ..managers.hover import panel as hover_panel
 from .click_behavior import add_click_behavior, get_external_reference_data
 
 
@@ -261,12 +262,14 @@ def plot_gene_reaction_influence_heatmap(
         tools="hover,save,pan,box_zoom,reset,wheel_zoom",
         x_axis_location="above",
         # Update tooltips to include correlation
-        tooltips=[
-            ("Gene", "@gene"),
-            ("Reaction", "@reaction"),
-            ("Influence", "@influence{0.00}%"),
-            ("Correlation", "@correlation{0.00}"),  # Add correlation
-        ],
+        tooltips=hover_panel.panel(
+            hover_panel.row("Gene", "@gene"),
+            hover_panel.row("Reaction", "@reaction"),
+            hover_panel.section(
+                hover_panel.row("Influence", "@influence{0.00}%"),
+                hover_panel.row("Correlation", "@correlation{0.00}"),
+            ),
+        ),
     )
 
     # Add rectangles using the pre-calculated colors
@@ -667,18 +670,21 @@ def plot_subsystem_ranking_by_influence(
 
     # Generate hover tooltips
     metrics_df["hover"] = metrics_df.apply(
-        lambda row: (
-            f"""
-        <div>
-            <span style="font-size: 14px;"><b>{row["subsystem"]}</b></span><br>
-            <b>Highly influenced reactions:</b> {row["highly_influenced_reactions_count"]} / {row["total_reactions"]}
-                ({row["highly_influenced_reactions_count"] / max(1, row["total_reactions"]):.0%})<br>
-            <b>Key regulator genes:</b> {row["key_regulator_genes_count"]}<br>
-            <b>Max reaction influence:</b> {row["max_reaction_influence"]:.1f}%<br>
-            <b>Max gene regulation:</b> {row["max_gene_regulation"]} reactions<br>
-            <b>Analysis:</b> {row["model_type"]} model with {row["importance_type"]} importance
-        </div>
-        """
+        lambda row: hover_panel.panel(
+            hover_panel.row("Subsystem", row["subsystem"]),
+            hover_panel.section(
+                hover_panel.row(
+                    "Highly influenced reactions",
+                    f"{row['highly_influenced_reactions_count']} of {row['total_reactions']} "
+                    f"({row['highly_influenced_reactions_count'] / max(1, row['total_reactions']):.0%})",
+                ),
+                hover_panel.row("Key regulator genes", row["key_regulator_genes_count"]),
+                hover_panel.row("Max reaction influence", f"{row['max_reaction_influence']:.1f}%"),
+                hover_panel.row("Max gene regulation", f"{row['max_gene_regulation']} reactions"),
+            ),
+            hover_panel.section(
+                hover_panel.note(f"{row['model_type']} model with {row['importance_type']} importance.")
+            ),
         ),
         axis=1,
     )

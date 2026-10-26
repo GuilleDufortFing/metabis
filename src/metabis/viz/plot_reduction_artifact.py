@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
+from html import escape
 
 import numpy as np
 import pandas as pd
@@ -31,6 +32,7 @@ from bokeh.plotting import figure
 
 from ..analysis.dimensionality_reduction import ReductionArtifact
 from ..managers.group_palettes import OKABE_ITO
+from ..managers.hover.panel import extend, panel, row, section
 from ..visual_config import theme
 from .click_behavior import get_external_reference_data
 from .plot_reduced_dimension import (
@@ -218,6 +220,17 @@ def _axis_labels(artifact: ReductionArtifact, first: int = 1, second: int = 2):
         return f"PC{first}", f"PC{second}"
     name = "t-SNE" if method.upper().replace("-", "") == "TSNE" else method.upper()
     return f"{name}{first}", f"{name}{second}"
+
+
+def _sample_tooltip(artifact: ReductionArtifact, first: int = 1, second: int = 2) -> str:
+    """A sample's hover: its ID, label and group in the group's colour, and its place."""
+    x_name, y_name = (label.split(" (")[0] for label in _axis_labels(artifact, first, second))
+    return panel(
+        row("ID", "@sample_id"),
+        row("Sample", "@display_label"),
+        row("Group", "<span style='color:@color;'>@group</span>"),
+        section(row(x_name, "@x{0.000}"), row(y_name, "@y{0.000}")),
+    )
 
 
 def _unitless_axes(plot) -> None:
@@ -501,6 +514,7 @@ def plot_reduction_artifact(
             continue
         values = coordinates[indices, :2]
         canonical_ids = [artifact.sample_ids[row] for row in indices]
+        color = group.color or DEFAULT_CATEGORICAL_PALETTE[index % len(DEFAULT_CATEGORICAL_PALETTE)]
         source = ColumnDataSource(
             {
                 "x": values[:, 0],
@@ -509,9 +523,9 @@ def plot_reduction_artifact(
                 "display_label": [sample_lookup[sample_id].display_label for sample_id in canonical_ids],
                 "group_id": [group.group_id] * len(indices),
                 "group": [group.display_name] * len(indices),
+                "color": [color] * len(indices),
             }
         )
-        color = group.color or DEFAULT_CATEGORICAL_PALETTE[index % len(DEFAULT_CATEGORICAL_PALETTE)]
         point_renderers.append(
             _style_points(
                 plot, source, color=color, size=size, label=f"{group.display_name} ({len(indices):,})"
@@ -536,18 +550,8 @@ def plot_reduction_artifact(
 
     if presentation.show_sample_labels:
         _selection_labels(plot, sources)
-    plot.add_tools(
-        HoverTool(
-            renderers=point_renderers,
-            tooltips=[
-                ("Sample ID", "@sample_id"),
-                ("Display label", "@display_label"),
-                ("Group", "@group"),
-                ("X", "@x{0.00}"),
-                ("Y", "@y{0.00}"),
-            ],
-        )
-    )
+    # One panel, the nearest sample's, rather than a column of them where samples crowd.
+    plot.add_tools(HoverTool(renderers=point_renderers, tooltips=_sample_tooltip(artifact), limit=1))
     x_label, y_label = _axis_labels(artifact)
     plot.xaxis.axis_label = x_label
     plot.yaxis.axis_label = y_label
@@ -672,11 +676,11 @@ def plot_pca_variance_artifact(
         )
     plot.add_tools(
         HoverTool(
-            tooltips=[
-                ("PC", "@components"),
-                ("Explained", "@explained_variance_str"),
-                ("Cumulative", "@cumulative_variance_str"),
-            ]
+            tooltips=panel(
+                row("Component", "@components"),
+                row("Variance explained", "@explained_variance_str"),
+                row("Cumulative", "@cumulative_variance_str"),
+            )
         )
     )
     plot.xaxis.axis_label = "Principal component"
@@ -722,14 +726,23 @@ def _loading_rows(artifact: ReductionArtifact, presentation: ReductionPlotPresen
             name = presentation_of.display_label
             if len(members) > 1:
                 name += f" and {len(members) - 1} identical"
+            twins = ", ".join(feature_lookup[artifact.feature_names[i]].display_label for i in members[1:11])
+            loading = float(values[members[0]])
+            # The feature's own panel, as the graphs show it, with its loading added.
+            facts = section(
+                row(f"Loading on PC{component + 1}", f"{loading:.3f}"),
+                row("Loading alike", escape(twins)) if twins else "",
+            )
             rows.append(
                 {
                     "PC": f"PC{component + 1}",
                     "feature_id": first,
                     "Feature": name,
-                    "loading": float(values[members[0]]),
-                    "twins": ", ".join(feature_lookup[artifact.feature_names[i]].display_label for i in members[1:11]),
-                    "hover": presentation_of.hover_html or f"Feature: {first}",
+                    "loading": loading,
+                    "twins": twins,
+                    "hover": extend(presentation_of.hover_html, facts)
+                    if presentation_of.hover_html
+                    else panel(row("ID", escape(first)), row("Feature", escape(name)), facts),
                     "external_url": presentation_of.external_url,
                     "display_label": presentation_of.display_label,
                 }
@@ -807,21 +820,7 @@ def plot_pca_loadings_artifact(
         line_color=None,
     )
     plot.add_layout(Span(location=0, dimension="height", line_color=theme.INK_MUTED, line_width=1))
-    plot.add_tools(
-        HoverTool(
-            renderers=[renderer],
-            tooltips="""
-                <div>
-                    <div><strong>Feature ID:</strong> @feature_id</div>
-                    <div><strong>Feature:</strong> @display_label</div>
-                    <div><strong>PC:</strong> @PC</div>
-                    <div><strong>Loading:</strong> @loading{0.000}</div>
-                    <div>@twins</div>
-                    @hover{safe}
-                </div>
-            """,
-        )
-    )
+    plot.add_tools(HoverTool(renderers=[renderer], tooltips="@hover{safe}"))
     yaxis = plot.yaxis[0]
     yaxis.axis_line_color = None
     yaxis.major_tick_line_color = None
@@ -963,8 +962,21 @@ def plot_pca_biplot_artifact(
         }
     )
     arrows["display_label"] = [feature_lookup[value].display_label for value in arrows["feature_id"]]
+    # The feature's own panel, as the graphs show it, with its loadings added.
     arrows["hover"] = [
-        feature_lookup[value].hover_html or f"Feature: {value}" for value in arrows["feature_id"]
+        (extend(feature_lookup[feature].hover_html, facts) if feature_lookup[feature].hover_html
+         else panel(row("ID", escape(feature)), row("Feature", escape(feature_lookup[feature].display_label)), facts))
+        for feature, facts in zip(
+            arrows["feature_id"],
+            (
+                section(
+                    row(f"Loading on PC{pc_x}", f"{loadings_x[index]:.3f}"),
+                    row(f"Loading on PC{pc_y}", f"{loadings_y[index]:.3f}"),
+                    row("Arrow length", f"{magnitudes[index]:.3f}"),
+                )
+                for index in chosen
+            ),
+        )
     ]
     arrows["external_url"] = [feature_lookup[value].external_url for value in arrows["feature_id"]]
     # Each name at its tip, set outwards along its arrow so it clears the others.
@@ -1002,29 +1014,8 @@ def plot_pca_biplot_artifact(
         y_offset="y_offset",
     )
     plot.add_tools(
-        HoverTool(
-            tooltips="""
-                <div>
-                    <div><strong>Feature ID:</strong> @feature_id</div>
-                    <div><strong>Feature:</strong> @display_label</div>
-                    <div><strong>Loading Magnitude:</strong> @magnitude{0.000}</div>
-                    @hover{safe}
-                </div>
-            """,
-            renderers=[arrow_hover_renderer],
-            name="arrow_hover",
-        ),
-        HoverTool(
-            tooltips=[
-                ("Sample ID", "@sample_id"),
-                ("Display label", "@display_label"),
-                ("Group", "@group"),
-                (f"PC{pc_x}", "@x{0.00}"),
-                (f"PC{pc_y}", "@y{0.00}"),
-            ],
-            renderers=sample_renderers,
-            name="sample_hover",
-        ),
+        HoverTool(tooltips="@hover{safe}", renderers=[arrow_hover_renderer], name="arrow_hover"),
+        HoverTool(tooltips=_sample_tooltip(artifact, pc_x, pc_y), renderers=sample_renderers, name="sample_hover", limit=1),
     )
     if presentation.show_separation_metrics:
         valid = scores[~scores["group"].isin(["Unassigned", "N/A"])]

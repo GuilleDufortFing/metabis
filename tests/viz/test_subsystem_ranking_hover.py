@@ -15,14 +15,15 @@ from __future__ import annotations
 
 import pandas as pd
 import pytest
-from bokeh.models import HoverTool
+from bokeh.models import GlyphRenderer, HoverTool
 
 from metabis.managers.color_manager import ColorManager
+from metabis.managers.hover import panel as hover_panel
 from metabis.managers.workspace_mode import AnalysisWorkspaceMode
 from metabis.viz.plot_subsystem_ranking import plot_subsystem_comparison
 from bokeh.models import Text
 
-from metabis.viz.ranking_layout import RANKING_DOTS
+from metabis.viz.ranking_layout import RANKING_DOTS, RANKING_SCORE
 
 METRIC = "cohens_d"
 SUBSYSTEM = "Glycolysis"
@@ -123,8 +124,22 @@ def test_every_ranked_dot_hovers_with_its_own_statistics(ranking):
     plot, source = ranking
     hover = _dot_hover(plot)
 
-    assert hover.tooltips == "@desc{safe}"
+    # The panel every hover has, round the element's own statistics.
+    assert hover.tooltips == hover_panel.panel("@desc{safe}")
     assert len(source["desc"]) == len(EFFECTS)
+
+
+def test_a_delta_score_diamond_hovers_as_its_node_does(ranking):
+    plot, _source = ranking
+    (diamonds,) = [
+        renderer
+        for renderer in plot.select_one({"name": RANKING_SCORE}).select({"type": GlyphRenderer})
+        if "score" in renderer.data_source.data
+    ]
+    (hover,) = [tool for tool in plot.select({"type": HoverTool}) if diamonds in (tool.renderers or [])]
+
+    assert hover.tooltips == hover_panel.panel("@hover{safe}")
+    assert diamonds.data_source.data["hover"] == [f"<div>{SUBSYSTEM} statistics</div>"]
 
 
 def test_the_hover_carries_no_gradient_color_reference(ranking):

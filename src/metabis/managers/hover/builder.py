@@ -3,6 +3,7 @@ from typing import List
 from ..workspace_mode import AnalysisWorkspaceMode
 from .interfaces import HoverSection
 from .models import HoverContext, HoverData
+from .panel import PANEL_STYLE
 
 
 class HoverTextBuilder:
@@ -11,10 +12,7 @@ class HoverTextBuilder:
     def __init__(self):
         """Initialize the hover text builder."""
         self.sections: List[HoverSection] = []
-        self.container_style = (
-            "font-family: Arial, sans-serif; font-size:12px; padding:8px; "
-            "border:1px solid #ddd; border-radius:4px; background-color:#f9f9f9;"
-        )
+        self.container_style = PANEL_STYLE
 
     def add_section(self, section: HoverSection) -> "HoverTextBuilder":
         """Add a section to the builder.

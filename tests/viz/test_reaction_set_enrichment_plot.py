@@ -6,6 +6,7 @@ from dataclasses import replace
 import pandas as pd
 from bokeh.models import HoverTool
 
+from metabis.managers.hover.panel import PANEL_STYLE
 from metabis.analysis.artifacts import (
     AnalysisArtifactMetadata,
     ArtifactDimension,
@@ -144,11 +145,13 @@ def test_plot_uses_readable_labels_and_a_bounded_scientific_hover():
     assert not any(label.startswith("set-") for label in plot.y_range.factors)
     assert hover.tooltips == "@hover_html{safe}"
     assert hover.attachment == "vertical"
-    assert "width:340px;max-width:340px" in hover_html
+    # The hover panel every figure shares.
+    assert hover_html.startswith(f"<div style='{PANEL_STYLE}'>")
     assert "Adjusted p-value" in hover_html
     assert "Enrichment ratio" in hover_html
-    assert "Subsystem overlap" in hover_html
-    assert "Analysis query" in hover_html
+    assert "Overlap" in hover_html
+    assert "Query" in hover_html
+    assert "·" not in hover_html
     assert "Reaction IDs" not in hover_html
     assert "overlap_reaction_ids" not in hover_html
     assert max(renderer.data_source.data["point_size"]) <= 25.0

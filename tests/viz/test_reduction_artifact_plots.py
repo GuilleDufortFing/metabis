@@ -343,3 +343,32 @@ def test_non_pca_or_invalid_component_requests_fail_without_calculation_fallback
         plot_pca_biplot_artifact(
             pca, presentation(biplot_pc_x=1, biplot_pc_y=4)
         )
+
+
+def test_every_reduction_hover_is_the_shared_panel():
+    """The hover panel the graphs' reactions and genes have, on every reduction figure."""
+    from bokeh.models import HoverTool
+
+    from metabis.managers.hover.panel import PANEL_STYLE
+
+    opening = f"<div style='{PANEL_STYLE}'>"
+    scatter = plot_reduction_artifact(artifact(), presentation())
+    (sample_hover,) = scatter.select({"type": HoverTool})
+    assert sample_hover.tooltips.startswith(opening)
+    # A sample names its group in the group's colour, and its place by component.
+    assert "color:@color" in sample_hover.tooltips and "<strong>PC1:</strong>" in sample_hover.tooltips
+    assert set(source_with(scatter, "sample_id").data["color"]) <= {"#112233", "#445566"}
+    (variance_hover,) = plot_pca_variance_artifact(artifact(), presentation()).select({"type": HoverTool})
+    assert variance_hover.tooltips.startswith(opening)
+
+    # A loading is added to its feature's own panel, in place of a second one round it.
+    loadings = plot_pca_loadings_artifact(artifact(), presentation())
+    hovers = list(source_with(loadings, "loading").data["hover"])
+    assert hovers and all(hover.startswith(opening) and "Loading on PC" in hover for hover in hovers)
+    assert all(hover.count(opening) == 1 for hover in hovers)
+
+    biplot = plot_pca_biplot_artifact(artifact(), presentation())
+    arrows = list(source_with(biplot, "x_end").data["hover"])
+    assert all(hover.startswith(opening) and "Loading on PC2" in hover for hover in arrows)
+    for tool in biplot.select({"type": HoverTool}):
+        assert tool.tooltips.startswith(opening) or tool.tooltips == "@hover{safe}"

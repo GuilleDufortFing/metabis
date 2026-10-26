@@ -25,6 +25,7 @@ from metabis.analysis.set_enrichment import (
 )
 from metabis.analysis_workspace import RevisionKind, WorkspaceRevisions
 from metabis.viz.ranking_layout import RANKING_NAMES, RANKING_PLOT
+from metabis.managers.hover import panel as panel_module
 from metabis.viz.plot_set_enrichment import (
     NOT_SIGNIFICANT_COLOR,
     plot_set_enrichment_category,
@@ -193,15 +194,18 @@ def test_nonsignificant_subsystem_is_gray_and_hover_reports_both_results():
 
     assert source["dominant_color"][index] == NOT_SIGNIFICANT_COLOR
     assert not source["significant"][index]
-    assert hover.tooltips.startswith("@hover_html{safe}")
-    assert "<strong>Color Reference:</strong>" in hover.tooltips
+    # One panel round the subsystem's facts and the colour reference under them.
+    assert hover.tooltips.startswith(f"<div style='{panel_module.PANEL_STYLE}'>")
+    assert hover.tooltips.index("@hover_html{safe}") < hover.tooltips.index("<strong>Color Reference:</strong>")
     assert "Target-higher" in html
     assert "Target-lower" in html
-    assert "Adjusted p" in html
+    assert "Adjusted p-value" in html
     assert "Overlap" in html
-    assert "query" in html
-    assert "Background N=5" in html
-    assert "Not applicable to gene-set enrichment" in html
+    assert "Query" in html
+    assert "background of 5" in html
+    # The reaction direction criterion is said of reactions only.
+    assert "Reaction direction criterion" not in html
+    assert "·" not in html
 
 
 def test_every_dot_carries_the_gradient_color_reference_it_was_painted_from():

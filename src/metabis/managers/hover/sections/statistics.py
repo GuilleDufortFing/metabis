@@ -5,6 +5,7 @@ from ....visual_config import theme
 from ...workspace_mode import AnalysisWorkspaceMode
 from ..interfaces import HoverSection
 from ..models import HoverContext, HoverData
+from ..panel import significance
 
 
 class StatisticsSection(HoverSection):
@@ -73,14 +74,7 @@ class StatisticsSection(HoverSection):
         if mean_diff is not None:
             column_parts.append(f"<div>Mean Δ: {mean_diff:.3f}</div>")
 
-        if values.get("is_significant"):
-            column_parts.append(
-                "<div style='color:red; font-weight:bold;'>Significant</div>"
-            )
-        else:
-            column_parts.append(
-                "<div style='color:#aaaaaa; font-weight:bold;'>Not Significant</div>"
-            )
+        column_parts.append(significance(bool(values.get("is_significant"))))
 
         column_parts.append("</div>")
         return "".join(column_parts)

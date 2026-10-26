@@ -38,6 +38,7 @@ import math
 import textwrap
 import zlib
 from dataclasses import dataclass, field
+from html import escape
 from typing import Dict, Iterable, List, Mapping, Optional, Tuple
 
 from bokeh.core.properties import value
@@ -54,6 +55,7 @@ from bokeh.models import (
 )
 from bokeh.plotting import figure
 
+from ..managers.hover import panel as hover_panel
 from ..visual_config import theme
 from .brand import GRADIENT_JS, OUTLINE_WIDTH, SELECTED_HEXAGON, SELECTED_HEXAGON_SIZE
 from .metabolic_visualization.generation.graph_building.spaced_network import (
@@ -540,6 +542,7 @@ def score_panel(
     colors: Optional[Mapping[str, str]] = None,
     navigation_event: Optional[str] = None,
     x_range: Optional[Range1d] = None,
+    hovers: Optional[Mapping[str, str]] = None,
 ):
     """Each subsystem's own score as a diamond, on an axis of its own, sharing ``plot``'s rows.
 
@@ -548,7 +551,8 @@ def score_panel(
     over the elements. Each diamond has a black edge and is filled with
     ``colors`` (its node's colour in the network) where given. By default the axis
     is symmetric and reaches past the largest score, so a diamond at either end
-    is drawn whole; ``x_range`` sets another, such as the members' own.
+    is drawn whole; ``x_range`` sets another, such as the members' own. A diamond's
+    hover is its node's in the network, from ``hovers``, or else its name and score.
     """
     largest = max([1.0, *(abs(float(v)) for v in scores.values())])
     reach = largest * SCORE_REACH
@@ -581,6 +585,12 @@ def score_panel(
                 "y": [rows.factor_of[sid] for sid in ids],
                 "name": [rows.name_of.get(sid, rows.factor_of[sid]) for sid in ids],
                 "color": [(colors or {}).get(sid) or SUMMARY_COLOR for sid in ids],
+                "hover": [
+                    hover_panel.inner((hovers or {}).get(sid) or "")
+                    or hover_panel.row("Subsystem", escape(str(rows.name_of.get(sid, rows.factor_of[sid]))))
+                    + hover_panel.row(title, f"{float(scores[sid]):.2f}")
+                    for sid in ids
+                ],
             }
         ),
         marker="diamond",
@@ -589,9 +599,7 @@ def score_panel(
         line_color=DIAMOND_EDGE,
         line_width=1,
     )
-    panel.add_tools(
-        HoverTool(renderers=[diamonds], tooltips=[("", "@name"), (title, "@score{0.00}")])
-    )
+    panel.add_tools(HoverTool(renderers=[diamonds], tooltips=hover_panel.panel("@hover{safe}")))
     center_title_on_zero(panel)
     return panel
 

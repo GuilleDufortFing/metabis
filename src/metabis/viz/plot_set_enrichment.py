@@ -22,6 +22,7 @@ from ..analysis.set_enrichment import (
     SetEnrichmentDirection,
     SetEnrichmentFeatureType,
 )
+from ..managers.hover import panel as hover_panel
 from ..visual_config import theme
 from .ranking_layout import (
     RankedSubsystem,
@@ -31,7 +32,7 @@ from .ranking_layout import (
     ranking_figure,
     ranking_layout,
 )
-from .set_enrichment_overview import signed_log2_gradient_scale
+from .set_enrichment_overview import ora_family_label, ora_hover_facts, signed_log2_gradient_scale
 
 # One dot per subsystem takes the shared signed-log2 gradient (red for
 # over-representation among Target-higher features, blue for Target-lower); a
@@ -47,31 +48,6 @@ def _finite_number(value: object, *, default: float = 0.0) -> float:
     except (TypeError, ValueError):
         return default
     return number if math.isfinite(number) else default
-
-
-def _format_number(value: object, *, digits: int = 3) -> str:
-    try:
-        number = float(value)
-    except (TypeError, ValueError):
-        return "Not available"
-    if not math.isfinite(number):
-        return "Not available"
-    return f"{number:.{digits}f}"
-
-
-def _format_probability(value: object) -> str:
-    try:
-        number = float(value)
-    except (TypeError, ValueError):
-        return "Not available"
-    if not math.isfinite(number):
-        return "Not available"
-    if number <= 0:
-        return "&lt; 2.23 × 10<sup>−308</sup>"
-    if number < 0.001:
-        coefficient, exponent = f"{number:.2e}".split("e")
-        return f"{coefficient} × 10<sup>{int(exponent)}</sup>"
-    return f"{number:.3g}"
 
 
 def _direction_criterion_label(artifact: SetEnrichmentArtifact) -> str:
@@ -232,41 +208,22 @@ def _assign_gradient_colors(paired: pd.DataFrame):
 
 
 def _hover_html(row: pd.Series, *, artifact: SetEnrichmentArtifact) -> str:
-    family = (
-        "Reaction-Set Enrichment - Over-Representation Analysis"
-        if artifact.feature_type is SetEnrichmentFeatureType.REACTION
-        else "Gene-Set Enrichment - Over-Representation Analysis"
-    )
-    target_status = "Significant" if row["target_significant"] else "Not significant"
-    baseline_status = (
-        "Significant" if row["baseline_significant"] else "Not significant"
-    )
-    correction = {
-        "fdr_bh": "Benjamini–Hochberg FDR",
-        "holm": "Holm FWER",
-    }.get(row["correction"], row["correction"])
-    return (
-        "<div style='font-family:Inter,-apple-system,BlinkMacSystemFont,&quot;Segoe UI&quot;,sans-serif;"
-        "width:390px;max-width:390px;color:#1E2A32;background:#FFFFFF;"
-        "border:1px solid #D9E1E8;border-radius:8px;overflow:hidden;font-size:12px;'>"
-        "<div style='padding:10px 12px;background:#F7F9FB;border-bottom:1px solid #D9E1E8;'>"
-        f"<div style='font-size:14px;font-weight:700;color:#20435C;'>{escape(str(row['subsystem_name']))}</div>"
-        f"<div style='color:#5C6B76;'>{escape(str(row['category']))} · {family}</div></div>"
-        "<div style='display:grid;grid-template-columns:1fr 1fr;gap:8px 14px;padding:11px 12px;'>"
-        "<div style='border-left:4px solid #C62828;padding-left:8px;'><strong>Target-higher</strong><br/>"
-        f"{target_status}<br/>Ratio {_format_number(row['target_enrichment_ratio'])}<br/>"
-        f"Adjusted p {_format_probability(row['target_adjusted_pval'])}<br/>"
-        f"Overlap {row['target_overlap_size']} of {row['subsystem_size']} · query {row['target_query_size']}</div>"
-        "<div style='border-left:4px solid #1565C0;padding-left:8px;'><strong>Target-lower</strong><br/>"
-        f"{baseline_status}<br/>Ratio {_format_number(row['baseline_enrichment_ratio'])}<br/>"
-        f"Adjusted p {_format_probability(row['baseline_adjusted_pval'])}<br/>"
-        f"Overlap {row['baseline_overlap_size']} of {row['subsystem_size']} · query {row['baseline_query_size']}</div>"
-        "</div><div style='padding:8px 12px;border-top:1px solid #E5EBF0;background:#FBFCFD;color:#52616D;'>"
-        f"Background N={row['universe_size']} · {escape(str(correction))} over "
-        f"{row['correction_family_size']} hypotheses · q ≤ "
-        f"{_format_probability(artifact.config.adjusted_pvalue_threshold)}<br/>"
-        f"Reaction direction criterion: {escape(_direction_criterion_label(artifact))}"
-        "</div></div>"
+    """A subsystem's hover, without its panel, which the tooltip template draws.
+
+    The same facts as its node in the network (set_enrichment_overview), and the
+    reaction direction criterion the reactions were read under.
+    """
+    reactions = artifact.feature_type is SetEnrichmentFeatureType.REACTION
+    return hover_panel.row(
+        "Subsystem",
+        f"{escape(str(row['subsystem_name']))} <span style='color:#888;'>({escape(str(row['category']))})</span>",
+    ) + hover_panel.row("Analysis", ora_family_label(artifact.feature_type)) + ora_hover_facts(
+        row,
+        target_significant=bool(row["target_significant"]),
+        baseline_significant=bool(row["baseline_significant"]),
+        feature_type=artifact.feature_type,
+        threshold=artifact.config.adjusted_pvalue_threshold,
+        criterion=_direction_criterion_label(artifact) if reactions else None,
     )
 
 
@@ -339,12 +296,13 @@ def plot_set_enrichment_category(
         name="set_enrichment_subsystem_points",
     )
     reference = frame.attrs.get("color_reference")
-    hover_tooltip = "@hover_html{safe}"
-    if reference is not None:
-        hover_tooltip += reference.hover_template(
-            marker_x_field="color_reference_marker_x",
-            value_field="color_reference_value",
-        )
+    # The colour reference sits in the subsystem's panel, as on a graph node's.
+    hover_tooltip = hover_panel.panel(
+        "@hover_html{safe}",
+        reference.hover_template(marker_x_field="color_reference_marker_x", value_field="color_reference_value")
+        if reference is not None
+        else "",
+    )
     plot.add_tools(
         HoverTool(
             renderers=[points],

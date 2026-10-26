@@ -1,3 +1,4 @@
+from html import escape
 from typing import Any, Dict, List, Optional
 
 import numpy as np
@@ -19,6 +20,7 @@ from bokeh.models import (
 )
 from bokeh.plotting import figure, show
 
+from ..managers.hover import panel as hover_panel
 from ..managers.workspace_mode import AnalysisWorkspaceMode
 from ..visual_config import theme
 from .click_behavior import add_click_behavior, get_external_reference_data
@@ -403,7 +405,8 @@ def _create_scatter_figure(
         line_color=theme.MARK_EDGE,
         line_width=theme.MARK_EDGE_WIDTH,
     )
-    scatter_fig.add_tools(HoverTool(renderers=[others, marked], tooltips="@desc{safe}"))
+    # One panel, the nearest point's, rather than a column of them where points crowd.
+    scatter_fig.add_tools(HoverTool(renderers=[others, marked], tooltips="@desc{safe}", limit=1))
 
     if thresholds:
         _threshold_spans(
@@ -589,11 +592,13 @@ def _significance_histogram(
     plot.add_tools(
         HoverTool(
             renderers=bars,
-            tooltips=[
-                (x_label, "@left{0.000} to @right{0.000}"),
-                ("Significant", "@marked"),
-                ("Not significant", "@others"),
-            ],
+            tooltips=hover_panel.panel(
+                hover_panel.row(x_label, "@left{0.000} to @right{0.000}"),
+                hover_panel.section(
+                    hover_panel.row(f"Significant {element_label}", "@marked"),
+                    hover_panel.row(f"Not significant {element_label}", "@others"),
+                ),
+            ),
         )
     )
     plot.y_range.start = 0
@@ -829,7 +834,7 @@ def _prepare_scatter_source(
 
     # Generate hover text for all elements
     hover_texts = []
-    for idx in test_results.index:
+    for position, idx in enumerate(test_results.index):
         if idx in interesting_indices:
             hover_text = data_manager.get_element_hover(
                 element_id=idx,
@@ -840,24 +845,24 @@ def _prepare_scatter_source(
                 show_influence=False,
             )
         else:
-            # Simple lightweight tooltip
-            row = test_results.loc[idx]
-            pval_val = format_statistical_value(row.get("adjusted_pval", float("nan")))
-            fc_val = format_statistical_value(row.get("log2_fc", float("nan")))
-            d_val = format_statistical_value(row.get("cohens_d", float("nan")))
-            mean_diff_val = format_statistical_value(
-                row.get("mean_difference", float("nan"))
+            # A lighter panel for the rest, without the element's model details.
+            values = test_results.loc[idx]
+            hover_text = hover_panel.panel(
+                hover_panel.row("ID", escape(str(idx))),
+                hover_panel.row(element_type.capitalize(), escape(str(data["display_label"][position]))),
+                hover_panel.section(
+                    *(
+                        hover_panel.row(label, format_statistical_value(values.get(column, float("nan"))))
+                        for column, label in (
+                            ("adjusted_pval", "Adjusted p-value"),
+                            ("log2_fc", "Log2 FC"),
+                            ("cohens_d", "Cohen's d"),
+                            ("mean_difference", "Mean difference"),
+                        )
+                    ),
+                    title="Statistical Comparison",
+                ),
             )
-
-            hover_text = f"""
-            <div style="font-size: 12px; padding: 5px;">
-                <b>{idx}</b><br>
-                <span style="color: #666;">Adj. P-val:</span> {pval_val}<br>
-                <span style="color: #666;">Log2 FC:</span> {fc_val}<br>
-                <span style="color: #666;">Cohen's d:</span> {d_val}<br>
-                <span style="color: #666;">Mean Diff:</span> {mean_diff_val}
-            </div>
-            """
 
         hover_texts.append(hover_text)
     data["desc"] = hover_texts

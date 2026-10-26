@@ -37,6 +37,7 @@ from ..analysis.set_enrichment import (
     SetEnrichmentFeatureType,
 )
 from ..managers.color_distributions import ColorDistributionRegistry
+from ..managers.hover import panel as hover_panel
 from ..managers.workspace_mode import AnalysisWorkspaceMode
 from ..visual_config import theme
 
@@ -354,10 +355,62 @@ def _comparison_registry() -> ColorDistributionRegistry:
     )
 
 
-def _family_label(feature_type: SetEnrichmentFeatureType) -> str:
+def ora_family_label(feature_type: SetEnrichmentFeatureType) -> str:
+    """The analysis a family's ORA is, as its hovers name it."""
     if feature_type is SetEnrichmentFeatureType.REACTION:
-        return "Reaction-Set Enrichment - Over-Representation Analysis"
-    return "Gene-Set Enrichment - Over-Representation Analysis"
+        return "Reaction-set over-representation analysis"
+    return "Gene-set over-representation analysis"
+
+
+CORRECTION_LABELS = {"fdr_bh": "Benjamini–Hochberg FDR", "holm": "Holm FWER"}
+
+
+def ora_hover_facts(
+    detail: Mapping[str, Any],
+    *,
+    target_significant: bool,
+    baseline_significant: bool,
+    feature_type: SetEnrichmentFeatureType,
+    threshold: object,
+    criterion: str | None = None,
+) -> str:
+    """A subsystem's two over-representation tests, side by side, and how they ran.
+
+    ``detail`` holds each direction's ``target_``/``baseline_`` ratio, adjusted p,
+    overlap and query, the subsystem's and background's sizes and the correction;
+    the overview's network and its ORA ranking both show it in a hover panel.
+    """
+    noun = _feature_noun(feature_type)
+
+    def side(title: str, prefix: str, significant: bool, accent: str) -> str:
+        return hover_panel.column(
+            title,
+            hover_panel.significance(significant),
+            hover_panel.row("Enrichment ratio", _format_number(detail[f"{prefix}_enrichment_ratio"])),
+            hover_panel.row("Adjusted p-value", _format_probability(detail[f"{prefix}_adjusted_pval"])),
+            hover_panel.row("Overlap", f"{detail[f'{prefix}_overlap_size']} of {detail['subsystem_size']} {noun}"),
+            hover_panel.row("Query", f"{detail[f'{prefix}_query_size']} {noun}"),
+            accent=accent if significant else "transparent",
+        )
+
+    correction = CORRECTION_LABELS.get(str(detail["correction"]), str(detail["correction"]))
+    notes = [
+        hover_panel.note(
+            f"Against a background of {detail['universe_size']} {noun}, with {escape(correction)} "
+            f"over {detail['correction_family_size']} hypotheses; significant at q ≤ "
+            f"{_format_probability(threshold)}."
+        )
+    ]
+    if criterion:
+        notes.append(hover_panel.note(f"Reaction direction criterion: {escape(criterion)}."))
+    return hover_panel.section(
+        hover_panel.columns(
+            side("Target-higher", "target", target_significant, theme.UP_REGULATED),
+            side("Target-lower", "baseline", baseline_significant, theme.DOWN_REGULATED),
+        ),
+        *notes,
+        title="Over-representation",
+    )
 
 
 def _feature_noun(feature_type: SetEnrichmentFeatureType) -> str:
@@ -373,20 +426,19 @@ def _ineligible_hover_html(
 ) -> str:
     """Hover for an ORA-ineligible subsystem under the Set-Enrichment summary."""
     parts = [
-        "<div style='font-family:Inter,-apple-system,sans-serif;width:340px;"
-        "color:#1E2A32;font-size:12px;'>",
-        f"<div style='font-weight:700;'>{escape(display_name)}</div>",
-        f"<div style='color:#5C6B76;'>{_family_label(feature_type)}</div>",
+        hover_panel.row("Subsystem", escape(display_name)),
+        hover_panel.row("Analysis", ora_family_label(feature_type)),
     ]
     if show_stats:
         parts.append(
-            "<div style='color:#52616D;margin-top:4px;'>Not over-representation "
-            f"eligible: fewer than {minimum_measured_set_size} measured "
-            f"{_feature_noun(feature_type)} in this subsystem, so it was not tested "
-            "and is shown as not significant.</div>"
+            hover_panel.section(
+                hover_panel.note(
+                    f"Not tested, as fewer than {minimum_measured_set_size} of its "
+                    f"{_feature_noun(feature_type)} were measured; shown as not significant."
+                )
+            )
         )
-    parts.append("</div>")
-    return "".join(parts)
+    return hover_panel.panel(*parts)
 
 
 def _format_number(value: object, *, digits: int = 3) -> str:
@@ -412,10 +464,6 @@ def _format_probability(value: object) -> str:
         coefficient, exponent = f"{number:.2e}".split("e")
         return f"{coefficient}e{int(exponent)}"
     return f"{number:.3g}"
-
-
-def _status(is_significant: bool) -> str:
-    return "Significant" if is_significant else "Not significant"
 
 
 def _color_reference_html(
@@ -472,45 +520,24 @@ def _subsystem_hover_html(
     show_stats: bool,
     show_color_reference: bool,
 ) -> str:
-    family = _family_label(feature_type)
     detail = decision.detail
     parts = [
-        "<div style='font-family:Inter,-apple-system,sans-serif;width:340px;"
-        "color:#1E2A32;font-size:12px;'>",
-        f"<div style='font-weight:700;'>{escape(decision.display_name)}</div>",
-        f"<div style='color:#5C6B76;'>{family}</div>",
+        hover_panel.row("Subsystem", escape(decision.display_name)),
+        hover_panel.row("Analysis", ora_family_label(feature_type)),
     ]
     if show_stats:
-        parts.extend(
-            [
-                f"<div style='border-left:3px solid {theme.UP_REGULATED};padding-left:6px;"
-                "margin-top:4px;'>"
-                f"<strong>Target-higher</strong> · {_status(decision.target_significant)}"
-                "<br/>Ratio "
-                f"{_format_number(detail['target_enrichment_ratio'])} · adj p "
-                f"{_format_probability(detail['target_adjusted_pval'])}<br/>"
-                f"Overlap {detail['target_overlap_size']} of "
-                f"{detail['subsystem_size']} · query {detail['target_query_size']}"
-                "</div>",
-                f"<div style='border-left:3px solid {theme.DOWN_REGULATED};padding-left:6px;"
-                "margin-top:4px;'>"
-                f"<strong>Target-lower</strong> · {_status(decision.baseline_significant)}"
-                "<br/>Ratio "
-                f"{_format_number(detail['baseline_enrichment_ratio'])} · adj p "
-                f"{_format_probability(detail['baseline_adjusted_pval'])}<br/>"
-                f"Overlap {detail['baseline_overlap_size']} of "
-                f"{detail['subsystem_size']} · query {detail['baseline_query_size']}"
-                "</div>",
-                "<div style='color:#52616D;margin-top:4px;'>Background N="
-                f"{detail['universe_size']} · {escape(str(detail['correction']))} over "
-                f"{detail['correction_family_size']} hypotheses · q ≤ "
-                f"{_format_probability(detail['adjusted_pvalue_threshold'])}</div>",
-            ]
+        parts.append(
+            ora_hover_facts(
+                detail,
+                target_significant=decision.target_significant,
+                baseline_significant=decision.baseline_significant,
+                feature_type=feature_type,
+                threshold=detail["adjusted_pvalue_threshold"],
+            )
         )
     if show_color_reference:
         parts.append(_color_reference_html(decision, color_manager, metric_name))
-    parts.append("</div>")
-    return "".join(parts)
+    return hover_panel.panel(*parts)
 
 
 __all__ = [
@@ -521,6 +548,8 @@ __all__ = [
     "SubsystemEnrichmentDecision",
     "build_set_enrichment_overview_colors",
     "build_subsystem_decisions",
+    "ora_family_label",
+    "ora_hover_facts",
     "signed_log2_gradient_colors",
     "signed_log2_gradient_scale",
 ]

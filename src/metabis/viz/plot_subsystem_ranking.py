@@ -14,6 +14,7 @@ from ..analysis.activity_analysis import (
     ActivityOverlay,
     displayed_feature_id,
 )
+from ..managers.hover import panel as hover_panel
 from ..managers.workspace_mode import AnalysisWorkspaceMode
 from ..visual_config import theme
 from .click_behavior import add_click_behavior, get_external_reference_data
@@ -49,7 +50,7 @@ def _attach_color_reference(
     axis clamp later drew it.
     """
     if reference is None:
-        return "@desc{safe}"
+        return hover_panel.panel("@desc{safe}")
     values = [
         float(value) if value is not None and np.isfinite(value) else 0.0
         for value in all_data["x"]
@@ -58,9 +59,13 @@ def _attach_color_reference(
     all_data["color_reference_marker_x"] = [
         reference.marker_x(value) for value in values
     ]
-    return "@desc{safe}" + reference.hover_template(
-        marker_x_field="color_reference_marker_x",
-        value_field="color_reference_value",
+    # The reference sits in the element's panel, as on a graph node's.
+    return hover_panel.panel(
+        "@desc{safe}",
+        reference.hover_template(
+            marker_x_field="color_reference_marker_x",
+            value_field="color_reference_value",
+        ),
     )
 
 
@@ -108,6 +113,35 @@ def node_colors(
         if color:
             colors[subsystem] = color
     return colors
+
+
+def subsystem_hovers(
+    data_manager,
+    subsystem_ids: List[str],
+    element_type: str,
+    metric: str,
+    delta_options: Optional[Dict[str, Any]] = None,
+) -> Dict[str, str]:
+    """Each subsystem's hover as its node has it in the network, for its diamond.
+
+    Without the colour reference's picture, which every row would otherwise carry.
+    """
+    getter = getattr(data_manager, "get_element_hover", None)
+    if not callable(getter):
+        return {}
+    hovers = {}
+    for subsystem in subsystem_ids:
+        try:
+            hovers[subsystem] = getter(
+                element_id=subsystem,
+                element_type=element_type,
+                color_metric=metric,
+                delta_options=delta_options,
+                show_stats=True,
+            )
+        except Exception:
+            continue
+    return hovers
 
 
 def _finish(layout, return_plot: bool):
@@ -290,7 +324,8 @@ def plot_subsystem_comparison(
     plot.background_fill_color = background_fill_color
     add_focus_link(plot, rows, navigation_event=navigation_event)
     dots = _draw_points(plot, all_data)
-    plot.add_tools(HoverTool(renderers=[dots], tooltips="@desc{safe}"))
+    # One panel, the nearest element's, where a row's elements crowd.
+    plot.add_tools(HoverTool(renderers=[dots], tooltips=hover_panel.panel("@desc{safe}"), limit=1))
 
     names = names_panel(rows, plot, navigation_event=navigation_event)
     score = score_panel(
@@ -301,6 +336,15 @@ def plot_subsystem_comparison(
         x_label="Delta score",
         colors=colors,
         navigation_event=navigation_event,
+        hovers=subsystem_hovers(
+            data_manager,
+            list(scores),
+            "subsystem_genes" if for_genes else "subsystem",
+            metric,
+            delta_options,
+        )
+        if groups is None
+        else None,
     )
     layout = ranking_layout(rows, names, plot, score)
     add_click_behavior(
@@ -502,11 +546,14 @@ def plot_subsystem_activity_ranking(
             all_data["alpha"].append(0.85)
             all_data["color"].append(colors.loc[feature_id])
             all_data["marker"].append("circle")
+            # Its panel's content: the tooltip template draws the panel.
             all_data["desc"].append(
-                data_manager.get_element_hover(
-                    element_id=feature_id,
-                    element_type=overlay_name,
-                    show_stats=True,
+                hover_panel.inner(
+                    data_manager.get_element_hover(
+                        element_id=feature_id,
+                        element_type=overlay_name,
+                        show_stats=True,
+                    )
                 )
             )
             all_metric_values.append(value)
@@ -570,7 +617,7 @@ def plot_subsystem_activity_ranking(
     plot.background_fill_color = background_fill_color
     add_focus_link(plot, rows, navigation_event=navigation_event)
     dots = _draw_points(plot, all_data)
-    plot.add_tools(HoverTool(renderers=[dots], tooltips=hover_tooltip))
+    plot.add_tools(HoverTool(renderers=[dots], tooltips=hover_tooltip, limit=1))
     # The subsystem's own score, the median of its members, on their scale, in its
     # node's colour, in a panel of its own.
     names = names_panel(rows, plot, navigation_event=navigation_event)
@@ -585,6 +632,10 @@ def plot_subsystem_activity_ranking(
         navigation_event=navigation_event,
         # Wider than the members' own, so a diamond at either end is drawn whole.
         x_range=Range1d(lower - 2.5 * padding, upper + 2.5 * padding),
+        # Its node's hover, which reports the true score of a clamped diamond.
+        hovers=subsystem_hovers(data_manager, [entry.subsystem_id for entry in ranked], "subsystem", activity_metric)
+        if groups is None
+        else None,
     )
     layout = ranking_layout(rows, names, plot, score)
 
@@ -699,10 +750,11 @@ def _prepare_subsystem_scatter_data_horizontal(
         data["display_label"].append(reference_data["display_label"])
         data["external_url"].append(reference_data["external_url"])
 
+        # Its panel's content: the tooltip template draws the panel.
         hover_text = data_manager.get_element_hover(
             element_id=idx, element_type=element_type, show_stats=True
         )
-        hover_texts.append(hover_text)
+        hover_texts.append(hover_panel.inner(hover_text))
     data["desc"] = hover_texts
 
     return data

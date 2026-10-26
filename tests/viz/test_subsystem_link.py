@@ -148,6 +148,17 @@ def test_a_tap_on_a_category_selects_it_and_the_network_follows():
     circles = plot.select_one({"name": CATEGORY_CIRCLES})
     hexes = plot.select_one({"name": CATEGORY_HEXES})
     assert circles.data["category"] == ["Carbohydrate Metabolism"]
+    # Pointing at a number names its category and counts its subsystems, in the
+    # hover panel every figure has.
+    from bokeh.models import HoverTool
+
+    from metabis.managers.hover.panel import PANEL_STYLE
+
+    (number_hover,) = [
+        tool for tool in plot.select({"type": HoverTool}) if any(r.data_source is hexes for r in tool.renderers or [])
+    ]
+    assert number_hover.tooltips.startswith(f"<div style='{PANEL_STYLE}'>") and "@count" in number_hover.tooltips
+    assert "count" in hexes.data
     assert hexes.data["badge"] == ["1"] and hexes.data["category"] == circles.data["category"]
     assert circles.data["base_alpha"] == [0.4]
     (callback,) = focus.js_property_callbacks["change:data"]

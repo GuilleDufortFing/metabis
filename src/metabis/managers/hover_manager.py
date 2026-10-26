@@ -14,6 +14,7 @@ from .element_presentation import (
 )
 from .hover import presets
 from .hover.models import HoverContext
+from .hover.panel import PANEL_STYLE
 from .workspace_mode import AnalysisWorkspaceMode
 
 logger = logging.getLogger(__name__)
@@ -73,47 +74,22 @@ class HoverManager:
         """Initialize hover builders based on the current mode.
 
         Creates mode-appropriate hover builders for genes, reactions, and subsystems.
-        Different modes use different styling and content strategies.
+        Different modes use different content strategies, in one panel style.
         """
         self.gene_hover_builder = presets.create_gene_builder_for_mode(self._mode)
         self.reaction_hover_builder = presets.create_reaction_builder_for_mode(self._mode)
         self.metabolite_hover_builder = presets.create_metabolite_builder_for_mode(self._mode)
         self.subsystem_hover_builder = presets.create_subsystem_builder_for_mode(self._mode)
 
-        if self._mode == AnalysisWorkspaceMode.GROUP_COMPARISON:
-            # Group Comparison styling
-            style = (
-                "font-family: Arial, sans-serif; font-size:12px; padding:10px; "
-                "border:1px solid #ddd; border-radius:4px; background-color:rgba(255, 255, 255, 0.95); "
-                "box-shadow: 0 2px 5px rgba(0,0,0,0.1); max-width: 700px;"
-            )
-            self.gene_hover_builder.set_container_style(style)
-            self.reaction_hover_builder.set_container_style(style)
-            self.metabolite_hover_builder.set_container_style(style)
-            self.subsystem_hover_builder.set_container_style(style)
-
-        elif self._mode == AnalysisWorkspaceMode.EXPERIMENT_ANALYSIS:
-            # Experiment Analysis styling
-            style = (
-                "font-family: Arial, sans-serif; font-size:12px; padding:10px; "
-                "border:1px solid #ddd; border-radius:4px; background-color:rgba(255, 255, 255, 0.95); "
-                "box-shadow: 0 2px 5px rgba(0,0,0,0.1); max-width: 700px;"
-            )
-            self.gene_hover_builder.set_container_style(style)
-            self.reaction_hover_builder.set_container_style(style)
-            self.metabolite_hover_builder.set_container_style(style)
-            self.subsystem_hover_builder.set_container_style(style)
-
-        else:
-            # No Experiment styling
-            style = (
-                "font-family: Arial, sans-serif; font-size:12px; padding:8px; "
-                "border:1px solid #ddd; border-radius:4px; background-color:#f9f9f9;"
-            )
-            self.gene_hover_builder.set_container_style(style)
-            self.reaction_hover_builder.set_container_style(style)
-            self.metabolite_hover_builder.set_container_style(style)
-            self.subsystem_hover_builder.set_container_style(style)
+        # Every mode draws its panels alike, as the subsystem graph's reactions and
+        # genes are drawn in a comparison (panel.PANEL_STYLE).
+        for builder in (
+            self.gene_hover_builder,
+            self.reaction_hover_builder,
+            self.metabolite_hover_builder,
+            self.subsystem_hover_builder,
+        ):
+            builder.set_container_style(PANEL_STYLE)
 
     def refresh_builders(self, new_mode: Optional[AnalysisWorkspaceMode] = None) -> None:
         """Refresh hover builders when mode changes.
@@ -638,11 +614,12 @@ class HoverManager:
                     color_metric=color_metric,
                     show_color_reference=show_color_reference,
                 )
-            elif element_type == "subsystem":
+            elif element_type in ("subsystem", "subsystem_genes"):
+                # A subsystem read through its genes, as the overview's gene overlay draws it.
                 return self.get_subsystem_hover(
                     subsystem_name=element_id,
                     subsystem_metric=color_metric,
-                    for_genes=False,
+                    for_genes=element_type == "subsystem_genes",
                     show_stats=show_stats,
                     show_color_reference=show_color_reference,
                     delta_options=delta_options,
