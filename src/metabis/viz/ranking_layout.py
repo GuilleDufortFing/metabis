@@ -62,6 +62,7 @@ from .metabolic_visualization.generation.graph_building.spaced_network import (
 )
 from .plot_utils import apply_academic_style
 from .subsystem_link import (
+    CATEGORY_EVENT,
     FOCUS_EVENT,
     FOCUS_SOURCE,
     attach,
@@ -111,6 +112,8 @@ SCORE_WIDTH = 120  # the score panel beside the elements; alone it takes the wid
 # either end is drawn whole inside the frame.
 SCORE_REACH = 1.25
 DIAMOND_EDGE = "#000000"
+# The tint behind the name in focus: the gradient at this opacity, a pale shade.
+NAME_TINT_ALPHA = 0.22
 NAMES_MIN_WIDTH = 240  # room for a heading of about 30 characters on one line
 
 
@@ -493,7 +496,38 @@ def names_panel(
     chosen = plot.select_one({"name": CHOSEN_CATEGORY})
     if chosen is not None:
         follow_category(chosen, headings, badge)
+        select_on_heading(panel, rows, chosen)
     return panel
+
+
+def select_on_heading(panel, rows: RankingRows, chosen: ColumnDataSource) -> None:
+    """A click on a category's heading, its number or its name, selects the category.
+
+    It dispatches :data:`CATEGORY_EVENT` as a click on the network's number does,
+    with ``null`` when the category is already selected, for the page to relay.
+    """
+    panel.js_on_event(
+        "tap",
+        CustomJS(
+            args=dict(
+                panel=panel,
+                chosen=chosen,
+                factors=[list(heading.factors) for heading in rows.headings],
+                categories=[heading.category for heading in rows.headings],
+                event=CATEGORY_EVENT,
+            ),
+            code="""
+            const y = cb_obj.y
+            const hit = categories.find((category, i) => factors[i].some((factor) => {
+              const middle = panel.y_range.synthetic(factor)
+              return Math.abs(y - middle) <= 0.5
+            }))
+            if (hit === undefined) return
+            const category = chosen.data.category[0] === hit ? null : hit
+            window.dispatchEvent(new CustomEvent(event, {detail: {category}}))
+            """,
+        ),
+    )
 
 
 def score_panel(
@@ -671,6 +705,20 @@ def outline_selection(panels: List, rows: RankingRows, chosen: ColumnDataSource,
     gradient runs from the first shown panel's left to the last one's right, as if
     they were one.
     """
+    # Behind the name in focus, in the names panel only, where no data is drawn:
+    # a light tint of the gradient, so the row is found at a glance.
+    tint = ColumnDataSource({key: [] for key in ("left", "right", "bottom", "top", "color")})
+    panels[0].quad(
+        left="left",
+        right="right",
+        bottom="bottom",
+        top="top",
+        fill_color="color",
+        fill_alpha=NAME_TINT_ALPHA,
+        line_color=None,
+        level="underlay",
+        source=tint,
+    )
     sources = []
     for panel in panels:
         source = ColumnDataSource({key: [] for key in ("x0", "y0", "x1", "y1", "color")})
@@ -688,7 +736,9 @@ def outline_selection(panels: List, rows: RankingRows, chosen: ColumnDataSource,
         sources.append(source)
     edges = {category: list(rows.edges(category)) for category in rows.members}
     callback = CustomJS(
-        args=dict(panels=panels, sources=sources, chosen=chosen, focused=focused, edges=edges, edge=OUTLINE_WIDTH),
+        args=dict(
+            panels=panels, sources=sources, tint=tint, chosen=chosen, focused=focused, edges=edges, edge=OUTLINE_WIDTH
+        ),
         code=GRADIENT_JS
         + """
         const shown = panels.map((panel) => panel.visible !== false)
@@ -700,10 +750,26 @@ def outline_selection(panels: List, rows: RankingRows, chosen: ColumnDataSource,
         const category = chosen.data.category[0]
         if (category != null && edges[category]) boxes.push(edges[category])
         const factors = panels[0].y_range.factors
+        const rows = []
         for (const factor of focused.data.y) {
           const i = factors.indexOf(factor)
-          if (i >= 0) boxes.push([i, i + 1])
+          if (i >= 0) rows.push([i, i + 1])
         }
+        boxes.push(...rows)
+        // The tint runs the gradient across the names, in slices.
+        const names = panels[0].x_range
+        const fill = {left: [], right: [], bottom: [], top: [], color: []}
+        const slices = 24
+        for (const [bottom, top] of rows) {
+          for (let i = 0; i < slices; i++) {
+            fill.left.push(names.start + (names.end - names.start) * i / slices)
+            fill.right.push(names.start + (names.end - names.start) * (i + 1) / slices)
+            fill.bottom.push(bottom)
+            fill.top.push(top)
+            fill.color.push(metabisGradient((i + 0.5) / slices))
+          }
+        }
+        tint.data = fill
         let offset = 0
         panels.forEach((panel, k) => {
           const out = {x0: [], y0: [], x1: [], y1: [], color: []}
@@ -862,6 +928,7 @@ __all__ = [
     "ranking_figure",
     "ranking_layout",
     "score_panel",
+    "select_on_heading",
     "shade_rows",
     "spread_offset",
 ]

@@ -157,6 +157,9 @@ def test_one_subsystems_band_at_a_time():
     # under everything else the map draws.
     outline, core = plot.renderers[:2]
     assert outline.data_source is core.data_source
+    # On the lowest level, with the links, which come after it, so its white core
+    # never covers them.
+    assert outline.level == core.level == "image"
     assert core.glyph.line_color == "#ffffff" and outline.glyph.line_color == "color"
     band = outline.data_source.data
     assert band["x0"] and len(set(band["color"])) > 3

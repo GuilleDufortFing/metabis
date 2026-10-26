@@ -157,8 +157,18 @@ def test_a_tap_on_a_category_selects_it_and_the_network_follows():
     assert callback.args["badge"] is plot.select_one({"name": CATEGORY_BADGE})
     assert set(callback.args["ring"].data) == {"x0", "y0", "x1", "y1", "color"}
     assert "metabisRing" in callback.code and "tint" not in callback.code
+    # The ring runs under the numbers on the circles' rims, never across them.
+    levels = ("image", "underlay", "glyph", "guide", "annotation", "overlay")
+    (ring,) = [r for r in plot.renderers if getattr(r, "data_source", None) is callback.args["ring"]]
+    numbers = [r for r in plot.renderers if getattr(r, "data_source", None) in (hexes, callback.args["badge"])]
+    assert numbers and all(levels.index(ring.level) < levels.index(r.level) for r in numbers)
     (tap,) = plot.js_event_callbacks["tap"]
     assert tap.args["event"] == CATEGORY_EVENT and tap.args["nodes"] is not None
+    # Clearing the category hands the view back to Bokeh's fit, and a zoomed view
+    # keeps one scale on both axes when the plot changes size.
+    assert "have_updated_interactively = category !== null" in callback.code
+    for size in ("inner_width", "inner_height"):
+        assert any("have_updated_interactively" in c.code for c in plot.js_property_callbacks[f"change:{size}"])
 
 
 def test_a_selected_categorys_subsystems_are_named_by_category():
@@ -249,3 +259,45 @@ def test_the_page_chooses_the_score_the_elements_or_both():
     ]
     (diamond,) = diamonds
     assert diamond.glyph.line_color == "#000000"
+
+
+def test_a_click_on_a_ranking_heading_selects_its_category():
+    from metabis.viz.ranking_layout import RANKING_NAMES
+    from metabis.viz.subsystem_link import CATEGORY_EVENT
+
+    stats = pd.DataFrame({"subsystem": [SUBSYSTEM], "delta_score": [1.4]})
+    layout = plot_subsystem_comparison(
+        data_manager=_Workspace(),
+        subsystem_stats=stats,
+        metric=METRIC,
+        return_plot=True,
+        navigation_event=NAVIGATE,
+    )
+    names = layout.select_one({"name": RANKING_NAMES})
+
+    (tap,) = names.js_event_callbacks["tap"]
+    assert tap.args["event"] == CATEGORY_EVENT
+    assert tap.args["factors"] == [["heading:1:0"]]
+    # A second click on the selected category clears it.
+    assert "=== hit ? null : hit" in tap.code
+
+
+def test_the_name_in_focus_takes_a_tint_of_the_gradient_in_the_names_panel_only():
+    from metabis.viz.ranking_layout import FOCUSED_ROWS, NAME_TINT_ALPHA, RANKING_NAMES
+
+    stats = pd.DataFrame({"subsystem": [SUBSYSTEM], "delta_score": [1.4]})
+    layout = plot_subsystem_comparison(
+        data_manager=_Workspace(),
+        subsystem_stats=stats,
+        metric=METRIC,
+        return_plot=True,
+        navigation_event=NAVIGATE,
+    )
+    focused = layout.select_one({"name": FOCUSED_ROWS})
+    (outline,) = focused.js_property_callbacks["change:data"]
+    tint = outline.args["tint"]
+    drawn_by = [r for r in layout.select({"type": GlyphRenderer}) if r.data_source is tint]
+
+    assert len(drawn_by) == 1
+    assert drawn_by[0] in layout.select_one({"name": RANKING_NAMES}).renderers
+    assert drawn_by[0].glyph.fill_alpha == NAME_TINT_ALPHA

@@ -367,10 +367,11 @@ def add_map_bands(plot, map_id: str, shown: Optional[str] = None) -> Optional[Co
             every[key].extend(values)
     every = ColumnDataSource(every)
     drawn = ColumnDataSource({key: [] for key in ("x0", "y0", "x1", "y1", "color")})
-    common = dict(x0="x0", y0="y0", x1="x1", y1="y1", line_cap="round", level="underlay", source=drawn)
+    # On the links' own level, before them: under the links and the nodes, over
+    # the compartments only.
+    common = dict(x0="x0", y0="y0", x1="x1", y1="y1", line_cap="round", level="image", source=drawn)
     outline = plot.segment(line_color="color", line_width=1, **common)
     core = plot.segment(line_color="#ffffff", line_width=0, **common)
-    # Under the links and the nodes, and over the compartments only.
     renderers = [renderer for renderer in plot.renderers if renderer not in (outline, core)]
     after = max(
         (

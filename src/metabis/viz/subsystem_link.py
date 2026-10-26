@@ -108,7 +108,8 @@ def add_network_focus_link(plot, nodes: Optional[ColumnDataSource] = None) -> Op
         focus = focus_source()
         attach(plot, focus)
     # The ring round the subsystem in focus and round a selected category, outlined
-    # in the logo's gradient as short segments (brand.GRADIENT_JS).
+    # in the logo's gradient as short segments (brand.GRADIENT_JS). It is drawn over
+    # the subsystems but under the categories' numbers, which sit on their rims.
     ring = ColumnDataSource({"x0": [], "y0": [], "x1": [], "y1": [], "color": []}, name=NETWORK_OUTLINE)
     plot.segment(
         x0="x0",
@@ -118,7 +119,7 @@ def add_network_focus_link(plot, nodes: Optional[ColumnDataSource] = None) -> Op
         line_color="color",
         line_width=OUTLINE_WIDTH,
         line_cap="round",
-        level="overlay",
+        level="glyph",
         source=ring,
     )
     # The shared-metabolite edges fade with the nodes while a search is active.
@@ -211,9 +212,9 @@ def add_network_focus_link(plot, nodes: Optional[ColumnDataSource] = None) -> Op
             if (view.category === null) view.ranges = [xr.start, xr.end, yr.start, yr.end]
             view.category = category
             // As a zoom tool does, so a data range keeps the view rather than
-            // computing it again from the data.
-            xr.have_updated_interactively = true
-            yr.have_updated_interactively = true
+            // computing it again from the data; cleared, it fits the data again.
+            xr.have_updated_interactively = category !== null
+            yr.have_updated_interactively = category !== null
             if (chosen >= 0) {
               let width = 0
               let height = 0
@@ -235,6 +236,26 @@ def add_network_focus_link(plot, nodes: Optional[ColumnDataSource] = None) -> Op
             """,
         ),
     )
+    # A zoomed view keeps both axes at one scale when the plot changes size, as
+    # when the key under it is shown or its column is widened; an unzoomed one is
+    # fitted to the data again by Bokeh itself.
+    same_scale = CustomJS(
+        args=dict(plot=plot),
+        code="""
+        const xr = plot.x_range
+        const yr = plot.y_range
+        if (!xr.have_updated_interactively && !yr.have_updated_interactively) return
+        let width, height
+        try { width = plot.inner_width; height = plot.inner_height } catch { return }
+        if (!(width > 0 && height > 0)) return
+        const half = Math.abs(xr.end - xr.start) / width * height / 2
+        const middle = (yr.start + yr.end) / 2
+        yr.have_updated_interactively = true
+        yr.setv(yr.start > yr.end ? {start: middle + half, end: middle - half} : {start: middle - half, end: middle + half})
+        """,
+    )
+    plot.js_on_change("inner_width", same_scale)
+    plot.js_on_change("inner_height", same_scale)
     if circles is not None:
         plot.js_on_event(
             "tap",
