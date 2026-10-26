@@ -331,9 +331,9 @@ def add_fitting_label_callback(plot, label_source, focus):
     A name fits when its lines take at most 90% of the node's width on screen, so
     the names that show never meet; zooming in names more nodes. The subsystem in
     ``focus`` (the page's shared selection, :mod:`metabis.viz.subsystem_link`), and
-    a search's few matches, are named whatever their size, on a white backing; near
-    either side of the view, such a name starts or ends at its node's edge, so the
-    frame does not cut it. While a category is selected, every one of its
+    a search's few matches, are named whatever their size; near either side of the
+    view, such a name starts or ends at its node's edge, so the frame does not cut
+    it. While a category is selected, every one of its
     subsystems is named, centred on its node, and no other subsystem is.
     """
     callback = CustomJS(
@@ -356,7 +356,6 @@ def add_fitting_label_callback(plot, label_source, focus):
         if (matches.length <= named_matches) matches.forEach((id) => named.add(id))
         const category = focus.data.id.find((id, i) => kinds[i] === 'category') ?? null
         const alpha = []
-        const backing = []
         const align = []
         const offset = []
         const start = Math.min(plot.x_range.start, plot.x_range.end)
@@ -366,7 +365,6 @@ def add_fitting_label_callback(plot, label_source, focus):
           const member = category !== null && data.category[i] === category
           const shown = named.has(data.element_id[i]) || member
           alpha.push(shown || (fits && category === null) ? 1 : 0)
-          backing.push(shown && !fits ? 0.85 : 0)
           // Where the node sits across the view, from 0 at the left to 1 at the right.
           const across = (data.x[i] - start) * scale / width
           const edge = data.radius[i] * scale
@@ -385,7 +383,6 @@ def add_fitting_label_callback(plot, label_source, focus):
           }
         }
         data.text_alpha = alpha
-        data.background_fill_alpha = backing
         data.text_align = align
         data.x_offset = offset
         labels.change.emit()

@@ -157,6 +157,8 @@ def test_a_tap_on_a_category_selects_it_and_the_network_follows():
     assert callback.args["badge"] is plot.select_one({"name": CATEGORY_BADGE})
     assert set(callback.args["ring"].data) == {"x0", "y0", "x1", "y1", "color"}
     assert "metabisRing" in callback.code and "tint" not in callback.code
+    # The subsystem in focus is outlined on its own rim, as a highlighter.
+    assert "nodes.data.radius[index], down)" in callback.code
     # The ring runs under the numbers on the circles' rims, never across them.
     levels = ("image", "underlay", "glyph", "guide", "annotation", "overlay")
     (ring,) = [r for r in plot.renderers if getattr(r, "data_source", None) is callback.args["ring"]]
@@ -203,6 +205,15 @@ def test_a_selected_categorys_subsystems_are_named_by_category():
     assert labels.data["category"] == ["Carbohydrate Metabolism"]
     # The full name, wrapped by the network, not the glyph's own line breaks.
     assert labels.data["label_text"] == ["Glycolysis /\nGluconeogenesis"]
+    # No box behind a name, which would hide its node's colour: a white outline
+    # round its letters, drawn under them so they keep their weight.
+    from bokeh.models import LabelSet
+
+    halo, names = [layout for layout in plot.center if isinstance(layout, LabelSet) and layout.source is labels]
+    assert (halo.text_color, halo.text_outline_color) == ("#ffffff", "#ffffff")
+    assert names.text_color != "#ffffff" and names.text_outline_color is None
+    assert all(layout.background_fill_color is None for layout in (halo, names))
+    assert "background_fill_alpha" not in labels.data
     # A node with no data keeps its dashed edge a little heavier.
     assert nodes.data["line_width"] == [1.4]
 

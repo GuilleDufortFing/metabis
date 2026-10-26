@@ -858,29 +858,33 @@ def _draw_enriched_subsystems(plot, subsystem_glyphs):
     ]
     label_data["label_height"] = [len(name) * NETWORK_LABEL_LINE_HEIGHT for name in lines]
     label_data["text_alpha"] = [0.0] * len(lines)
-    label_data["background_fill_alpha"] = [0.0] * len(lines)
     label_data["text_align"] = ["center"] * len(lines)
     label_data["x_offset"] = [0.0] * len(lines)
     label_source = ColumnDataSource(label_data, name=NETWORK_LABELS)
 
-    labels = LabelSet(
-        x="x",
-        y="y",
-        text="label_text",
-        text_color=VisualizationConstants.CATEGORY_LABEL_COLOR,
-        text_font=value(VisualizationConstants.FONT_FAMILY),
-        text_font_size=VisualizationConstants.FONT_SIZE_SUBSYSTEM,
-        text_font_style="bold",
-        text_align="text_align",
-        text_baseline="middle",
-        x_offset="x_offset",
-        text_alpha="text_alpha",
-        background_fill_color="#ffffff",
-        background_fill_alpha="background_fill_alpha",
-        level="glyph",
-        source=label_source,
-    )
-    plot.add_layout(labels)
+    # A name has no box behind it, which would hide its node's colour, but a thin
+    # white outline round its letters: the same names drawn first in white, each
+    # letter stroked a little wider, so the dark letters over them keep their
+    # full weight (BokehJS strokes text after filling it).
+    for color, outline in (("#ffffff", "#ffffff"), (VisualizationConstants.CATEGORY_LABEL_COLOR, None)):
+        plot.add_layout(
+            LabelSet(
+                x="x",
+                y="y",
+                text="label_text",
+                text_color=color,
+                text_outline_color=outline,
+                text_font=value(VisualizationConstants.FONT_FAMILY),
+                text_font_size=VisualizationConstants.FONT_SIZE_SUBSYSTEM,
+                text_font_style="bold",
+                text_align="text_align",
+                text_baseline="middle",
+                x_offset="x_offset",
+                text_alpha="text_alpha",
+                level="glyph",
+                source=label_source,
+            )
+        )
     focus = focus_source()
     attach(plot, focus)
     add_fitting_label_callback(plot, label_source, focus)

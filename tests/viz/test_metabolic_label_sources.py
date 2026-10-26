@@ -54,7 +54,9 @@ def test_label_sources_exclude_hover_payloads_used_only_by_glyphs():
     )
 
     label_sets = list(plot.select({"type": LabelSet}))
-    assert len(label_sets) == 6
+    # The network's names are drawn twice from one source: white outlines, then the letters.
+    assert len(label_sets) == 7
+    assert len({id(labels.source) for labels in label_sets}) == 6
     assert all("hover" not in labels.source.data for labels in label_sets)
     assert all(labels.text in labels.source.data for labels in label_sets)
 

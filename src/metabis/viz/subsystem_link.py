@@ -162,7 +162,8 @@ def add_network_focus_link(plot, nodes: Optional[ColumnDataSource] = None) -> Op
             const down = plot.y_range.start > plot.y_range.end ? 1 : -1
             const outline = {x0: [], y0: [], x1: [], y1: [], color: []}
             if (index >= 0) {
-              metabisRing(outline, nodes.data.x[index], nodes.data.y[index], nodes.data.radius[index] * 1.25 + 40, down)
+              // On the subsystem's own rim, as a highlighter over its edge.
+              metabisRing(outline, nodes.data.x[index], nodes.data.y[index], nodes.data.radius[index], down)
             }
             const base = nodes.data.base_alpha
             const members = nodes.data.category ?? []
