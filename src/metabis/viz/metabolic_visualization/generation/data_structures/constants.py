@@ -297,6 +297,9 @@ class VisualizationConstants:
 
     # Arrowhead styling
     ARROWHEAD_SIZE = 18
+    # A map's arrowheads are drawn once they would be this many pixels long, when
+    # they can be read; seen whole, a map's arrowheads are a pixel or two.
+    ARROWHEAD_MIN_PIXELS = 3
     ARROWHEAD_ANGLE_RADIANS = 3.14159 / 6  # 30 degrees = π/6 radians
 
     # Connection geometry

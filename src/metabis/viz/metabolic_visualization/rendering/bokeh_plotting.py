@@ -4,7 +4,7 @@ import math
 import textwrap
 
 from bokeh.core.properties import value
-from bokeh.models import ColumnDataSource, HoverTool, LabelSet
+from bokeh.models import ColumnDataSource, CustomJS, HoverTool, LabelSet
 from bokeh.plotting import figure
 
 from ....visual_config import theme
@@ -1205,9 +1205,17 @@ def _draw_atlas_links(plot, atlas, connections):
 
     A reaction's paths take the colour, fading and dash its straight links had
     (the glow in its colour under a grey line, as
-    :func:`_draw_metabolic_connections_with_arrowheads` draws them), and its
-    arrowheads are Metabolic Atlas's. Returns the connections left to draw
-    straight: every one but a routed reaction's metabolic links.
+    :func:`_draw_metabolic_connections_with_arrowheads` draws them). Its
+    arrowheads stand where Metabolic Atlas's do, pointing the same way, but are
+    drawn as the straight links' are: a filled grey triangle over a halo in the
+    reaction's colour. The paths and arrowheads of every reaction sharing a style
+    are drawn as one line broken by gaps, rather than one each: a map has
+    thousands, and a few dozen lines repaint faster while the view is dragged.
+    The arrowheads (8,500 in Mitochondria) are one triangle each, so only those
+    in view are drawn, and none while they would be under
+    ``ARROWHEAD_MIN_PIXELS`` long on screen, when a map is seen whole. Returns the
+    connections left to draw straight: every one but a routed reaction's
+    metabolic links.
     """
     links = atlas.get("links") or {}
     heads = atlas.get("heads") or {}
@@ -1220,65 +1228,134 @@ def _draw_atlas_links(plot, atlas, connections):
             remaining.append(connection)
             continue
         styles.setdefault(reaction, connection)
-
-    lines = {"xs": [], "ys": [], "color": [], "glow_alpha": [], "line_alpha": [], "line_dash": [], "reaction_id": []}
-    tips = {"xs": [], "ys": [], "line_alpha": [], "reaction_id": []}
-    for reaction, style in styles.items():
-        missing = style.get("is_missing_connection", False)
-        for flat in links[reaction]:
-            lines["xs"].append(flat[0::2])
-            lines["ys"].append(flat[1::2])
-            lines["color"].append(style["color"])
-            lines["glow_alpha"].append(0.0 if missing else VisualizationConstants.EDGE_GLOW_ALPHA)
-            lines["line_alpha"].append(style["line_alpha"])
-            lines["line_dash"].append(style.get("line_dash", "solid"))
-            lines["reaction_id"].append(reaction)
-        for flat in heads.get(reaction, ()):
-            tips["xs"].append(flat[0::2])
-            tips["ys"].append(flat[1::2])
-            tips["line_alpha"].append(style["line_alpha"])
-            tips["reaction_id"].append(reaction)
-    if not lines["xs"]:
+    if not styles:
         return remaining
 
-    source = ColumnDataSource(lines)
+    def dash_key(dash):
+        return tuple(dash) if isinstance(dash, list) else dash
+
+    # (colour, opacity, dash) -> the paths drawn in it, gapped by NaN; and each
+    # arrowhead, with its halo, as a triangle of its own.
+    glows = {}
+    overlays = {}
+    halos = {"xs": [], "ys": [], "color": []}
+    tips = {"xs": [], "ys": [], "alpha": []}
+
+    def add(groups, key, flat):
+        xs, ys = groups.setdefault(key, ([], []))
+        if xs:
+            xs.append(math.nan)
+            ys.append(math.nan)
+        xs.extend(flat[0::2])
+        ys.extend(flat[1::2])
+
+    for reaction, style in styles.items():
+        dash = dash_key(style.get("line_dash", "solid"))
+        for flat in links[reaction]:
+            if not style.get("is_missing_connection", False):
+                add(glows, (style["color"], VisualizationConstants.EDGE_GLOW_ALPHA, dash), flat)
+            add(overlays, (VisualizationConstants.EDGE_OVERLAY_COLOR, style["line_alpha"], dash), flat)
+        for flat in heads.get(reaction, ()):
+            xs, ys = _arrowhead(flat)
+            tips["xs"].append(xs)
+            tips["ys"].append(ys)
+            tips["alpha"].append(style.get("fill_alpha", style["line_alpha"]))
+            if not style.get("is_missing_connection", False):
+                # The halo, as the straight links' arrowheads have it: the head
+                # grown round its tip, in the reaction's colour.
+                tip_x, tip_y = xs[0], ys[0]
+                halos["xs"].append([tip_x + (x - tip_x) * 1.4 for x in xs])
+                halos["ys"].append([tip_y + (y - tip_y) * 1.4 for y in ys])
+                halos["color"].append(style["color"])
+
+    def draw(groups, **style):
+        for (color, alpha, dash), (xs, ys) in groups.items():
+            plot.line(
+                x="x",
+                y="y",
+                source=ColumnDataSource({"x": xs, "y": ys}),
+                line_color=color,
+                line_alpha=alpha,
+                line_dash=list(dash) if isinstance(dash, tuple) else dash,
+                level="image",
+                **style,
+            )
+
+    width = VisualizationConstants.DEFAULT_LINE_WIDTH
     if VisualizationConstants.EDGE_GLOW_ENABLED:
-        plot.multi_line(
-            xs="xs",
-            ys="ys",
-            line_color="color",
-            line_alpha="glow_alpha",
-            line_width=VisualizationConstants.DEFAULT_LINE_WIDTH
-            + VisualizationConstants.EDGE_GLOW_WIDTH_DELTA,
-            line_dash="line_dash",
+        draw(
+            glows,
+            line_width=width + VisualizationConstants.EDGE_GLOW_WIDTH_DELTA,
             line_cap="round",
             line_join="round",
-            level="image",
-            source=source,
         )
-    plot.multi_line(
-        xs="xs",
-        ys="ys",
-        line_color=VisualizationConstants.EDGE_OVERLAY_COLOR,
-        line_alpha="line_alpha",
-        line_width=VisualizationConstants.DEFAULT_LINE_WIDTH,
-        line_dash="line_dash",
-        line_join="round",
-        level="image",
-        source=source,
-    )
+    draw(overlays, line_width=width, line_join="round")
+    arrowheads = []
+    if VisualizationConstants.EDGE_GLOW_ENABLED and halos["xs"]:
+        arrowheads.append(
+            plot.patches(
+                xs="xs",
+                ys="ys",
+                source=ColumnDataSource(halos),
+                fill_color="color",
+                fill_alpha=VisualizationConstants.EDGE_GLOW_ALPHA,
+                line_color=None,
+                level="image",
+            )
+        )
     if tips["xs"]:
-        plot.multi_line(
-            xs="xs",
-            ys="ys",
-            line_color=VisualizationConstants.EDGE_OVERLAY_COLOR,
-            line_alpha="line_alpha",
-            line_width=VisualizationConstants.DEFAULT_LINE_WIDTH + 0.5,
-            line_join="round",
-            level="image",
-            source=ColumnDataSource(tips),
+        arrowheads.append(
+            plot.patches(
+                xs="xs",
+                ys="ys",
+                source=ColumnDataSource(tips),
+                fill_color=VisualizationConstants.EDGE_OVERLAY_COLOR,
+                fill_alpha="alpha",
+                line_color=None,
+                level="image",
+            )
         )
+    if arrowheads:
+        _hide_while_too_small(plot, arrowheads)
     return remaining
+
+
+def _hide_while_too_small(plot, renderers):
+    """Show ``renderers`` only once an arrowhead would be long enough on screen to read."""
+    callback = CustomJS(
+        args=dict(
+            plot=plot,
+            renderers=renderers,
+            length=VisualizationConstants.ARROWHEAD_SIZE,
+            least=VisualizationConstants.ARROWHEAD_MIN_PIXELS,
+        ),
+        code="""
+        let width
+        try { width = plot.inner_width } catch { return }
+        const span = Math.abs(plot.x_range.end - plot.x_range.start)
+        if (!(width > 0 && span > 0)) return
+        const shown = length * width / span >= least
+        for (const renderer of renderers) {
+          if (renderer.visible !== shown) renderer.visible = shown
+        }
+        """,
+    )
+    for attribute in ("start", "end"):
+        plot.x_range.js_on_change(attribute, callback)
+    plot.js_on_change("inner_width", callback)
+
+
+def _arrowhead(flat):
+    """The straight links' arrowhead where Metabolic Atlas draws one, pointing the same way.
+
+    Each of Metabolic Atlas's arrowheads is a triangle on a short base; its tip
+    is the corner across from that base.
+    """
+    points = list(zip(flat[0::2], flat[1::2]))[:3]
+    tip = min(range(3), key=lambda i: math.dist(points[(i + 1) % 3], points[(i + 2) % 3]))
+    base = [points[(tip + 1) % 3], points[(tip + 2) % 3]]
+    middle = ((base[0][0] + base[1][0]) / 2, (base[0][1] + base[1][1]) / 2)
+    return calculate_arrowhead_vertices(middle[0], middle[1], points[tip][0], points[tip][1])
 
 
 def _draw_simple_connections(plot, connections):

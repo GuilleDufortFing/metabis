@@ -82,25 +82,47 @@ def test_a_reaction_keeps_the_paths_to_metabolites_the_layout_draws(tmp_path):
 
 
 def test_a_routed_reaction_is_drawn_along_its_paths_in_its_links_style():
+    import math
+
+    from bokeh.models import Line, Patches
+
     plot = figure()
-    atlas = {"links": {"R1": [[0.0, 0.0, 10.0, 0.0, 10.0, 10.0]]}, "heads": {"R1": [[10.0, 10.0, 9.0, 8.0]]}}
+    atlas = {
+        "links": {
+            "R1": [[0.0, 0.0, 10.0, 0.0, 10.0, 10.0]],
+            "R3": [[20.0, 0.0, 30.0, 0.0]],
+        },
+        # Metabolic Atlas's arrowhead: a 10-unit base, its tip 14 above.
+        "heads": {"R1": [[5.0, 0.0, 15.0, 0.0, 10.0, 14.0]]},
+    }
+    red = dict(connection_class="metabolic", color="#ff0000", line_alpha=0.9)
     connections = [
-        {"source": "m1", "target": "R1", "connection_class": "metabolic", "color": "#ff0000", "line_alpha": 0.9},
-        {"source": "R1", "target": "m2", "connection_class": "metabolic", "color": "#ff0000", "line_alpha": 0.9},
+        {"source": "m1", "target": "R1", **red},
+        {"source": "R1", "target": "m2", **red},
+        {"source": "R3", "target": "m3", **red},
         {"source": "R2", "target": "m2", "connection_class": "metabolic", "color": "#0000ff", "line_alpha": 0.9},
         {"source": "e1", "target": "R1", "connection_class": "regulatory", "color": "#7b68ee", "line_alpha": 0.9},
     ]
 
     remaining = _draw_atlas_links(plot, atlas, connections)
 
-    # R1's metabolic links are drawn along the path; the rest stay straight.
+    # R1's and R3's metabolic links are drawn along their paths; the rest stay straight.
     assert [(c["source"], c["target"]) for c in remaining] == [("R2", "m2"), ("e1", "R1")]
-    sources = [r.data_source for r in plot.renderers]
-    lines = next(s for s in sources if "glow_alpha" in s.data)
-    assert lines.data["xs"] == [[0.0, 10.0, 10.0]] and lines.data["ys"] == [[0.0, 0.0, 10.0]]
-    assert lines.data["color"] == ["#ff0000"] and lines.data["reaction_id"] == ["R1"]
-    heads = next(s for s in sources if "glow_alpha" not in s.data)
-    assert heads.data["xs"] == [[10.0, 9.0]]
+    lines = [r for r in plot.renderers if isinstance(r.glyph, Line)]
+    # One line per style, not one per path: the red glow and the grey overlay.
+    assert len(lines) == 2
+    glow = next(r for r in lines if r.glyph.line_color == "#ff0000")
+    xs = glow.data_source.data["x"]
+    # Both reactions' paths in one line, broken by a gap.
+    assert xs[:3] == [0.0, 10.0, 10.0] and math.isnan(xs[3]) and xs[4:] == [20.0, 30.0]
+    # The arrowhead is a filled triangle over a halo in the reaction's colour, as
+    # the straight links draw theirs, one triangle a row so only those in view
+    # are drawn, and none while they would be too small to read.
+    halo, head = [r for r in plot.renderers if isinstance(r.glyph, Patches)]
+    assert halo.data_source.data["color"] == ["#ff0000"] and head.glyph.line_color is None
+    assert [len(xs) for xs in head.data_source.data["xs"]] == [3]
+    (hide,) = plot.x_range.js_property_callbacks["change:start"]
+    assert hide.args["renderers"] == [halo, head]
 
 
 def test_a_glyph_on_an_atlas_metabolite_is_a_metabolite_and_a_renamed_reaction_takes_its_paths(tmp_path):
@@ -220,7 +242,9 @@ def test_the_logos_gradient_runs_from_its_blue_to_its_cyan():
 
 def test_a_graph_keeps_every_link_drawn_while_its_view_moves():
     """Bokeh thins a glyph past 2,000 rows while the view is dragged; a map's links pass that."""
-    from metabis.viz.metabolic_visualization.rendering.bokeh_plotting import create_bokeh_plot
+    from metabis.viz.metabolic_visualization.rendering.bokeh_plotting import (
+        create_bokeh_plot,
+    )
 
     glyph = {"id": "R1", "glyph_class": "reaction", "x": 0.0, "y": 0.0}
     plot = create_bokeh_plot(
@@ -237,3 +261,18 @@ def test_a_graph_keeps_every_link_drawn_while_its_view_moves():
     )
 
     assert plot.lod_threshold is None
+
+
+def test_an_atlas_arrowhead_becomes_the_straight_links_arrowhead_at_its_tip():
+    from metabis.viz.metabolic_visualization.generation.data_structures.constants import (
+        VisualizationConstants,
+    )
+    from metabis.viz.metabolic_visualization.rendering.bokeh_plotting import _arrowhead
+
+    xs, ys = _arrowhead([5.0, 0.0, 15.0, 0.0, 10.0, 14.0])
+
+    # The tip stays where Metabolic Atlas puts it, the head points away from its base.
+    assert (xs[0], ys[0]) == (10.0, 14.0)
+    assert all(y < 14.0 for y in ys[1:])
+    length = VisualizationConstants.ARROWHEAD_SIZE
+    assert all(abs(((x - 10.0) ** 2 + (y - 14.0) ** 2) ** 0.5 - length) < 1e-9 for x, y in zip(xs[1:], ys[1:]))
