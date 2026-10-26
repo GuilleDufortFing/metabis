@@ -216,3 +216,24 @@ def test_the_logos_gradient_runs_from_its_blue_to_its_cyan():
     pieces = gradient_segments([[0.0, 0.0, 300.0, 0.0]], piece=100.0)
     assert len(pieces["x0"]) == 3
     assert pieces["color"][0] != pieces["color"][-1]
+
+
+def test_a_graph_keeps_every_link_drawn_while_its_view_moves():
+    """Bokeh thins a glyph past 2,000 rows while the view is dragged; a map's links pass that."""
+    from metabis.viz.metabolic_visualization.rendering.bokeh_plotting import create_bokeh_plot
+
+    glyph = {"id": "R1", "glyph_class": "reaction", "x": 0.0, "y": 0.0}
+    plot = create_bokeh_plot(
+        display_title="Map",
+        width=600,
+        height=400,
+        aspect_ratio=None,
+        sizing_mode="fixed",
+        glyphs=[glyph],
+        connections=[],
+        auxiliary_data={},
+        zoom=1.0,
+        fit_view_to_bounds=True,
+    )
+
+    assert plot.lod_threshold is None

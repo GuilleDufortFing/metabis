@@ -261,6 +261,11 @@ def create_bokeh_plot(
     plot.axis.visible = False
     plot.grid.visible = False
     plot.min_width = 0
+    # Every link and node stays drawn while the view is dragged or zoomed. Past
+    # 2,000 rows a glyph would otherwise be thinned to every tenth row, in a faint
+    # grey, until the pointer is released: a compartment map's links (up to 8,500
+    # rows in Mitochondria) and a large subsystem's would all but vanish.
+    plot.lod_threshold = None
 
     if use_bounds_viewport and bounds is not None:
         _apply_plot_bounds(plot, bounds)
