@@ -20,11 +20,15 @@ from metabis.analysis.dimensionality_reduction import (
 )
 from metabis.analysis_workspace import RevisionKind, WorkspaceRevisions
 from metabis.viz.plot_reduction_artifact import (
+    FEATURE_CHOICE,
+    FEATURE_ROWS,
+    ReductionColouring,
     ReductionFeaturePresentation,
     ReductionGroupPresentation,
     ReductionPlotPresentation,
     ReductionSamplePresentation,
     plot_pca_biplot_artifact,
+    plot_pca_components_artifact,
     plot_pca_loadings_artifact,
     plot_pca_variance_artifact,
     plot_reduction_artifact,
@@ -385,3 +389,100 @@ def test_every_reduction_hover_is_the_shared_panel():
     assert all(hover.startswith(opening) and "Loading on PC2" in hover for hover in arrows)
     for tool in biplot.select({"type": HoverTool}):
         assert tool.tooltips.startswith(opening) or tool.tooltips == "@hover{safe}"
+
+
+def test_a_pca_scatter_draws_the_chosen_components_and_arrows_only_when_asked():
+    plain = plot_reduction_artifact(artifact(), presentation(biplot_pc_x=2, biplot_pc_y=3))
+    arrows = plot_reduction_artifact(
+        artifact(), presentation(biplot_pc_x=2, biplot_pc_y=3, show_biplot_arrows=True)
+    )
+
+    healthy = next(s for s in sources(plain) if "group_id" in s.data and s.data["group_id"][0] == "g1")
+    assert list(healthy.data["x"]) == [-1.0, -2.0]
+    assert list(healthy.data["y"]) == [0.1, 0.2]
+    assert plain.xaxis[0].axis_label == "PC2 (30.0%)"
+    assert plain.yaxis[0].axis_label == "PC3 (10.0%)"
+    assert not any("x_end" in s.data for s in sources(plain))
+    assert len(source_with(arrows, "x_end").data["feature_id"]) == 2
+
+
+def test_a_coloured_scatter_reads_on_the_sample_heatmaps_scale():
+    # s4 is in no group: the scale is the grouped samples', as the heatmap's is,
+    # and s4 lies far off it, clipped at three.
+    groups = (
+        ReductionGroupPresentation("g1", "Healthy", "#112233", ("s1", "s2")),
+        ReductionGroupPresentation("g2", "Disease", "#445566", ("s3",)),
+    )
+    colouring = ReductionColouring("R9", "Lactate dehydrogenase", "reactions", (1.0, 2.0, 3.0, 10.0))
+
+    plot = plot_reduction_artifact(artifact(), presentation(groups=groups, colouring=colouring))
+
+    points = source_with(plot, "z")
+    # Extremes last, so they are drawn over the rest.
+    assert list(points.data["sample_id"]) == ["s2", "s1", "s3", "s4"]
+    np.testing.assert_allclose(points.data["z"], [0.0, -1.0, 1.0, 3.0])
+    assert list(points.data["group"]) == ["Healthy", "Healthy", "Disease", "Unassigned"]
+    assert plot.title.text.endswith("coloured by Lactate dehydrogenase")
+    assert not plot.legend or not plot.legend[0].items
+    (bar,) = [item for item in plot.right if type(item).__name__ == "ColorBar"]
+    assert bar.title == "Standardized score"
+    assert (bar.color_mapper.low, bar.color_mapper.high) == (-3.0, 3.0)
+    with pytest.raises(ValueError, match="one value per artifact sample"):
+        plot_reduction_artifact(artifact(), presentation(colouring=replace(colouring, values=(1.0,))))
+
+
+def test_the_components_figure_sets_variance_bars_over_the_loadings_columns():
+    plot = plot_pca_components_artifact(
+        artifact(),
+        presentation(loading_component_count=3, loading_feature_count=3, loading_sort_component=None),
+        plotted=(1, 3),
+        feature_event="pick-feature",
+        component_event="pick-component",
+    )
+
+    assert list(plot.x_range.factors) == ["PC1", "PC2", "PC3"]
+    bars = source_with(plot, "top")
+    # Bars stand on the rows, each in proportion to the first component's share.
+    np.testing.assert_allclose(bars.data["top"], [3.5 + 5.0, 3.5 + 2.5, 3.5 + 5.0 / 6])
+    assert list(bars.data["share"]) == ["60.0%", "30.0%", "10.0%"]
+    cells = source_with(plot, "loading")
+    assert len(cells.data["loading"]) == 9
+    assert sorted(plot.yaxis[0].major_label_overrides.values()) == ["Display R1", "Display R2", "Display R3"]
+    # PC1 and PC3 outlined, and the chosen feature's row empty until a click.
+    choice = next(source for source in sources(plot) if source.name == FEATURE_CHOICE)
+    assert list(choice.data["y"]) == []
+    outlines = [
+        list(renderer.data_source.data["x"])[0]
+        for renderer in plot.renderers
+        if renderer.data_source is not choice and getattr(renderer.glyph, "line_width", None) == 2.5
+    ]
+    assert outlines == ["PC1", "PC3"]
+    rows = next(tag for tag in plot.tags if getattr(tag, "name", None) == FEATURE_ROWS)
+    assert sorted(rows.data["feature"]) == ["R1", "R2", "R3"]
+    (callback,) = plot.js_event_callbacks["tap"]
+    assert callback.args["feature_event"] == "pick-feature"
+    assert callback.args["component_event"] == "pick-component"
+    assert callback.args["data_type"] == "reactions"
+
+
+def test_the_components_figure_names_long_rows_short_and_counts_alike_features():
+    twins = replace(
+        artifact(),
+        pca=PCAArtifacts(
+            explained_variance_ratio=np.array([0.6, 0.3, 0.1]),
+            loadings=np.array([[0.9, 0.9, -0.1], [0.1, 0.1, 0.4], [0.2, 0.2, 0.7]]),
+        ),
+    )
+    long_name = "A reaction named at far greater length than a row can hold"
+    features = tuple(
+        ReductionFeaturePresentation(f, long_name if f == "R1" else f"Display {f}", "", "")
+        for f in ("R1", "R2", "R3")
+    )
+
+    plot = plot_pca_components_artifact(
+        twins, presentation(features=features, loading_component_count=3, loading_feature_count=3)
+    )
+
+    labels = sorted(plot.yaxis[0].major_label_overrides.values())
+    assert labels == ["A reaction named at far great\u2026 (+1)", "Display R3"]
+    assert not plot.js_event_callbacks

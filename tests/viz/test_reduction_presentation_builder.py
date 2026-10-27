@@ -164,3 +164,19 @@ def test_knobs_pass_through_to_the_presentation(model):
     assert presentation.biplot_pc_y == 3
     assert presentation.biplot_top_arrows == 2
     assert presentation.biplot_arrow_scale == 0.9
+
+
+def test_a_feature_colours_the_samples_with_its_own_values(model):
+    manager, reactions = _loaded_workspace(model)
+    artifact = _artifact(manager)
+    frame = manager.reaction_data.get_reaction_df()
+
+    presentation = build_reduction_presentation(manager, artifact, colour_by=("reactions", reactions[2]))
+
+    colouring = presentation.colouring
+    assert colouring is not None and colouring.feature_id == reactions[2]
+    assert colouring.values == tuple(frame.loc[list(artifact.sample_ids), reactions[2]])
+    assert colouring.display_label and colouring.display_label != reactions[2]
+    assert isinstance(plot_reduction_artifact(artifact, presentation), Plot)
+    with pytest.raises(KeyError, match="No reaction"):
+        build_reduction_presentation(manager, artifact, colour_by=("reactions", "not-a-reaction"))

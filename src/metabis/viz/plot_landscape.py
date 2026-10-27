@@ -15,6 +15,7 @@ from bokeh.models import (
     BasicTicker,
     ColorBar,
     ColumnDataSource,
+    CustomJS,
     CustomJSHover,
     FactorRange,
     FixedTicker,
@@ -30,13 +31,19 @@ from ..managers.color_distributions import gradient_palette
 from ..managers.group_palettes import group_palette
 from ..managers.hover.panel import note, panel, row, section
 from ..visual_config import theme
-from .plot_utils import apply_academic_style
+from .plot_reduction_artifact import FEATURE_CHOICE, FEATURE_REACH, FEATURE_TAP_CODE, feature_rows_source
+from .plot_utils import apply_academic_style, short_row_label
 
 __all__ = [
     "plot_delta_landscape",
     "plot_sample_heatmap",
+    "sample_heatmap_block",
     "sample_heatmap_rows",
 ]
+
+# Genes ranked over every sample before the grouped samples are read: enough
+# candidates that the most variable over the grouped samples are among them.
+HEATMAP_CANDIDATES = 2000
 
 ROW_HEIGHT = 20
 SAMPLE_ROW_HEIGHT = 14
@@ -151,18 +158,34 @@ def plot_delta_landscape(
     return plot
 
 
+def sample_heatmap_block(matrix, samples: Sequence[str], count: int) -> pd.DataFrame:
+    """The grouped samples' values for the features a heatmap of ``count`` rows can show.
+
+    An expression matrix holds tens of thousands of genes, often sparse, so it
+    is never made dense whole: genes are ranked by their variance over every
+    sample, which the matrix computes without densifying, and the most variable
+    ``max(HEATMAP_CANDIDATES, 20 * count)`` are read for the grouped samples.
+    :func:`sample_heatmap_rows` then ranks them over those samples alone.
+    """
+    variances = matrix.feature_variances().fillna(0.0)
+    pool = variances.sort_values(ascending=False, kind="mergesort").index[: max(HEATMAP_CANDIDATES, 20 * count)]
+    block = matrix.select_features(list(pool))
+    block.index = block.index.map(str)
+    return block.loc[[sample for sample in samples if sample in block.index]]
+
+
 def sample_heatmap_rows(
     scores: pd.DataFrame, count: int
 ) -> list[list[str]]:
-    """The ``count`` most variable distinct reaction profiles across samples.
+    """The ``count`` most variable distinct feature profiles across samples.
 
-    Reactions are ranked by their variance over samples. Reactions with the same
-    profile (several reactions a tool scores alike, or one flux through a chain)
-    share a row, so the rows show distinct profiles. Each item lists a row's
-    reactions, the first naming it.
+    Reactions or genes are ranked by their variance over samples. Features with
+    the same profile (several reactions a tool scores alike, or one flux through
+    a chain) share a row, so the rows show distinct profiles. Each item lists a
+    row's features, the first naming it.
     """
     if count < 1:
-        raise ValueError("Show at least one reaction")
+        raise ValueError("Show at least one row")
     variance = scores.var(axis=0, ddof=1).fillna(0.0)
     order = variance.sort_values(ascending=False, kind="mergesort").index
     rows: dict[bytes, list[str]] = {}
@@ -186,15 +209,24 @@ def plot_sample_heatmap(
     group_colors: Mapping[str, str] | None = None,
     title: str,
     width: int = 900,
+    data_type: str = "reactions",
+    label_limit: int | None = None,
+    feature_event: str | None = None,
 ):
-    """The most variable reactions (rows) across samples (columns), z-scored.
+    """The most variable reactions or genes (rows) across samples (columns), z-scored.
 
     Each row is scaled to mean zero and unit standard deviation over the shown
-    samples, so the colour reads high or low for that reaction. Samples are
+    samples, so the colour reads high or low for that feature. Samples are
     ordered by group, in the groups' own order, under a band in each group's
     colour. Samples outside every group are left out. The matrix is one image,
     so hundreds of samples stay light to send and to draw.
+
+    With ``label_limit`` the row names are cut to that many characters, for a
+    heatmap set beside another figure; the hover keeps the full name and ID. A
+    click on a row outlines it and dispatches ``feature_event`` with the
+    feature, so the page can colour a reduction by it.
     """
+    noun = "Reaction" if data_type == "reactions" else "Gene"
     labels = dict(labels or {})
     order = list(dict.fromkeys(sample_groups.values()))
     samples = [
@@ -205,7 +237,7 @@ def plot_sample_heatmap(
     block = scores.loc[samples]
     rows = sample_heatmap_rows(block, count)
     if not rows:
-        raise ValueError("No reaction varies across these samples")
+        raise ValueError(f"No {noun.lower()} varies across these samples")
     colors = dict(group_colors or zip(order, group_palette(len(order))))
 
     # Two reactions can share a name (one transport into several compartments):
@@ -222,7 +254,9 @@ def plot_sample_heatmap(
     spread = values.std(axis=0, ddof=1)
     spread[spread == 0] = 1.0
     z = (values - values.mean(axis=0)) / spread
-    reach = float(min(3.0, max(1.0, np.nanmax(np.abs(z)))))
+    # Three standard deviations either way, always: a reduction coloured by a
+    # feature uses the same scale, so a dot has the colour of its cell.
+    reach = FEATURE_REACH
     n_samples, n_rows = len(samples), len(rows)
     # Image rows run bottom to top: the most variable reaction is drawn last, on top.
     image = np.clip(z.T[::-1], -reach, reach).astype(np.float32)
@@ -243,8 +277,13 @@ def plot_sample_heatmap(
     _style_categorical(plot)
     plot.yaxis.major_label_text_font_size = "10px"
     plot.yaxis.ticker = FixedTicker(ticks=[index + 0.5 for index in range(n_rows + 1)])
+    ticks = (
+        [short_row_label(name, len(members) - 1, label_limit) for members, name in zip(rows, first_names)]
+        if label_limit is not None
+        else names
+    )
     plot.yaxis.major_label_overrides = {
-        **{n_rows - 1 - index + 0.5: name for index, name in enumerate(names)},
+        **{n_rows - 1 - index + 0.5: tick for index, tick in enumerate(ticks)},
         n_rows + 0.5: BAND_ROW,
     }
     # Hundreds of sample names cannot be read; the band and the hover name them.
@@ -303,7 +342,7 @@ def plot_sample_heatmap(
         const line = Math.min(rows.length - 1, Math.max(0, Math.floor(special_vars.y)))
         if (format === 'sample') return samples[column]
         if (format === 'group') return groups[column]
-        if (format === 'reaction') return rows[line]
+        if (format === 'feature') return rows[line]
         if (format === 'id') return ids[line]
         return scores[line * n + column].toPrecision(4)
         """,
@@ -312,11 +351,11 @@ def plot_sample_heatmap(
         HoverTool(
             renderers=[renderer],
             tooltips=panel(
-                row("Reaction", "$x{reaction}"),
+                row(noun, "$x{feature}"),
                 row("ID", "$x{id}"),
                 row("Sample", "$x{sample}"),
                 row("Group", "$x{group}"),
-                section(row("Score", "$x{score}"), row("Standardized", "@image{+0.00}")),
+                section(row("Score" if data_type == "reactions" else "Expression", "$x{score}"), row("Standardized", "@image{+0.00}")),
             ),
             formatters={"$x": lookup},
         ),
@@ -326,4 +365,28 @@ def plot_sample_heatmap(
         ),
     )
     plot.add_layout(_color_bar(mapper, "Standardized score"), "right")
+    choice = ColumnDataSource({"y": []}, name=FEATURE_CHOICE)
+    plot.rect(
+        x=n_samples / 2, y="y", width=n_samples, height=1, source=choice,
+        fill_color=None, line_color=theme.SELECTED, line_width=2.5,
+    )
+    plot.tags = [*plot.tags, feature_rows_source(rows, [n_rows - 1 - index + 0.5 for index in range(n_rows)])]
+    if feature_event:
+        plot.js_on_event(
+            "tap",
+            CustomJS(
+                args=dict(
+                    choice=choice,
+                    rows=list(reversed(names)),
+                    ids=[members[0] for members in reversed(rows)],
+                    labels=list(reversed(first_names)),
+                    data_type=data_type,
+                    feature_event=feature_event,
+                    component_event=None,
+                    base=n_rows,
+                    count=0,
+                ),
+                code=FEATURE_TAP_CODE,
+            ),
+        )
     return plot

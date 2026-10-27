@@ -58,6 +58,7 @@ _MODULE_EXPORTS: dict[str, tuple[str, ...]] = {
     ".viz.plot_landscape": (
         "plot_delta_landscape",
         "plot_sample_heatmap",
+        "sample_heatmap_block",
     ),
     ".viz.plot_result_scatter": (
         "plot_reaction_gene_concordance",
@@ -131,15 +132,20 @@ _MODULE_EXPORTS: dict[str, tuple[str, ...]] = {
     ".viz.plot_reaction_set_enrichment": ("plot_reaction_set_enrichment",),
     ".viz.plot_set_enrichment": ("plot_set_enrichment_category",),
     ".viz.plot_reduction_artifact": (
+        "FEATURE_CHOICE",
+        "FEATURE_ROWS",
+        "ReductionColouring",
         "ReductionFeaturePresentation",
         "ReductionGroupPresentation",
         "ReductionPlotPresentation",
         "ReductionSamplePresentation",
         "build_reduction_presentation",
         "plot_pca_biplot_artifact",
+        "plot_pca_components_artifact",
         "plot_pca_loadings_artifact",
         "plot_pca_variance_artifact",
         "plot_reduction_artifact",
+        "reduction_colouring",
     ),
     ".viz.plot_statistical_distributions": (
         "create_statistical_results_table",
@@ -248,6 +254,7 @@ if TYPE_CHECKING:
     from .viz.plot_landscape import (
         plot_delta_landscape,
         plot_sample_heatmap,
+        sample_heatmap_block,
     )
     from .viz.plot_result_scatter import (
         plot_reaction_gene_concordance,
@@ -318,15 +325,20 @@ if TYPE_CHECKING:
     from .viz.plot_metabolic_graph import plot_metabolic_graph
     from .viz.plot_reaction_set_enrichment import plot_reaction_set_enrichment
     from .viz.plot_reduction_artifact import (
+        FEATURE_CHOICE,
+        FEATURE_ROWS,
+        ReductionColouring,
         ReductionFeaturePresentation,
         ReductionGroupPresentation,
         ReductionPlotPresentation,
         ReductionSamplePresentation,
         build_reduction_presentation,
         plot_pca_biplot_artifact,
+        plot_pca_components_artifact,
         plot_pca_loadings_artifact,
         plot_pca_variance_artifact,
         plot_reduction_artifact,
+        reduction_colouring,
     )
     from .viz.plot_set_enrichment import plot_set_enrichment_category
     from .viz.plot_statistical_distributions import (
@@ -439,6 +451,7 @@ __all__ = [
     "with_thresholds",
     "plot_delta_landscape",
     "plot_sample_heatmap",
+    "sample_heatmap_block",
     "plot_reaction_gene_concordance",
     "plot_result_agreement",
     # Typed analysis results
@@ -496,8 +509,10 @@ __all__ = [
     "plot_comparison_scatter",
     "plot_gene_reaction_influence_heatmap",
     "plot_pca_biplot_artifact",
+    "plot_pca_components_artifact",
     "plot_pca_loadings_artifact",
     "plot_pca_variance_artifact",
+    "reduction_colouring",
     "plot_reaction_set_enrichment",
     "plot_set_enrichment_category",
     "plot_reaction_violins",
@@ -511,6 +526,9 @@ __all__ = [
     "plot_subsystem_influence_summary",
     "plot_subsystem_ranking_artifact",
     "plot_subsystem_ranking_by_influence",
+    "FEATURE_CHOICE",
+    "FEATURE_ROWS",
+    "ReductionColouring",
     "ReductionFeaturePresentation",
     "ReductionGroupPresentation",
     "ReductionPlotPresentation",

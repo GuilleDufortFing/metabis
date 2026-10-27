@@ -113,6 +113,15 @@ def apply_academic_style(
 
     return p
 
+def short_row_label(name: str, alike: int = 0, limit: int | None = None) -> str:
+    """A row's name for a narrow heatmap: cut at ``limit`` characters, and how many
+    more features the row holds as "(+N)". The hover keeps the full name.
+    """
+    if limit is not None and len(name) > limit:
+        name = name[: limit - 1].rstrip() + "\u2026"
+    return name + (f" (+{alike})" if alike else "")
+
+
 def format_scientific(value, threshold=0.01):
     """Format number in scientific notation if small enough."""
     if abs(value) < threshold and value != 0:

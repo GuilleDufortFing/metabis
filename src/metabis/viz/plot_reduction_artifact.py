@@ -5,6 +5,11 @@ by how many there are, translucent with a white edge so overlaps show, the legen
 outside with each group's count, both axes at one scale, PCA axes with their
 share of variance, and UMAP and t-SNE axes with no numbers, which carry no unit
 (as scanpy and Seurat draw them).
+
+A scatter can instead colour each sample by one reaction or gene, as scanpy's
+``pl.umap(color=gene)`` and Seurat's ``FeaturePlot`` do, on the sample heatmap's
+own scale: the feature standardized over the grouped samples, clipped at three
+standard deviations, so a sample's dot has the colour of its heatmap cell.
 """
 
 from __future__ import annotations
@@ -22,6 +27,7 @@ from bokeh.models import (
     ColumnDataSource,
     CustomJS,
     FactorRange,
+    FixedTicker,
     HoverTool,
     LabelSet,
     LinearColorMapper,
@@ -45,7 +51,7 @@ from .plot_reduced_dimension import (
     calculate_cluster_metrics,
     get_metric_interpretation,
 )
-from .plot_utils import apply_academic_style
+from .plot_utils import apply_academic_style, short_row_label
 
 DEFAULT_CATEGORICAL_PALETTE = OKABE_ITO
 DEFAULT_SINGLE_COLOR = OKABE_ITO[3]  # Okabe-Ito blue, for samples with no group
@@ -55,6 +61,13 @@ VARIANCE_MARKS = (0.5, 0.8)  # where the cumulative share is marked
 BIPLOT_SECTORS = 8  # one arrow per 45 degrees
 BIPLOT_MINIMUM_SHARE = 0.15  # of the longest arrow
 LOADING_ROW_HEIGHT = 20
+FEATURE_REACH = 3.0  # standard deviations, as the sample heatmap clips its rows
+COMPONENT_BAR_ROWS = 5.0  # the variance bars' height, in feature rows
+LABEL_LIMIT = 30  # characters of a row name beside another figure
+# Named sources the page reads and writes: which features each row holds, and
+# the row outlined as the samples' colour.
+FEATURE_ROWS = "feature_rows"
+FEATURE_CHOICE = "feature_choice"
 
 
 def point_size(count: int) -> float:
@@ -91,6 +104,20 @@ class ReductionFeaturePresentation:
 
 
 @dataclass(frozen=True)
+class ReductionColouring:
+    """One reaction or gene, by whose values the samples are coloured.
+
+    ``values`` follow the artifact's samples; a sample the feature has no value
+    for is ``nan`` and drawn grey.
+    """
+
+    feature_id: str
+    display_label: str
+    data_type: str
+    values: tuple[float, ...]
+
+
+@dataclass(frozen=True)
 class ReductionPlotPresentation:
     """Every display choice needed to rebuild all four reduction plot cards."""
 
@@ -113,6 +140,10 @@ class ReductionPlotPresentation:
     biplot_pc_y: int = 2
     biplot_top_arrows: int | None = 5
     biplot_arrow_scale: float = 1.5
+    # A PCA scatter draws ``biplot_pc_x`` against ``biplot_pc_y``, with the
+    # strongest features as arrows when asked.
+    show_biplot_arrows: bool = False
+    colouring: ReductionColouring | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.samples, tuple) or not all(
@@ -173,6 +204,8 @@ def _validate_inputs(
     group_ids = tuple(group.group_id for group in presentation.groups)
     if len(set(group_ids)) != len(group_ids):
         raise ValueError("Presentation group IDs must be unique")
+    if presentation.colouring is not None and len(presentation.colouring.values) != len(sample_ids):
+        raise ValueError("The colouring needs one value per artifact sample")
     known_samples = set(artifact.sample_ids)
     for group in presentation.groups:
         if not group.group_id or not group.display_name or not group.color:
@@ -287,7 +320,8 @@ def _separation_note(plot, coordinates, labels) -> None:
     quality = get_metric_interpretation("silhouette", metrics["silhouette"]).lower()
     plot.add_layout(
         Title(
-            text=f"Separation of the groups is {quality} ({', '.join(parts)}).",
+            # Two lines, so the note fits a map drawn at half the page's width.
+            text=f"Separation of the groups is {quality}:\n{', '.join(parts)}.",
             text_font_size="12px",
             text_font_style="normal",
             text_color=theme.INK_MUTED,
@@ -434,6 +468,44 @@ def _reduction_feature_presentations(
     return tuple(presentations)
 
 
+def reduction_colouring(
+    data_manager, artifact: ReductionArtifact, data_type: str, feature_id: str
+) -> ReductionColouring:
+    """Read one feature's values on the artifact's samples from the loaded data.
+
+    A reaction is read from the reaction scores and a gene from the expression
+    matrix, whichever the reduction was fitted on: the samples are the same, so
+    a gene can colour the reaction map. Raises ``KeyError`` for a feature the
+    data does not carry.
+    """
+    source = getattr(data_manager, "reaction_data" if data_type == "reactions" else "expression_data", None)
+    if source is None:
+        raise KeyError(f"No {data_type} data is loaded")
+    if data_type == "reactions":
+        frame = source.get_reaction_df()
+        if feature_id not in frame.columns:
+            raise KeyError(f"No reaction {feature_id!r} in the reaction data")
+        column = frame[feature_id]
+        element_type = "reaction"
+    elif data_type == "expression":
+        column = source.matrix().feature_column(feature_id)
+        if column is None:
+            raise KeyError(f"No gene {feature_id!r} in the expression data")
+        element_type = "gene"
+    else:
+        raise ValueError(f"Unsupported data type: {data_type}")
+    values = pd.Series(
+        pd.to_numeric(column, errors="coerce").to_numpy(dtype=float), index=column.index.map(str)
+    ).reindex(list(artifact.sample_ids))
+    reference = get_external_reference_data(data_manager, feature_id, element_type)
+    return ReductionColouring(
+        feature_id=feature_id,
+        display_label=str(reference.get("short_name") or reference["display_label"]),
+        data_type=data_type,
+        values=tuple(float(value) for value in values.to_numpy(dtype=float)),
+    )
+
+
 def build_reduction_presentation(
     data_manager,
     artifact: ReductionArtifact,
@@ -451,7 +523,10 @@ def build_reduction_presentation(
     biplot_pc_y: int = 2,
     biplot_top_arrows: int | None = 5,
     biplot_arrow_scale: float = 1.5,
+    show_biplot_arrows: bool = False,
+    colour_by: tuple[str, str] | None = None,
     include_feature_hover: bool = True,
+    features: tuple[ReductionFeaturePresentation, ...] | None = None,
 ) -> ReductionPlotPresentation:
     """Freeze a document-thread presentation for the artifact reduction cards.
 
@@ -459,13 +534,17 @@ def build_reduction_presentation(
     hover HTML) once on the document thread and returns an immutable value the
     artifact-first factories render without touching a manager. It is the
     production caller that installs the reduction presentation seam.
+    ``colour_by`` is a ``(data_type, feature_id)`` pair the samples are
+    coloured by, read with :func:`reduction_colouring`. ``features`` are this
+    artifact's feature presentations from an earlier call: they depend on the
+    model alone, so a caller drawing one artifact again can skip reading them.
     """
     return ReductionPlotPresentation(
         samples=_reduction_sample_presentations(data_manager, artifact),
         groups=_reduction_group_presentations(data_manager, artifact),
-        features=_reduction_feature_presentations(
-            data_manager, artifact, include_hover=include_feature_hover
-        ),
+        features=features
+        if features is not None
+        else _reduction_feature_presentations(data_manager, artifact, include_hover=include_feature_hover),
         width=width,
         height=height,
         show_sample_labels=show_sample_labels,
@@ -479,19 +558,125 @@ def build_reduction_presentation(
         biplot_pc_y=biplot_pc_y,
         biplot_top_arrows=biplot_top_arrows,
         biplot_arrow_scale=biplot_arrow_scale,
+        show_biplot_arrows=show_biplot_arrows,
+        colouring=(
+            reduction_colouring(data_manager, artifact, *colour_by) if colour_by is not None else None
+        ),
     )
+
+
+def _is_pca(artifact: ReductionArtifact) -> bool:
+    return str(artifact.key.method).upper() == "PCA"
+
+
+def standardized_colouring(
+    colouring: ReductionColouring, sample_ids, groups
+) -> np.ndarray:
+    """The feature as the sample heatmap draws it: standardized, clipped at three.
+
+    The mean and standard deviation are taken over the grouped samples, as the
+    heatmap's are, or over every sample when there are no groups; an ungrouped
+    sample is placed on the same scale.
+    """
+    values = np.asarray(colouring.values, dtype=float)
+    grouped = {sample for group in groups for sample in group.sample_ids}
+    basis = values[[sample in grouped for sample in sample_ids]] if grouped else values
+    basis = basis[np.isfinite(basis)]
+    spread = float(np.std(basis, ddof=1)) if basis.size > 1 else 0.0
+    centre = float(np.mean(basis)) if basis.size else 0.0
+    z = (values - centre) / (spread or 1.0)
+    return np.clip(z, -FEATURE_REACH, FEATURE_REACH)
+
+
+def _colour_bar(mapper, title: str) -> ColorBar:
+    return ColorBar(
+        color_mapper=mapper,
+        ticker=BasicTicker(desired_num_ticks=5),
+        label_standoff=8,
+        border_line_color=None,
+        location=(0, 0),
+        major_label_text_font_size="8pt",
+        title=title,
+        title_text_font_style="normal",
+        title_text_font_size="9pt",
+        title_standoff=8,
+        width=12,
+    )
+
+
+def _coloured_points(plot, artifact, presentation, columns, size):
+    """Every sample in one layer, coloured by the feature, the extremes drawn last.
+
+    Samples far from the mean are drawn over the rest, so a few high ones are
+    never hidden under a crowd of average ones, as scanpy orders them.
+    """
+    colouring = presentation.colouring
+    assert colouring is not None
+    sample_lookup = _sample_lookup(presentation)
+    membership: dict[str, ReductionGroupPresentation] = {}
+    for group in presentation.groups:
+        for sample_id in group.sample_ids:
+            membership.setdefault(sample_id, group)
+    z = standardized_colouring(colouring, artifact.sample_ids, presentation.groups)
+    order = np.argsort(np.nan_to_num(np.abs(z), nan=-1.0), kind="stable")
+    ids = [artifact.sample_ids[index] for index in order]
+    source = ColumnDataSource(
+        {
+            "x": artifact.coordinates[order, columns[0]],
+            "y": artifact.coordinates[order, columns[1]],
+            "sample_id": ids,
+            "display_label": [sample_lookup[sample_id].display_label for sample_id in ids],
+            "group": [membership[s].display_name if s in membership else "Unassigned" for s in ids],
+            "color": [membership[s].color if s in membership else theme.NOT_SIGNIFICANT for s in ids],
+            "value": np.asarray(colouring.values, dtype=float)[order],
+            "z": z[order],
+        }
+    )
+    mapper = LinearColorMapper(
+        palette=_loading_palette(), low=-FEATURE_REACH, high=FEATURE_REACH, nan_color=theme.NOT_SIGNIFICANT
+    )
+    renderer = plot.scatter(
+        "x",
+        "y",
+        source=source,
+        size=size,
+        fill_color=transform("z", mapper),
+        line_color=theme.MARK_EDGE,
+        line_width=0.4,
+        name="sample_points",
+    )
+    plot.add_layout(_colour_bar(mapper, "Standardized score"), "right")
+    return source, renderer
 
 
 def plot_reduction_artifact(
     artifact: ReductionArtifact, presentation: ReductionPlotPresentation
 ):
-    """Build the reduction scatter directly from immutable artifact values."""
+    """Build the reduction scatter directly from immutable artifact values.
+
+    A PCA draws ``biplot_pc_x`` against ``biplot_pc_y`` and, with
+    ``show_biplot_arrows``, the strongest features as arrows; other methods draw
+    their first two components. With a ``colouring`` the samples take the
+    feature's colours instead of their groups'.
+    """
     _validate_inputs(artifact, presentation)
     if artifact.coordinates.shape[1] < 2:
         raise ValueError("Reduction scatter requires at least two components")
+    pca = _is_pca(artifact)
+    first, second = (presentation.biplot_pc_x, presentation.biplot_pc_y) if pca else (1, 2)
+    if max(first, second) > artifact.coordinates.shape[1]:
+        raise ValueError(
+            f"Invalid PC selection ({first}, {second}) for "
+            f"{artifact.coordinates.shape[1]} components"
+        )
+    columns = (first - 1, second - 1)
     coordinates = artifact.coordinates
     sample_lookup = _sample_lookup(presentation)
+    colouring = presentation.colouring
     title = f"{artifact.key.method} of {artifact.key.data_type.capitalize()} Data"
+    if colouring is not None:
+        # On a line of its own, so the title fits a map at half the page's width.
+        title += f"\ncoloured by {colouring.display_label}"
     plot = apply_academic_style(
         figure(
             width=presentation.width,
@@ -517,7 +702,12 @@ def plot_reduction_artifact(
         ]
         if not indices:
             continue
-        values = coordinates[indices, :2]
+        values = coordinates[np.ix_(indices, columns)]
+        if presentation.groups:
+            separation_coordinates.extend(values)
+            separation_labels.extend([group.group_id] * len(values))
+        if colouring is not None:
+            continue
         canonical_ids = [artifact.sample_ids[row] for row in indices]
         color = group.color or DEFAULT_CATEGORICAL_PALETTE[index % len(DEFAULT_CATEGORICAL_PALETTE)]
         source = ColumnDataSource(
@@ -549,18 +739,36 @@ def plot_reduction_artifact(
                 text_color=theme.INK,
                 text_font_style="bold",
             )
-        if presentation.groups:
-            separation_coordinates.extend(values)
-            separation_labels.extend([group.group_id] * len(values))
+    tooltip = _sample_tooltip(artifact, first, second)
+    if colouring is not None:
+        source, renderer = _coloured_points(plot, artifact, presentation, columns, size)
+        sources, point_renderers = [source], [renderer]
+        x_name, y_name = (label.split(" (")[0] for label in _axis_labels(artifact, first, second))
+        tooltip = panel(
+            row("ID", "@sample_id"),
+            row("Sample", "@display_label"),
+            row("Group", "<span style='color:@color;'>@group</span>"),
+            section(row(escape(colouring.display_label), "@value{0.000}"), row("Standardized", "@z{+0.00}")),
+            section(row(x_name, "@x{0.000}"), row(y_name, "@y{0.000}")),
+        )
 
     if presentation.show_sample_labels:
         _selection_labels(plot, sources)
+    if pca and presentation.show_biplot_arrows and artifact.pca is not None and artifact.pca.loadings is not None:
+        span = coordinates[:, list(columns)]
+        _draw_arrows(
+            plot,
+            artifact,
+            presentation,
+            columns,
+            max(float(np.ptp(span[:, 0])), float(np.ptp(span[:, 1])), 1.0),
+        )
     # One panel, the nearest sample's, rather than a column of them where samples crowd.
-    plot.add_tools(HoverTool(renderers=point_renderers, tooltips=_sample_tooltip(artifact), limit=1))
-    x_label, y_label = _axis_labels(artifact)
+    plot.add_tools(HoverTool(renderers=point_renderers, tooltips=tooltip, limit=1, name="sample_hover"))
+    x_label, y_label = _axis_labels(artifact, first, second)
     plot.xaxis.axis_label = x_label
     plot.yaxis.axis_label = y_label
-    if str(artifact.key.method).upper() != "PCA":
+    if not pca:
         _unitless_axes(plot)
         plot.grid.grid_line_color = None
     _legend_outside(plot)
@@ -861,6 +1069,201 @@ def plot_pca_loadings_artifact(
     return _apply_presentation_style(plot, presentation)
 
 
+FEATURE_TAP_CODE = """
+const y = cb_obj.y
+if (y >= 0 && y < rows.length) {
+  const index = Math.floor(y)
+  choice.data = {y: [index + 0.5]}
+  if (feature_event) {
+    window.dispatchEvent(new CustomEvent(feature_event, {detail: {feature: ids[index], label: labels[index], data_type}}))
+  }
+} else if (component_event && y >= base) {
+  const column = Math.floor(cb_obj.x)
+  if (column >= 0 && column < count) {
+    window.dispatchEvent(new CustomEvent(component_event, {detail: {component: column + 1, data_type}}))
+  }
+}
+"""
+
+
+def feature_rows_source(rows: list[list[str]], centres: list[float]) -> ColumnDataSource:
+    """Every feature a row holds beside the row's centre, so the page can outline
+    the row of whichever feature colours the samples."""
+    features, ys = [], []
+    for members, centre in zip(rows, centres):
+        features.extend(members)
+        ys.extend([centre] * len(members))
+    return ColumnDataSource({"feature": features, "y": ys}, name=FEATURE_ROWS)
+
+
+def plot_pca_components_artifact(
+    artifact: ReductionArtifact,
+    presentation: ReductionPlotPresentation,
+    *,
+    plotted: tuple[int, ...] = (),
+    feature_event: str | None = None,
+    component_event: str | None = None,
+):
+    """Each component's share of the variance over its loadings, in one figure.
+
+    The bars are the variance each component explains and the cells below them
+    the strongest features' loadings on it, as ComplexHeatmap sets a bar
+    annotation over a heatmap's columns (Gu, Eils and Schlesner 2016): a
+    component's bar and its column share one position, so how much a component
+    explains reads beside which features make it. Rows are chosen and merged as
+    in :func:`plot_pca_loadings_artifact`, and named short, the full name in the
+    hover. The ``plotted`` components (numbered from 1) are outlined.
+
+    A click on a row outlines it and dispatches ``feature_event`` with the
+    feature; a click on a bar dispatches ``component_event`` with the component.
+    """
+    _validate_inputs(artifact, presentation)
+    _require_pca_loadings(artifact)
+    _require_pca_variance(artifact)
+    assert artifact.pca is not None
+    assert artifact.pca.loadings is not None and artifact.pca.explained_variance_ratio is not None
+    if artifact.pca.loadings.size == 0:
+        raise ValueError("Loadings matrix is empty")
+    count, groups = _loading_columns(artifact, presentation)
+    loadings = artifact.pca.loadings
+    lookup = _feature_lookup(presentation)
+    variance = np.asarray(artifact.pca.explained_variance_ratio[:count], dtype=float)
+    cumulative = np.cumsum(artifact.pca.explained_variance_ratio)[:count]
+    components = [f"PC{index + 1}" for index in range(count)]
+    noun = "reaction" if str(artifact.key.data_type).lower() == "reactions" else "gene"
+    n = len(groups)
+
+    # Rows run top to bottom from the strongest; row i is centred at n - i - 0.5,
+    # so the arrays below are kept bottom to top, as the y axis counts.
+    names, labels, ticks, hovers, ids = [], [], [], [], []
+    for members in groups:
+        first = artifact.feature_names[members[0]]
+        feature = lookup[first]
+        names.append(feature.display_label)
+        ticks.append(short_row_label(feature.display_label, len(members) - 1, LABEL_LIMIT))
+        hover = (
+            hover_panel_inner(feature.hover_html)
+            if feature.hover_html
+            else row("ID", escape(first)) + row("Feature", escape(feature.display_label))
+        )
+        twins = ", ".join(lookup[artifact.feature_names[i]].display_label for i in members[1:11])
+        if twins:
+            hover += section(row("Loading alike", escape(twins)))
+        hovers.append(hover)
+        ids.append(first)
+    cells: dict[str, list] = {"component": [], "y": [], "loading": [], "hover": []}
+    for index, members in enumerate(groups):
+        for column, component in enumerate(components):
+            cells["component"].append(component)
+            cells["y"].append(n - index - 0.5)
+            cells["loading"].append(float(loadings[column, members[0]]))
+            cells["hover"].append(hovers[index])
+    reach = max([abs(value) for value in cells["loading"]] + [1e-9])
+    mapper = LinearColorMapper(palette=_loading_palette(), low=-reach, high=reach)
+
+    base, tall = n + 0.5, COMPONENT_BAR_ROWS
+    tops = base + tall * variance / (variance[0] or 1.0)
+    ceiling = base + tall + 2.0
+    plot = apply_academic_style(
+        figure(
+            width=presentation.width,
+            height=int(LOADING_ROW_HEIGHT * (n + tall + 2.2) + 110),
+            x_range=FactorRange(factors=components),
+            y_range=Range1d(0, ceiling),
+            title=f"Variance explained (bars) and the {n} strongest {noun}s' loadings (cells)",
+            tools="save",
+        ),
+        suppress_grid=True,
+    )
+    cell_renderer = plot.rect(
+        x="component",
+        y="y",
+        width=1,
+        height=1,
+        source=ColumnDataSource(cells),
+        fill_color=transform("loading", mapper),
+        line_color="#ffffff",
+        line_width=1,
+    )
+    bars = ColumnDataSource(
+        {
+            "component": components,
+            "top": tops,
+            "share": [f"{value * 100:.1f}%" for value in variance],
+            "cumulative": [f"{value * 100:.1f}%" for value in cumulative],
+            "label_y": tops + 0.25,
+        }
+    )
+    bar_renderer = plot.vbar(
+        x="component", bottom=base, top="top", width=0.62, source=bars,
+        fill_color=theme.FRAME_LINE, line_color=None,
+    )
+    plot.text(
+        x="component", y="label_y", text="share", source=bars,
+        text_align="center", text_baseline="bottom", text_font_size="10px", text_color=theme.INK,
+    )
+    for component in plotted:
+        if 1 <= component <= count:
+            plot.rect(
+                x=[components[component - 1]], y=[(base + tall + 1.6) / 2], width=0.98,
+                height=base + tall + 1.6, fill_color=None, line_color=theme.SELECTED, line_width=2.5,
+            )
+    choice = ColumnDataSource({"y": []}, name=FEATURE_CHOICE)
+    plot.rect(
+        x=count / 2, y="y", width=count, height=1, source=choice,
+        fill_color=None, line_color=theme.SELECTED, line_width=2.5,
+    )
+    rows = feature_rows_source(
+        [[artifact.feature_names[i] for i in members] for members in groups],
+        [n - index - 0.5 for index in range(n)],
+    )
+    plot.tags = [*plot.tags, rows]
+
+    plot.yaxis.ticker = FixedTicker(ticks=[n - index - 0.5 for index in range(n)])
+    plot.yaxis.major_label_overrides = {n - index - 0.5: tick for index, tick in enumerate(ticks)}
+    plot.axis.axis_line_color = None
+    plot.axis.major_tick_line_color = None
+    plot.axis.minor_tick_line_color = None
+    plot.yaxis.major_label_text_font_size = "11px"
+    plot.yaxis.major_label_text_color = theme.INK
+    plot.xaxis.major_label_text_color = theme.INK
+    plot.add_layout(_colour_bar(mapper, "Loading"), "right")
+    plot.add_tools(
+        HoverTool(
+            renderers=[cell_renderer],
+            tooltips=panel("@hover{safe}", section(row("Loading on @component", "@loading{0.000}"))),
+        ),
+        HoverTool(
+            renderers=[bar_renderer],
+            tooltips=panel(
+                row("Component", "@component"),
+                row("Variance explained", "@share"),
+                row("Cumulative", "@cumulative"),
+            ),
+        ),
+    )
+    if feature_event or component_event:
+        plot.js_on_event(
+            "tap",
+            CustomJS(
+                args=dict(
+                    choice=choice,
+                    # Bottom to top, as the rows' y positions count.
+                    rows=list(reversed(ticks)),
+                    ids=list(reversed(ids)),
+                    labels=list(reversed(names)),
+                    data_type=str(artifact.key.data_type),
+                    feature_event=feature_event,
+                    component_event=component_event,
+                    base=base,
+                    count=count,
+                ),
+                code=FEATURE_TAP_CODE,
+            ),
+        )
+    return _apply_presentation_style(plot, presentation)
+
+
 def biplot_arrows(loadings_x: np.ndarray, loadings_y: np.ndarray, limit: int | None) -> list[int]:
     """The longest arrow in each 45 degree sector, at least 15% of the longest.
 
@@ -881,6 +1284,89 @@ def biplot_arrows(loadings_x: np.ndarray, loadings_y: np.ndarray, limit: int | N
             chosen.append(int(members[np.argmax(magnitudes[members])]))
     chosen.sort(key=lambda index: -magnitudes[index])
     return chosen[:limit] if limit is not None else chosen
+
+
+def _draw_arrows(plot, artifact: ReductionArtifact, presentation, columns, score_range: float) -> None:
+    """The strongest features as arrows from the origin, each named at its tip.
+
+    Arrows are scaled so the longest reaches a fifth of the samples' spread
+    times ``biplot_arrow_scale``; see :func:`biplot_arrows` for which are drawn.
+    """
+    assert artifact.pca is not None and artifact.pca.loadings is not None
+    x_index, y_index = columns
+    pc_x, pc_y = x_index + 1, y_index + 1
+    loadings_x = artifact.pca.loadings[x_index]
+    loadings_y = artifact.pca.loadings[y_index]
+    magnitudes = np.sqrt(loadings_x**2 + loadings_y**2)
+    max_loading = float(np.max(magnitudes)) if magnitudes.size else 1.0
+    if max_loading == 0:
+        max_loading = 1.0
+    scale = score_range / max_loading * 0.20 * presentation.biplot_arrow_scale
+    feature_lookup = _feature_lookup(presentation)
+    chosen = biplot_arrows(loadings_x, loadings_y, presentation.biplot_top_arrows)
+    arrows = pd.DataFrame(
+        {
+            "x_end": loadings_x[chosen] * scale,
+            "y_end": loadings_y[chosen] * scale,
+            "feature_id": [artifact.feature_names[index] for index in chosen],
+            "magnitude": magnitudes[chosen],
+            "x_start": 0.0,
+            "y_start": 0.0,
+        }
+    )
+    arrows["display_label"] = [feature_lookup[value].display_label for value in arrows["feature_id"]]
+    # The feature's own panel, as the graphs show it, with its loadings added.
+    arrows["hover"] = [
+        (extend(feature_lookup[feature].hover_html, facts) if feature_lookup[feature].hover_html
+         else panel(row("ID", escape(feature)), row("Feature", escape(feature_lookup[feature].display_label)), facts))
+        for feature, facts in zip(
+            arrows["feature_id"],
+            (
+                section(
+                    row(f"Loading on PC{pc_x}", f"{loadings_x[index]:.3f}"),
+                    row(f"Loading on PC{pc_y}", f"{loadings_y[index]:.3f}"),
+                    row("Arrow length", f"{magnitudes[index]:.3f}"),
+                )
+                for index in chosen
+            ),
+        )
+    ]
+    arrows["external_url"] = [feature_lookup[value].external_url for value in arrows["feature_id"]]
+    # Each name at its tip, set outwards along its arrow so it clears the others.
+    arrows["align"] = ["left" if x >= 0 else "right" for x in arrows["x_end"]]
+    arrows["baseline"] = ["bottom" if y >= 0 else "top" for y in arrows["y_end"]]
+    arrows["x_offset"] = [4 if x >= 0 else -4 for x in arrows["x_end"]]
+    arrows["y_offset"] = [-3 if y >= 0 else 3 for y in arrows["y_end"]]
+    arrow_source = ColumnDataSource(arrows)
+    arrow_color = theme.INK_MUTED
+    plot.add_layout(
+        Arrow(
+            end=VeeHead(size=7, fill_color=arrow_color, line_color=arrow_color, line_width=1),
+            x_start="x_start",
+            y_start="y_start",
+            x_end="x_end",
+            y_end="y_end",
+            source=arrow_source,
+            line_color=arrow_color,
+            line_width=1.5,
+        )
+    )
+    arrow_hover_renderer = plot.scatter(
+        x="x_end", y="y_end", source=arrow_source, size=10, alpha=0, name="arrow_endpoints"
+    )
+    plot.text(
+        x="x_end",
+        y="y_end",
+        text="display_label",
+        source=arrow_source,
+        text_font_size="11px",
+        text_color=theme.INK,
+        text_align="align",
+        text_baseline="baseline",
+        x_offset="x_offset",
+        y_offset="y_offset",
+    )
+    plot.add_tools(HoverTool(tooltips="@hover{safe}", renderers=[arrow_hover_renderer], name="arrow_hover"))
 
 
 def plot_pca_biplot_artifact(
@@ -968,84 +1454,13 @@ def plot_pca_biplot_artifact(
                 text_font_style="bold",
             )
 
-    loadings_x = artifact.pca.loadings[x_index]
-    loadings_y = artifact.pca.loadings[y_index]
     score_range = max(
         float(scores["x"].max() - scores["x"].min()),
         float(scores["y"].max() - scores["y"].min()),
         1.0,
     )
-    magnitudes = np.sqrt(loadings_x**2 + loadings_y**2)
-    max_loading = float(np.max(magnitudes)) if magnitudes.size else 1.0
-    if max_loading == 0:
-        max_loading = 1.0
-    scale = score_range / max_loading * 0.20 * presentation.biplot_arrow_scale
-    feature_lookup = _feature_lookup(presentation)
-    chosen = biplot_arrows(loadings_x, loadings_y, presentation.biplot_top_arrows)
-    arrows = pd.DataFrame(
-        {
-            "x_end": loadings_x[chosen] * scale,
-            "y_end": loadings_y[chosen] * scale,
-            "feature_id": [artifact.feature_names[index] for index in chosen],
-            "magnitude": magnitudes[chosen],
-            "x_start": 0.0,
-            "y_start": 0.0,
-        }
-    )
-    arrows["display_label"] = [feature_lookup[value].display_label for value in arrows["feature_id"]]
-    # The feature's own panel, as the graphs show it, with its loadings added.
-    arrows["hover"] = [
-        (extend(feature_lookup[feature].hover_html, facts) if feature_lookup[feature].hover_html
-         else panel(row("ID", escape(feature)), row("Feature", escape(feature_lookup[feature].display_label)), facts))
-        for feature, facts in zip(
-            arrows["feature_id"],
-            (
-                section(
-                    row(f"Loading on PC{pc_x}", f"{loadings_x[index]:.3f}"),
-                    row(f"Loading on PC{pc_y}", f"{loadings_y[index]:.3f}"),
-                    row("Arrow length", f"{magnitudes[index]:.3f}"),
-                )
-                for index in chosen
-            ),
-        )
-    ]
-    arrows["external_url"] = [feature_lookup[value].external_url for value in arrows["feature_id"]]
-    # Each name at its tip, set outwards along its arrow so it clears the others.
-    arrows["align"] = ["left" if x >= 0 else "right" for x in arrows["x_end"]]
-    arrows["baseline"] = ["bottom" if y >= 0 else "top" for y in arrows["y_end"]]
-    arrows["x_offset"] = [4 if x >= 0 else -4 for x in arrows["x_end"]]
-    arrows["y_offset"] = [-3 if y >= 0 else 3 for y in arrows["y_end"]]
-    arrow_source = ColumnDataSource(arrows)
-    arrow_color = theme.INK_MUTED
-    plot.add_layout(
-        Arrow(
-            end=VeeHead(size=7, fill_color=arrow_color, line_color=arrow_color, line_width=1),
-            x_start="x_start",
-            y_start="y_start",
-            x_end="x_end",
-            y_end="y_end",
-            source=arrow_source,
-            line_color=arrow_color,
-            line_width=1.5,
-        )
-    )
-    arrow_hover_renderer = plot.scatter(
-        x="x_end", y="y_end", source=arrow_source, size=10, alpha=0, name="arrow_endpoints"
-    )
-    plot.text(
-        x="x_end",
-        y="y_end",
-        text="display_label",
-        source=arrow_source,
-        text_font_size="11px",
-        text_color=theme.INK,
-        text_align="align",
-        text_baseline="baseline",
-        x_offset="x_offset",
-        y_offset="y_offset",
-    )
+    _draw_arrows(plot, artifact, presentation, (x_index, y_index), score_range)
     plot.add_tools(
-        HoverTool(tooltips="@hover{safe}", renderers=[arrow_hover_renderer], name="arrow_hover"),
         HoverTool(tooltips=_sample_tooltip(artifact, pc_x, pc_y), renderers=sample_renderers, name="sample_hover", limit=1),
     )
     if presentation.show_separation_metrics:
@@ -1056,13 +1471,20 @@ def plot_pca_biplot_artifact(
 
 
 __all__ = [
+    "FEATURE_CHOICE",
+    "FEATURE_ROWS",
+    "ReductionColouring",
     "ReductionFeaturePresentation",
     "ReductionGroupPresentation",
     "ReductionPlotPresentation",
     "ReductionSamplePresentation",
     "build_reduction_presentation",
+    "feature_rows_source",
     "plot_pca_biplot_artifact",
+    "plot_pca_components_artifact",
     "plot_pca_loadings_artifact",
     "plot_pca_variance_artifact",
     "plot_reduction_artifact",
+    "reduction_colouring",
+    "standardized_colouring",
 ]
