@@ -243,6 +243,11 @@ class GroupComparisonArtifact:
     # ------------------------------------------------------------------
 
     @property
+    def adjusted_for(self) -> tuple[str, ...]:
+        """The sample-sheet columns the model adjusted for, as labelled."""
+        return tuple(self.metadata.configuration.get("adjusted_for") or ())
+
+    @property
     def group_id_1(self) -> str:
         """The canonical ID of the left comparison group."""
         return " + ".join(self.membership.target_base_group_ids)
@@ -403,6 +408,7 @@ def comparison_export_frame(
     )
     export.insert(7, "effect_direction", "target_minus_baseline")
     export["test"] = artifact.test
+    export["adjusted_for"] = ", ".join(artifact.adjusted_for)
     export["correction"] = artifact.correction
     export["threshold_pval"] = thresholds.pval
     export["threshold_cohens_d"] = thresholds.cohens_d

@@ -4,21 +4,27 @@ This module provides statistical test functionality, effect size calculations,
 and significance determination for comparing groups of samples.
 """
 
+import math
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 import pandas as pd
-from scipy.stats import mannwhitneyu, ttest_ind
+from scipy import special
+from scipy.stats import mannwhitneyu, t as t_distribution, ttest_ind
 from statsmodels.stats.multitest import multipletests
 
 __all__ = [
     "CORRECTION_METHODS",
+    "SUPPORTED_TESTS",
     "StatisticalAnalysis",
     "ComparisonInputs",
+    "ModeratedFit",
     "validate_comparison_inputs",
     "comparison_test",
     "cohens_d",
+    "moderated_linear_fit",
+    "rank_sum_floor",
 ]
 
 
@@ -26,6 +32,24 @@ CORRECTION_METHODS = {
     "fdr_bh": "Benjamini-Hochberg (FDR)",
     "holm": "Holm-Bonferroni (FWER)",
 }
+
+# The two-group tests a comparison can run. ``moderated_t`` is limma's: a linear
+# model per feature whose residual variance borrows strength from every feature
+# (Smyth 2004), and the only one that can adjust for sample-sheet columns.
+SUPPORTED_TESTS = ("wilcoxon", "ttest", "moderated_t")
+
+
+def rank_sum_floor(n_target: int, n_baseline: int) -> float:
+    """The smallest two-sided p-value the exact rank-sum test can return.
+
+    Under the exact null distribution of the Mann-Whitney statistic (Mann and
+    Whitney 1947) the most extreme ranking of ``n_target + n_baseline`` samples
+    has probability ``1 / C(n, n_target)`` in each tail. No effect, however large,
+    gives a smaller p-value, so groups this small cannot pass a correction.
+    """
+    if n_target < 1 or n_baseline < 1:
+        raise ValueError("Both groups need at least one sample")
+    return min(1.0, 2.0 / math.comb(n_target + n_baseline, n_target))
 
 
 @dataclass(frozen=True)
@@ -78,15 +102,15 @@ class StatisticalAnalysis:
         """Initialize the statistical analysis with a specific test type.
 
         Args:
-            test_type (str): Statistical test to use ('wilcoxon' or 'ttest')
+            test_type (str): Statistical test to use ('wilcoxon', 'ttest' or
+                'moderated_t')
 
         Raises:
             ValueError: If the test type is not supported
         """
-        supported_tests = ["wilcoxon", "ttest"]
-        if test_type.lower() not in supported_tests:
+        if test_type.lower() not in SUPPORTED_TESTS:
             raise ValueError(
-                f"Unsupported statistical test: {test_type}. Supported tests: {supported_tests}"
+                f"Unsupported statistical test: {test_type}. Supported tests: {list(SUPPORTED_TESTS)}"
             )
         self.test_type = test_type.lower()
 
@@ -111,6 +135,7 @@ class StatisticalAnalysis:
         group_2_samples: List[str],
         test_type: Optional[str] = None,
         correction_type: Optional[str] = None,
+        covariates: Optional[pd.DataFrame] = None,
     ) -> pd.DataFrame:
         """Run statistical test between two groups.
 
@@ -119,6 +144,8 @@ class StatisticalAnalysis:
             group_1_samples (List[str]): List of sample IDs for group 1
             group_2_samples (List[str]): List of sample IDs for group 2
             test_type (str, optional): Override the default test type
+            covariates (pd.DataFrame, optional): Numeric sample-sheet columns,
+                indexed by sample, to adjust for; only the moderated t-test accepts them
 
         Returns:
             pd.DataFrame: Test results with statistical metrics
@@ -132,7 +159,8 @@ class StatisticalAnalysis:
             group_1_samples,
             group_2_samples,
             test=test,
-            correction=correction
+            correction=correction,
+            covariates=covariates,
         )
 
         return self.attach_derived_metrics(results)
@@ -335,22 +363,172 @@ def _signed_log2_fold_change(target_mean: float, baseline_mean: float) -> float:
     return float(np.copysign(magnitude, difference))
 
 
+def _trigamma_inverse(x: float) -> float:
+    """Solve ``trigamma(y) = x`` by Newton's method, as limma's trigammaInverse."""
+    if x > 1e7:
+        return 1.0 / math.sqrt(x)
+    if x < 1e-6:
+        return 1.0 / x
+    y = 0.5 + 1.0 / x
+    for _ in range(50):
+        tri = float(special.polygamma(1, y))
+        dif = tri * (1.0 - tri / x) / float(special.polygamma(2, y))
+        y += dif
+        if -dif / y < 1e-8:
+            break
+    return y
+
+
+def _prior_variance(variances: np.ndarray, df: float) -> tuple[float, float]:
+    """Estimate the scaled-F prior of the residual variances (limma's fitFDist).
+
+    Returns ``(df_prior, var_prior)``. ``df_prior`` is infinite when the observed
+    variances spread no more than sampling alone explains, and every feature then
+    takes the prior variance.
+    """
+    usable = variances[np.isfinite(variances) & (variances > -1e-15)]
+    if usable.size < 2:
+        return 0.0, float(usable.mean()) if usable.size else 1.0
+    usable = np.maximum(usable, 0.0)
+    median = float(np.median(usable))
+    if median == 0:
+        median = 1.0
+    # Zero variances are offset away from zero, as limma does.
+    usable = np.maximum(usable, 1e-5 * median)
+    e = np.log(usable) - special.digamma(df / 2) + math.log(df / 2)
+    mean = float(e.mean())
+    spread = float(((e - mean) ** 2).sum() / (e.size - 1)) - float(
+        special.polygamma(1, df / 2)
+    )
+    if spread > 0:
+        df_prior = 2.0 * _trigamma_inverse(spread)
+        var_prior = math.exp(
+            mean + float(special.digamma(df_prior / 2)) - math.log(df_prior / 2)
+        )
+        return df_prior, var_prior
+    # limma (since 2017) takes the pooled variance, the scale's MLE, here.
+    return math.inf, float(usable.mean())
+
+
+@dataclass(frozen=True)
+class ModeratedFit:
+    """One linear model per feature, tested with empirical-Bayes moderated t."""
+
+    coefficient: np.ndarray
+    t: np.ndarray
+    pval: np.ndarray
+    residual_variance: np.ndarray
+    residual_df: int
+    df_prior: float
+    var_prior: float
+
+
+def moderated_linear_fit(
+    values: np.ndarray, design: np.ndarray, coefficient: int = 1
+) -> ModeratedFit:
+    """Fit ``values ~ design`` per feature and test one coefficient (limma).
+
+    ``values`` is samples by features and ``design`` samples by parameters. Each
+    feature gets an ordinary least-squares fit. Its residual variance is then
+    shrunk toward a prior estimated from all features, ``(d0 s0^2 + d s^2) /
+    (d0 + d)``, and the coefficient is tested with ``d + d0`` degrees of freedom
+    (Smyth 2004, as limma's lmFit and eBayes without a variance trend).
+    """
+    values = np.asarray(values, dtype=float)
+    design = np.asarray(design, dtype=float)
+    n_samples, n_parameters = design.shape
+    if values.shape[0] != n_samples:
+        raise ValueError("The design has a different number of samples than the data")
+    if np.linalg.matrix_rank(design) < n_parameters:
+        raise ValueError(
+            "The adjustment columns are collinear with the groups or with each other"
+        )
+    residual_df = n_samples - n_parameters
+    if residual_df < 1:
+        raise ValueError("Too few samples to fit the model: add samples or drop a column")
+    unscaled = np.linalg.inv(design.T @ design)
+    coefficients = unscaled @ design.T @ values
+    residuals = values - design @ coefficients
+    residual_variance = (residuals**2).sum(axis=0) / residual_df
+    df_prior, var_prior = _prior_variance(residual_variance, float(residual_df))
+    if math.isinf(df_prior):
+        posterior = np.full_like(residual_variance, var_prior)
+        df_total = float(residual_df * values.shape[1])
+    else:
+        posterior = (df_prior * var_prior + residual_df * residual_variance) / (
+            df_prior + residual_df
+        )
+        # limma caps the total degrees of freedom at the pooled residual df.
+        df_total = min(df_prior + residual_df, float(residual_df * values.shape[1]))
+    with np.errstate(divide="ignore", invalid="ignore"):
+        t = coefficients[coefficient] / np.sqrt(
+            posterior * unscaled[coefficient, coefficient]
+        )
+    t = np.where(np.isfinite(t), t, 0.0)
+    pval = 2.0 * t_distribution.sf(np.abs(t), df_total)
+    return ModeratedFit(
+        coefficient=coefficients[coefficient],
+        t=t,
+        pval=pval,
+        residual_variance=residual_variance,
+        residual_df=residual_df,
+        df_prior=df_prior,
+        var_prior=var_prior,
+    )
+
+
+def _covariate_design(
+    covariates: pd.DataFrame | None, samples: Sequence[str]
+) -> np.ndarray:
+    """Centred covariate columns for the tested samples, in their order."""
+    if covariates is None or covariates.empty:
+        return np.empty((len(samples), 0))
+    missing = sorted(set(samples) - set(map(str, covariates.index)))
+    if missing:
+        raise ValueError(
+            f"No adjustment value for {len(missing)} sample(s): {', '.join(missing[:5])}"
+        )
+    block = covariates.loc[list(samples)].to_numpy(dtype=float)
+    if not np.isfinite(block).all():
+        raise ValueError("Adjustment columns must be finite for every tested sample")
+    constant = [
+        str(name)
+        for name, column in zip(covariates.columns, block.T)
+        if np.ptp(column) == 0
+    ]
+    if constant:
+        raise ValueError(
+            f"Adjustment column {', '.join(constant)} has one value across these "
+            "samples, so it cannot be adjusted for"
+        )
+    return block - block.mean(axis=0)
+
+
 def comparison_test(
-    consistencies_matrix, group_A_cells, group_B_cells, test="wilcoxon", correction="fdr_bh"
+    consistencies_matrix,
+    group_A_cells,
+    group_B_cells,
+    test="wilcoxon",
+    correction="fdr_bh",
+    covariates: pd.DataFrame | None = None,
 ):
-    """Perform a two-group comparison (Wilcoxon/Mann-Whitney or t-test) between groups.
+    """Perform a two-group comparison between groups.
 
     Args:
         consistencies_matrix (pd.DataFrame): DataFrame with reaction activities
         group_A_cells (List[str]): List of cell IDs for group A
         group_B_cells (List[str]): List of cell IDs for group B
-        test (str): Type of test, either 'wilcoxon' or 'ttest' (default 'wilcoxon').
+        test (str): 'wilcoxon' (rank-sum), 'ttest' (Welch) or 'moderated_t'
+            (limma's linear model). Default 'wilcoxon'.
         correction (str): Type of p-value correction, either 'bonferroni' or 'fdr_bh' (default 'fdr_bh')
+        covariates (pd.DataFrame, optional): Numeric columns indexed by sample to
+            adjust for. Only the moderated t-test accepts them; its effect is then
+            the group coefficient at equal covariate values.
 
     Returns:
                 pd.DataFrame: Test results including:
-                        - test statistic and p-value
-                            (Mann-Whitney U for wilcoxon, Welch t statistic for ttest)
+                        - test statistic and p-value (Mann-Whitney U for
+                            wilcoxon, Welch t for ttest, moderated t for moderated_t)
             - Cohen's d effect size
             - Log2 fold change
             - Mean difference
@@ -358,8 +536,10 @@ def comparison_test(
             - Adjusted p-value
             - Z-scores
     """
-    if test not in {"wilcoxon", "ttest"}:
-        raise ValueError("test must be 'wilcoxon' or 'ttest'")
+    if test not in SUPPORTED_TESTS:
+        raise ValueError(f"test must be one of {', '.join(SUPPORTED_TESTS)}")
+    if covariates is not None and not covariates.empty and test != "moderated_t":
+        raise ValueError("Only the moderated t-test can adjust for sample-sheet columns")
     validated = validate_comparison_inputs(
         consistencies_matrix, group_A_cells, group_B_cells
     )
@@ -401,7 +581,24 @@ def comparison_test(
     # original ``mannwhitneyu(B, A)`` orientation.
     test_stat = np.zeros(n_reactions, dtype=float)
     pval = np.ones(n_reactions, dtype=float)
-    if tested.any():
+    fit: ModeratedFit | None = None
+    adjusted_difference: np.ndarray | None = None
+    if test == "moderated_t" and tested.any():
+        # One model over every feature that varies: the prior variance is
+        # estimated from all of them. Features constant across every tested
+        # sample are left out, as limma's workflow filters unexpressed genes
+        # before the fit (Law et al. 2016), and keep the neutral result below.
+        samples = validated.tested_samples
+        group = np.r_[np.ones(n_group_1), np.zeros(n_group_2)]
+        adjustment = _covariate_design(covariates, samples)
+        design = np.column_stack([np.ones(len(samples)), group, adjustment])
+        fit = moderated_linear_fit(np.hstack([group_A, group_B])[tested].T, design)
+        test_stat[tested] = fit.t
+        pval[tested] = fit.pval
+        if adjustment.shape[1]:
+            adjusted_difference = np.zeros(n_reactions)
+            adjusted_difference[tested] = fit.coefficient
+    elif tested.any():
         if test == "ttest":
             stat_tested, pval_tested = ttest_ind(
                 group_A[tested], group_B[tested], axis=1, equal_var=False
@@ -414,8 +611,18 @@ def comparison_test(
         pval[tested] = pval_tested
 
     # Cohen's d with a pooled standard deviation, matching ``cohens_d`` element
-    # for element (NaN where the pooled variance is undefined or zero).
-    if n_group_1 < 2 or n_group_2 < 2:
+    # for element (NaN where the pooled variance is undefined or zero). With
+    # adjustment columns the effect is the model's: the group coefficient, the
+    # difference at equal covariate values, over the residual standard deviation.
+    # Without them the two definitions are the same number.
+    if adjusted_difference is not None:
+        mean_difference = adjusted_difference
+        residual_std = np.zeros(n_reactions)
+        residual_std[tested] = np.sqrt(fit.residual_variance)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            cohens_d_values = mean_difference / residual_std
+        cohens_d_values[~np.isfinite(residual_std) | (residual_std == 0)] = np.nan
+    elif n_group_1 < 2 or n_group_2 < 2:
         cohens_d_values = np.full(n_reactions, np.nan)
     else:
         var_A = group_A.var(axis=1, ddof=1)
@@ -496,5 +703,16 @@ def comparison_test(
     )
     results.attrs["correction_method"] = correction
     results.attrs["test_method"] = test
+    if fit is not None:
+        results.attrs["moderation"] = {
+            "residual_df": fit.residual_df,
+            "df_prior": fit.df_prior,
+            "var_prior": fit.var_prior,
+            "covariates": (
+                [str(name) for name in covariates.columns]
+                if covariates is not None
+                else []
+            ),
+        }
 
     return results

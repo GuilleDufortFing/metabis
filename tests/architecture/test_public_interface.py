@@ -59,6 +59,8 @@ EXPECTED_ROOT_ALL = frozenset(
         "ComparisonMode",
         "ComparisonSideSpec",
         "GroupComparisonSpec",
+        "AdjustmentColumn",
+        "ComparisonAdjustment",
         # Typed analysis results
         "ReductionKey",
         "ReductionResult",

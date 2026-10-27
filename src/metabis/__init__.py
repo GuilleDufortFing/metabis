@@ -35,6 +35,7 @@ _MODULE_EXPORTS: dict[str, tuple[str, ...]] = {
         "displayed_feature_id",
         "resolve_display_direction",
     ),
+    ".analysis.adjustment": ("AdjustmentColumn", "ComparisonAdjustment"),
     ".analysis.comparison_membership": (
         "ComparisonMembership",
         "ComparisonMode",
@@ -197,6 +198,7 @@ if TYPE_CHECKING:
         displayed_feature_id,
         resolve_display_direction,
     )
+    from .analysis.adjustment import AdjustmentColumn, ComparisonAdjustment
     from .analysis.comparison_membership import (
         ComparisonMembership,
         ComparisonMode,
@@ -365,6 +367,8 @@ __all__ = [
     "ComparisonMode",
     "ComparisonSideSpec",
     "GroupComparisonSpec",
+    "AdjustmentColumn",
+    "ComparisonAdjustment",
     # Typed analysis results
     "ReductionKey",
     "ReductionResult",
