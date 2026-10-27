@@ -14,6 +14,9 @@ deployed application read byte-identical inputs:
     - smillie_clusters_pool_reactions.tsv,
       smillie_clusters_pool_expression_cpm.tsv, smillie_metadata.tsv
       (the Smillie multi-group notebook)
+    - smillie_pseudobulk_reactions.tsv,
+      smillie_pseudobulk_expression_cp10k.tsv, smillie_pseudobulk_metadata.tsv
+      (the server's Smillie example: Compass's pseudobulk notebook rebuilt)
 
 The archive is the single source for these files, so the notebooks and the
 deployed application read byte-identical inputs.
@@ -44,7 +47,7 @@ from pathlib import Path, PurePosixPath
 DATA_DIR = Path(__file__).resolve().parent
 DOWNLOAD_URL = "https://nube.fing.edu.uy/index.php/s/FSRdpzGAiAAiyJF/download"
 ARCHIVE_NAME = "MetabisDatasets.zip"
-ARCHIVE_SHA256 = "b19ea4caae08379611a6368cf7280584f8d0ac79528a854e31d4096829d2cbf7"
+ARCHIVE_SHA256 = "f87fc820d0bd07fd6615ef6f8409f83a8e4b1db61c59c4c084dc6229d68ee1f8"
 CHUNK_SIZE = 1024 * 1024
 
 

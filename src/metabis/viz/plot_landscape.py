@@ -268,28 +268,27 @@ def plot_sample_heatmap(
         segments["group"].append(group)
         segments["samples"].append(size)
         start += size
-    segment_source = ColumnDataSource(
-        {
-            **segments,
-            "middle": [(left + right) / 2 for left, right in zip(segments["left"], segments["right"])],
-            # A name where its segment is wide enough to hold it; the hover names the rest.
-            "label": [
-                group if (right - left) / n_samples * width >= 7 * len(group) + 8 else ""
-                for group, left, right in zip(segments["group"], segments["left"], segments["right"])
-            ],
-        }
-    )
     band = plot.quad(
         left="left", right="right", bottom=n_rows, top=n_rows + 1,
         fill_color="color", line_color="#ffffff", line_width=1,
-        source=segment_source,
+        source=ColumnDataSource(segments),
     )
-    plot.text(
-        x="middle", y=n_rows + 0.5, text="label", source=segment_source,
-        text_align="center", text_baseline="middle", text_font_size="10px",
-        text_color=theme.INK, background_fill_color="#ffffff", background_fill_alpha=0.85,
-        padding=2,
-    )
+    # A group is named on the band where its segment is wide enough to hold the
+    # name; the hover names the rest.
+    named = [
+        index
+        for index, (group, left, right) in enumerate(zip(segments["group"], segments["left"], segments["right"]))
+        if (right - left) / n_samples * width >= 7 * len(group) + 8
+    ]
+    if named:
+        plot.text(
+            x=[(segments["left"][i] + segments["right"][i]) / 2 for i in named],
+            y=[n_rows + 0.5] * len(named),
+            text=[segments["group"][i] for i in named],
+            text_align="center", text_baseline="middle", text_font_size="10px",
+            text_color=theme.INK, background_fill_color="#ffffff", background_fill_alpha=0.85,
+            padding=2,
+        )
     lookup = CustomJSHover(
         args={
             "samples": samples,
