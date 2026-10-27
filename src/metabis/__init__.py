@@ -36,6 +36,33 @@ _MODULE_EXPORTS: dict[str, tuple[str, ...]] = {
         "resolve_display_direction",
     ),
     ".analysis.adjustment": ("AdjustmentColumn", "ComparisonAdjustment"),
+    ".analysis.agreement": (
+        "AGREEMENT_CLASSES",
+        "Agreement",
+        "ResultEffects",
+        "compare_results",
+    ),
+    ".analysis.concordance": (
+        "CONCORDANCE_CLASSES",
+        "reaction_gene_concordance",
+    ),
+    ".analysis.landscape": (
+        "DEFAULT_LANDSCAPE_DELTA",
+        "Landscape",
+        "build_landscape",
+        "marker_reactions",
+        "select_landscape_subsystems",
+        "subsystem_delta",
+        "with_thresholds",
+    ),
+    ".viz.plot_landscape": (
+        "plot_delta_landscape",
+        "plot_sample_heatmap",
+    ),
+    ".viz.plot_result_scatter": (
+        "plot_reaction_gene_concordance",
+        "plot_result_agreement",
+    ),
     ".analysis.comparison_membership": (
         "ComparisonMembership",
         "ComparisonMode",
@@ -199,6 +226,33 @@ if TYPE_CHECKING:
         resolve_display_direction,
     )
     from .analysis.adjustment import AdjustmentColumn, ComparisonAdjustment
+    from .analysis.agreement import (
+        AGREEMENT_CLASSES,
+        Agreement,
+        ResultEffects,
+        compare_results,
+    )
+    from .analysis.concordance import (
+        CONCORDANCE_CLASSES,
+        reaction_gene_concordance,
+    )
+    from .analysis.landscape import (
+        DEFAULT_LANDSCAPE_DELTA,
+        Landscape,
+        build_landscape,
+        marker_reactions,
+        select_landscape_subsystems,
+        subsystem_delta,
+        with_thresholds,
+    )
+    from .viz.plot_landscape import (
+        plot_delta_landscape,
+        plot_sample_heatmap,
+    )
+    from .viz.plot_result_scatter import (
+        plot_reaction_gene_concordance,
+        plot_result_agreement,
+    )
     from .analysis.comparison_membership import (
         ComparisonMembership,
         ComparisonMode,
@@ -369,6 +423,24 @@ __all__ = [
     "GroupComparisonSpec",
     "AdjustmentColumn",
     "ComparisonAdjustment",
+    # Results across comparisons: landscape, agreement, reactions against genes
+    "AGREEMENT_CLASSES",
+    "Agreement",
+    "ResultEffects",
+    "compare_results",
+    "CONCORDANCE_CLASSES",
+    "reaction_gene_concordance",
+    "DEFAULT_LANDSCAPE_DELTA",
+    "Landscape",
+    "build_landscape",
+    "marker_reactions",
+    "select_landscape_subsystems",
+    "subsystem_delta",
+    "with_thresholds",
+    "plot_delta_landscape",
+    "plot_sample_heatmap",
+    "plot_reaction_gene_concordance",
+    "plot_result_agreement",
     # Typed analysis results
     "ReductionKey",
     "ReductionResult",

@@ -76,3 +76,12 @@ def test_only_the_moderated_t_test_adjusts():
 
     comparison = GroupComparison(spec=spec, test="moderated_t", adjustment=adjustment)
     assert comparison.adjustment is adjustment
+
+
+def test_numbers_read_as_text_are_numbers():
+    sheet = SHEET.assign(reads=["100", "1000", "10", "10000"])
+    adjustment = ComparisonAdjustment.from_metadata(
+        sheet, [AdjustmentColumn("reads", log10=True)]
+    )
+
+    np.testing.assert_allclose(adjustment.design(["s1", "s2"])["log10 reads"], [2.0, 3.0])

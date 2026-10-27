@@ -63,6 +63,15 @@ class ComparisonAdjustment:
         values = metadata.loc[:, [name for name in names if name in metadata.columns]]
         values = values.copy()
         values.index = values.index.map(str)
+        # Sample sheets are read as text: a column whose every value reads as a
+        # number is a number.
+        for name in values.columns:
+            column = values[name]
+            if is_numeric_dtype(column) or is_bool_dtype(column):
+                continue
+            numeric = pd.to_numeric(column, errors="coerce")
+            if numeric[column.notna()].notna().all() and column.notna().any():
+                values[name] = numeric
         return cls(columns=columns, values=values)
 
     @property
