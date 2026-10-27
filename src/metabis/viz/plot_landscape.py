@@ -132,6 +132,9 @@ def plot_delta_landscape(
     _style_categorical(plot)
     plot.yaxis.group_text_color = theme.INK_MUTED
     plot.yaxis.group_text_font_style = "normal"
+    plot.yaxis.group_text_font_size = "11px"
+    plot.yaxis.group_label_orientation = "horizontal"
+    plot.yaxis.separator_line_color = theme.GRID_LINE
     plot.xaxis.major_label_orientation = 0.6 if len(groups) > 6 else 0.0
     renderer = plot.rect(
         x="group",
@@ -205,9 +208,14 @@ def plot_sample_heatmap(
         raise ValueError("No reaction varies across these samples")
     colors = dict(group_colors or zip(order, group_palette(len(order))))
 
+    # Two reactions can share a name (one transport into several compartments):
+    # a repeated name carries its ID, so every row reads as its own.
+    first_names = [labels.get(members[0], members[0]) for members in rows]
+    repeated = {name for name in first_names if first_names.count(name) > 1}
     names = []
-    for members in rows:
-        name = labels.get(members[0], members[0])
+    for members, name in zip(rows, first_names):
+        if name in repeated:
+            name += f" [{members[0]}]"
         names.append(name + (f" and {len(members) - 1} alike" if len(members) > 1 else ""))
 
     values = block[[members[0] for members in rows]].to_numpy(dtype=float)
@@ -260,10 +268,27 @@ def plot_sample_heatmap(
         segments["group"].append(group)
         segments["samples"].append(size)
         start += size
+    segment_source = ColumnDataSource(
+        {
+            **segments,
+            "middle": [(left + right) / 2 for left, right in zip(segments["left"], segments["right"])],
+            # A name where its segment is wide enough to hold it; the hover names the rest.
+            "label": [
+                group if (right - left) / n_samples * width >= 7 * len(group) + 8 else ""
+                for group, left, right in zip(segments["group"], segments["left"], segments["right"])
+            ],
+        }
+    )
     band = plot.quad(
         left="left", right="right", bottom=n_rows, top=n_rows + 1,
         fill_color="color", line_color="#ffffff", line_width=1,
-        source=ColumnDataSource(segments),
+        source=segment_source,
+    )
+    plot.text(
+        x="middle", y=n_rows + 0.5, text="label", source=segment_source,
+        text_align="center", text_baseline="middle", text_font_size="10px",
+        text_color=theme.INK, background_fill_color="#ffffff", background_fill_alpha=0.85,
+        padding=2,
     )
     lookup = CustomJSHover(
         args={
