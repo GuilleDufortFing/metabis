@@ -339,6 +339,40 @@ def test_the_biplot_draws_one_arrow_per_direction():
     assert biplot_arrows(x, y, 1) == [0]
 
 
+def test_of_features_loading_alike_but_for_rounding_the_first_is_drawn():
+    from metabis.viz.plot_reduction_artifact import biplot_arrows
+
+    # Scored alike, two features' loadings differ by rounding alone, the second by
+    # a hair longer: the first is drawn, the one the components' row is named after.
+    x, y = np.array([0.6, 0.6 + 2e-16, -0.2]), np.array([0.3, 0.3, 0.9])
+    assert biplot_arrows(x, y, None) == [2, 0]
+
+
+def test_a_feature_loading_as_an_arrow_does_colours_that_arrow_rather_than_adding_one():
+    data = artifact()
+    # R1 is longer than R2 by rounding alone, as the row's first member and the
+    # feature clicked in it are in Compass's tied reactions.
+    loadings = np.array([[0.9 + 2e-16, 0.9, -0.1], [0.1, 0.1, 0.4], [0.2, 0.5, 0.7]])
+    tied = replace(data, pca=replace(data.pca, loadings=loadings))
+    colouring = ReductionColouring("R2", "Display R2", "reactions", (1.0, 2.0, 3.0, 4.0))
+
+    plot = plot_reduction_artifact(
+        tied, presentation(show_biplot_arrows=True, colouring=colouring, show_sample_labels=False)
+    )
+
+    (endpoints,) = [r for r in plot.renderers if r.name == "arrow_endpoints"]
+    ids = list(endpoints.data_source.data["feature_id"])
+    # R1 and R2 are one arrow, named after R2, which colours the samples.
+    assert "R2" in ids and "R1" not in ids and len(ids) == len(set(ids))
+    names = [
+        label
+        for renderer in plot.renderers
+        if getattr(getattr(renderer, "glyph", None), "text", None) == "tip_label"
+        for label in renderer.data_source.data["tip_label"]
+    ]
+    assert [name for name in names if name.startswith(("Display R1", "Display R2"))] == ["Display R2 (+1)"]
+
+
 def test_an_arrow_leading_features_that_load_alike_is_named_with_their_count():
     from metabis.viz.plot_reduction_artifact import arrow_ties, biplot_arrows
 

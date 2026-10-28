@@ -1560,8 +1560,11 @@ def biplot_arrows(loadings_x: np.ndarray, loadings_y: np.ndarray, limit: int | N
     The strongest loadings often point the same way (tied reactions, one chain),
     so the top few by length would draw one arrow several times; one per sector
     shows the directions the variance runs in. At most ``limit``, longest first.
+    Features scored alike get loadings apart only by rounding (1e-16), so
+    lengths are compared as the PCA components' rows group features, to nine
+    decimals: of tied features the first is drawn, the one its row is named after.
     """
-    magnitudes = np.hypot(loadings_x, loadings_y)
+    magnitudes = np.round(np.hypot(loadings_x, loadings_y), 9)
     if magnitudes.size == 0 or float(magnitudes.max()) == 0:
         return []
     floor = BIPLOT_MINIMUM_SHARE * float(magnitudes.max())
@@ -1623,7 +1626,13 @@ def _draw_arrows(plot, artifact: ReductionArtifact, presentation, columns, score
         and colouring.feature_id in artifact.feature_names
     ):
         focus = artifact.feature_names.index(colouring.feature_id)
-        if focus not in chosen:
+        # A feature loading as a drawn arrow does is that arrow, named after it,
+        # rather than a second arrow on top of the first.
+        key = lambda index: (round(float(loadings_x[index]), 9), round(float(loadings_y[index]), 9))  # noqa: E731
+        twin = next((index for index in chosen if key(index) == key(focus)), None)
+        if twin is not None:
+            chosen = [focus if index == twin else index for index in chosen]
+        elif focus not in chosen:
             chosen = [*chosen, focus]
     arrows = pd.DataFrame(
         {
