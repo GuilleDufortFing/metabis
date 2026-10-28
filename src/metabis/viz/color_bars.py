@@ -163,9 +163,11 @@ def add_pathway_key(
 ) -> None:
     """A key row under a subsystem graph: what each shape is, and what each colour means.
 
-    A diamond is a reaction, a rectangle a gene, an oval a metabolite; grey is a
-    feature that is not significant or has no data. Each feature family that
-    colours the graph adds its colour bar, read from its own distribution.
+    A diamond is a reaction, a rectangle a gene, an oval a metabolite. In a
+    comparison grey is a feature that is not significant or has no data; in
+    single-group activity grey is the typical level, so no data is white with a
+    dashed edge. Each feature family that colours the graph adds its colour bar,
+    read from its own distribution.
     """
     from ..visual_config import theme
 
@@ -184,8 +186,12 @@ def add_pathway_key(
             plot.ellipse(**nowhere, width=18, height=11, width_units="screen", height_units="screen", **outline),
         ),
         (
-            "Not significant, or no data",
-            plot.scatter(**nowhere, marker="square", size=11, fill_color=theme.NOT_SIGNIFICANT, line_color=None),
+            ("No data", plot.scatter(**nowhere, marker="square", size=11, **outline, line_dash="dashed"))
+            if visualization_mode == "activity"
+            else (
+                "Not significant, or no data",
+                plot.scatter(**nowhere, marker="square", size=11, fill_color=theme.NOT_SIGNIFICANT, line_color=None),
+            )
         ),
     ]
     legend = Legend(

@@ -20,7 +20,10 @@ from metabis.analysis.dimensionality_reduction import (
 )
 from metabis.analysis_workspace import RevisionKind, WorkspaceRevisions
 from metabis.viz.plot_reduction_artifact import (
+    FADED_ALPHA,
+    FADED_SIZE,
     FEATURE_CHOICE,
+    GROUP_FOCUS,
     add_arrow_colouring,
     FEATURE_ROWS,
     ReductionColouring,
@@ -402,7 +405,7 @@ def test_a_pca_scatter_draws_the_chosen_components_and_arrows_only_when_asked():
         artifact(), presentation(biplot_pc_x=2, biplot_pc_y=3, show_biplot_arrows=True)
     )
 
-    healthy = next(s for s in sources(plain) if "group_id" in s.data and s.data["group_id"][0] == "g1")
+    healthy = next(s for s in sources(plain) if "sample_id" in s.data and s.data["group_id"][0] == "g1")
     assert list(healthy.data["x"]) == [-1.0, -2.0]
     assert list(healthy.data["y"]) == [0.1, 0.2]
     assert plain.xaxis[0].axis_label == "PC2 (30.0%)"
@@ -502,24 +505,43 @@ def test_the_components_figure_names_long_rows_short_and_counts_alike_features()
     assert not plot.js_event_callbacks
 
 
-def _fills(plot):
-    """Each sample layer's fill and its samples, in the order drawn."""
+def _layers(plot):
+    """Each sample layer, in the order drawn: its fill, samples, opacities and sizes."""
     return [
-        (renderer.glyph.fill_color, list(renderer.data_source.data["sample_id"]))
+        (
+            renderer.glyph.fill_color,
+            list(renderer.data_source.data["sample_id"]),
+            list(renderer.data_source.data["alpha"]),
+            list(renderer.data_source.data["size"]),
+        )
         for renderer in plot.renderers
         if hasattr(renderer, "data_source") and "sample_id" in renderer.data_source.data
         and len(renderer.data_source.data["sample_id"])
     ]
 
 
-def test_highlighted_groups_keep_their_colours_over_the_rest_in_grey_as_the_cell_browser_draws():
+def _focus(plot):
+    (focus,) = [s for s in sources(plot) if s.name == GROUP_FOCUS]
+    return focus
+
+
+def test_highlighted_groups_are_drawn_over_the_rest_which_keep_their_colours_faint_and_small():
     plot = plot_reduction_artifact(
         artifact(), presentation(highlight_group_ids=("g2",), show_legend=False, show_sample_labels=False)
     )
 
-    # The grey group first, so the highlighted one is drawn over it.
-    assert _fills(plot) == [("#c7c7c7", ["s1", "s2"]), ("#445566", ["s3", "s4"])]
+    # The faded group first, so the highlighted one is drawn over it; neither turns grey.
+    (faded, lit) = _layers(plot)
+    full = lit[3][0]
+    assert faded[:3] == ("#112233", ["s1", "s2"], [FADED_ALPHA] * 2) and faded[3] == [full * FADED_SIZE] * 2
+    assert lit[:3] == ("#445566", ["s3", "s4"], [0.8] * 2) and lit[3] == [full] * 2
     assert not plot.legend or not plot.legend[0].items
+    # The page moves the focus in the browser; the callback restyles both layers.
+    focus = _focus(plot)
+    assert list(focus.data["group_id"]) == ["g2"]
+    (callback,) = focus.js_property_callbacks["change:data"]
+    drawn = [r.data_source for r in plot.renderers if hasattr(r, "data_source") and "sample_id" in r.data_source.data]
+    assert [id(source) for source in callback.args["points"]] == [id(source) for source in drawn]
 
 
 def test_a_hidden_group_leaves_the_map_but_not_the_colour_scale():
@@ -538,16 +560,32 @@ def test_a_hidden_group_leaves_the_map_but_not_the_colour_scale():
     assert (mapper.palette[0].upper(), mapper.palette[-1].upper()) == ("#542788", "#E6AB02") and "#E0E0E0" in [c.upper() for c in mapper.palette]
 
 
-def test_a_highlighted_group_keeps_the_feature_colours_and_the_rest_turn_grey():
+def test_a_highlighted_group_keeps_the_feature_colours_and_the_rest_fade_in_theirs():
     colouring = ReductionColouring("R9", "A reaction", "reactions", (1.0, 2.0, 3.0, 10.0))
 
     plot = plot_reduction_artifact(
         artifact(), presentation(colouring=colouring, highlight_group_ids=("g1",), show_sample_labels=False)
     )
 
-    (grey, lit) = _fills(plot)
-    assert grey == ("#c7c7c7", ["s3", "s4"])
-    assert sorted(lit[1]) == ["s1", "s2"] and lit[0] != "#c7c7c7"
+    (faded, lit) = _layers(plot)
+    # Both layers read the feature's level; only the opacity and size tell them apart.
+    assert faded[0] == lit[0] and faded[0]["field"] == "z"
+    assert sorted(faded[1]) == ["s3", "s4"] and faded[2] == [FADED_ALPHA] * 2
+    assert sorted(lit[1]) == ["s1", "s2"] and lit[2] == [1.0] * 2
+    assert list(_focus(plot).data["group_id"]) == ["g1"]
+
+
+def test_a_sample_with_no_value_for_the_feature_is_hollow_not_grey():
+    colouring = ReductionColouring("R9", "A reaction", "reactions", (1.0, float("nan"), 3.0, 10.0))
+
+    plot = plot_reduction_artifact(artifact(), presentation(colouring=colouring, show_sample_labels=False))
+
+    points = source_with(plot, "z")
+    by_sample = dict(zip(points.data["sample_id"], zip(points.data["hollow"], points.data["edge"], points.data["edge_width"])))
+    assert by_sample["s2"] == (True, "#606060", 1.0)
+    assert not by_sample["s1"][0] and by_sample["s1"][1] != "#606060"
+    (mapper,) = plot.select({"type": LinearColorMapper})
+    assert mapper.nan_color == "#ffffff"
 
 
 def test_the_feature_colouring_the_map_has_its_arrow_in_the_gradient_and_an_arrow_click_colours():

@@ -445,6 +445,8 @@ def enrich_gene_glyph_with_data(
             line_dash = VisualizationConstants.MISSING_DATA_LINE_DASH
         else:
             color = data_manager.get_element_color(gene_id, "gene", color_metric)
+            if _unscored_activity(data_manager, color):
+                line_dash = VisualizationConstants.MISSING_DATA_LINE_DASH
     else:
         # Fallback when no data manager
         if missing_reason in {"no_experimental_data", "no_metadata"}:
@@ -530,6 +532,8 @@ def enrich_reaction_glyph_with_data(
             color = data_manager.get_element_color(
                 reaction_id, "reaction", color_metric, use_main_direction=True
             )
+            if _unscored_activity(data_manager, color):
+                line_dash = VisualizationConstants.MISSING_DATA_LINE_DASH
     else:
         # Fallback when no data manager
         if missing_reason in {"no_experimental_data", "no_metadata"}:
@@ -624,8 +628,18 @@ def _without_data(data_manager, subsystem_id, element_type, delta_options, color
             return False
         return not (stats or {}).get("total_elements")
     if mode == "experiment_analysis":
-        return str(color).lower() == str(theme.ACTIVITY_UNAVAILABLE).lower()
+        return _unscored_activity(data_manager, color)
     return False
+
+
+def _unscored_activity(data_manager, color) -> bool:
+    """Whether single-group activity drew an element as having no data.
+
+    It is then white with a dashed edge, as a subsystem with no measured
+    feature is; in a comparison white is a measured change of zero instead.
+    """
+    mode = getattr(getattr(data_manager, "mode", None), "value", None)
+    return mode == "experiment_analysis" and str(color).lower() == str(theme.ACTIVITY_UNAVAILABLE).lower()
 
 
 def enrich_subsystem_glyph_with_data(

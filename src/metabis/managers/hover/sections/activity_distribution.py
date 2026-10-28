@@ -69,7 +69,7 @@ class ActivityDistributionSection(HoverSection):
             plot_html = create_static_violin_for_hover(
                 list(reference_values),
                 list(element_values),
-                theme.ACTIVITY_UNAVAILABLE,
+                theme.NOT_SIGNIFICANT,  # the group's summary, as background
                 element_color,
                 x_label="",
                 y_label=y_label,

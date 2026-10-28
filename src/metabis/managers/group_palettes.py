@@ -1,26 +1,25 @@
 """Categorical colours for sample groups.
 
-Up to eight groups take the Okabe-Ito palette, as Wong recommends for colour-blind
-readers (B. Wong, "Points of view: Color blindness", Nature Methods 8, 441, 2011).
-Its yellow, #F0E442, is swapped for the grey of the R Graphics Cookbook's
-colour-blind palette, since yellow points vanish on the white plot background.
-More groups take scanpy's defaults, in scanpy's own order of use: its 20-colour
-palette (Vega's category20 adjusted for colour blindness), Zeileis et al.'s 28
-colours, then the 102 colours of "godsnot" (scanpy.plotting.palettes, BSD-3).
-Beyond 102 groups the colours repeat.
+Up to five groups take the Okabe-Ito palette, as Wong recommends for colour-blind
+readers (B. Wong, "Points of view: Color blindness", Nature Methods 8, 441, 2011),
+without four of its colours, each of which already says something else:
+its orange is the gold of a high level (ΔE 2.9), its grey the "not significant",
+"average" and "no data" greys, its black fades to that grey when other groups
+are highlighted, and its yellow vanishes on the white plot background.
+More groups take scanpy's defaults, which leave grey out as well, in scanpy's
+own order of use: its 20-colour palette (Vega's category20 adjusted for colour
+blindness), Zeileis et al.'s 28 colours, then the 102 colours of "godsnot"
+(scanpy.plotting.palettes, BSD-3). Beyond 102 groups the colours repeat.
 """
 
 from __future__ import annotations
 
 OKABE_ITO = (
-    "#E69F00",  # orange
     "#56B4E9",  # sky blue
     "#009E73",  # bluish green
     "#0072B2",  # blue
     "#D55E00",  # vermillion
     "#CC79A7",  # reddish purple
-    "#999999",  # grey, in place of yellow
-    "#000000",  # black
 )
 
 SCANPY_20 = (
@@ -56,7 +55,7 @@ SCANPY_102 = (
 
 
 def group_palette(n: int) -> list[str]:
-    """``n`` group colours: Okabe-Ito up to 8, then the smallest scanpy palette that fits."""
+    """``n`` group colours: Okabe-Ito up to 5, then the smallest scanpy palette that fits."""
     for palette in (OKABE_ITO, SCANPY_20, SCANPY_28, SCANPY_102):
         if n <= len(palette):
             return list(palette[:n])

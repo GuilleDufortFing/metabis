@@ -94,3 +94,18 @@ def test_the_pathway_key_names_each_shape_and_adds_a_bar_per_family():
     # Reactions have a distribution here and genes none, so one bar.
     bars = [item for item in plot.right if isinstance(item, ColorBar)]
     assert [bar.title for bar in bars] == ["Reactions, Cohen's d"]
+
+
+def test_the_activity_key_draws_no_data_white_and_dashed_since_grey_is_the_typical_level():
+    from bokeh.models import Legend
+    from bokeh.plotting import figure
+
+    from metabis.viz.color_bars import add_pathway_key
+
+    plot = figure()
+    add_pathway_key(plot, _Workspace({"a": 0.1}), visualization_mode="activity")
+
+    (legend,) = [item for item in plot.below if isinstance(item, Legend)]
+    assert [item.label.value for item in legend.items][-1] == "No data"
+    (renderer,) = legend.items[-1].renderers
+    assert renderer.glyph.fill_color == "#ffffff" and renderer.glyph.line_dash == "dashed"

@@ -134,7 +134,7 @@ def test_group_colors_cycle_instead_of_failing_beyond_the_palette_limit():
 
 
 def test_default_group_colors_are_okabe_ito_then_scanpy():
-    """Up to eight groups take Okabe-Ito; more take scanpy's palettes, then repeat."""
+    """Up to five groups take Okabe-Ito; more take scanpy's palettes, then repeat."""
     from metabis.managers.group_palettes import OKABE_ITO, SCANPY_20, SCANPY_102
 
     manager = ColorManager()
@@ -143,8 +143,22 @@ def test_default_group_colors_are_okabe_ito_then_scanpy():
         return list(manager.generate_group_colors([f"G{index}" for index in range(n)]).values())
 
     assert colors(3) == list(OKABE_ITO[:3])
-    assert colors(8) == list(OKABE_ITO)
+    assert colors(5) == list(OKABE_ITO)
+    assert colors(6) == list(SCANPY_20[:6])
     assert colors(9) == list(SCANPY_20[:9])
     assert colors(102) == list(SCANPY_102)
     beyond = colors(110)
     assert beyond[102:] == list(SCANPY_102[:8])
+
+
+def test_group_colors_leave_out_the_greys_and_the_level_gold():
+    """Grey says "not significant", "average" or "no data", and orange is the
+    gold of a high level; black fades to grey when another group is highlighted."""
+    from metabis.managers.group_palettes import OKABE_ITO, SCANPY_20
+
+    def grey(color):
+        red, green, blue = (int(color[i:i + 2], 16) for i in (1, 3, 5))
+        return max(red, green, blue) - min(red, green, blue) < 16
+
+    assert not [color for color in OKABE_ITO + SCANPY_20 if grey(color)]
+    assert "#E69F00" not in OKABE_ITO

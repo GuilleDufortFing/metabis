@@ -277,3 +277,35 @@ def test_changing_the_group_recolors_the_same_reaction(workspace, data_manager):
     color_b = data_manager.get_element_color(planted, "reaction")
 
     assert color_a != color_b
+
+
+@pytest.mark.integration
+def test_an_unscored_node_is_drawn_as_no_data_white_and_dashed_never_the_typical_grey(model, data_manager):
+    """Grey is the typical level in single-group activity, and "not significant"
+    in a comparison; an element with no activity score is no data, as a
+    subsystem with no measured feature is drawn."""
+    from bokeh.models import ColumnDataSource
+
+    from metabis.visual_config import theme
+
+    context = data_manager.activate_activity_mode(activity_config())
+    plot = plot_metabolic_graph(
+        element_name=model.get_subsystem(SUBSYSTEM_ID).name,
+        data_manager=data_manager,
+        graph_type="subsystem",
+        show_plot=False,
+        add_click_interactions=False,
+        enrichment_config=EnrichmentConfig(color_metric=context.metric_key),
+    )
+
+    nodes = [
+        (str(color).lower(), dash)
+        for source in plot.select({"type": ColumnDataSource})
+        if {"element_id", "color", "line_dash"} <= set(source.data)
+        for color, dash in zip(source.data["color"], source.data["line_dash"])
+    ]
+    # No gene expression was loaded: the gene nodes have no score.
+    unscored = [dash for color, dash in nodes if color == theme.ACTIVITY_UNAVAILABLE.lower()]
+    assert unscored and set(unscored) == {"dashed"}
+    assert theme.ACTIVITY_UNAVAILABLE.lower() == "#ffffff"
+    assert not [color for color, _ in nodes if color == theme.NOT_SIGNIFICANT.lower()]

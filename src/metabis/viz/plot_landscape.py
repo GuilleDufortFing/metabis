@@ -36,8 +36,8 @@ from .plot_reduction_artifact import (
     FEATURE_TAP_CODE,
     feature_level_palette,
     feature_rows_source,
-    gradient_box,
     gradient_choice,
+    group_blocks,
 )
 from .plot_utils import apply_academic_style, short_row_label
 
@@ -238,7 +238,9 @@ def plot_sample_heatmap(
 
     Rows are chosen and scaled over every grouped sample; ``hidden_groups``
     then leave the figure, so hiding a group changes no other cell's colour.
-    The bands of ``highlight_groups`` are outlined in the logo's gradient.
+    With ``highlight_groups`` the other groups' columns fade and the highlighted
+    bands are outlined in the logo's gradient; the page moves the focus through
+    the source named ``GROUP_FOCUS``, as on the map.
     With ``fill`` the figure takes its container's height, its rows dividing
     it, rather than a height of its own.
     """
@@ -283,8 +285,8 @@ def plot_sample_heatmap(
     # Image rows run bottom to top: the most variable reaction is drawn last, on top.
     image = np.clip(z.T[::-1], -reach, reach).astype(np.float32)
 
-    # A level, white for low through purple for high, as the reduction coloured
-    # by one feature is drawn.
+    # A level, purple for low through light grey to gold for high, as the
+    # reduction coloured by one feature is drawn.
     mapper = LinearColorMapper(palette=feature_level_palette(), low=-reach, high=reach)
     plot = apply_academic_style(
         figure(
@@ -336,9 +338,6 @@ def plot_sample_heatmap(
         fill_color="color", line_color="#ffffff", line_width=1,
         source=ColumnDataSource(segments),
     )
-    for group, left, right in zip(segments["group"], segments["left"], segments["right"]):
-        if group in set(highlight_groups):
-            gradient_box(plot, left + 0.2, right - 0.2, n_rows + 0.06, n_rows + 0.94, piece=max(n_samples / 120, 0.05))
     # A group is named on the band where its segment is wide enough to hold the
     # name; the hover names the rest.
     named = [
@@ -392,6 +391,16 @@ def plot_sample_heatmap(
         ),
     )
     plot.add_layout(_color_bar(mapper, "Standardized score"), "right")
+    # Under the chosen row's outline, so a faded block never hides it.
+    group_blocks(
+        plot,
+        list(zip(segments["group"], segments["left"], segments["right"])),
+        highlight_groups,
+        bottom=0,
+        top=n_rows + 1,
+        band=(n_rows + 0.06, n_rows + 0.94),
+        piece=max(n_samples / 120, 0.05),
+    )
     choice = gradient_choice(plot, 0, n_samples)
     plot.tags = [*plot.tags, feature_rows_source(rows, [n_rows - 1 - index + 0.5 for index in range(n_rows)])]
     if feature_event:

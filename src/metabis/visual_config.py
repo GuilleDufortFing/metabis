@@ -30,7 +30,10 @@ class VisualTheme:
     ACTIVITY_HIGH: str = "#E6AB02"    # Gold: highest relative activity
     ACTIVITY_MID: str = "#E0E0E0"     # Light grey: typical activity for that feature
     ACTIVITY_LOW: str = "#542788"     # Purple (ColorBrewer PuOr): lowest relative activity
-    ACTIVITY_UNAVAILABLE: str = "#c7c7c7"  # Gray: not measured / below coverage threshold
+    # No data (not measured, or below the coverage threshold) is white with a
+    # dashed edge, as a subsystem with no measured feature is drawn, so grey
+    # only ever means the typical level here, and "not significant" in a comparison.
+    ACTIVITY_UNAVAILABLE: str = "#FFFFFF"
 
     # Retained aliases: the gradient machinery names its endpoints up/down.
     ACTIVITY_UP: str = "#E6AB02"

@@ -23,10 +23,12 @@ from .plot_utils import apply_academic_style
 
 __all__ = ["plot_reaction_gene_concordance", "plot_result_agreement"]
 
-# Drawn in this order, so the classes that matter sit on top.
+# Drawn in this order, so the classes that matter sit on top. Grey is kept for
+# "neither changes", the not significant of a comparison: a change in the genes
+# alone takes Okabe-Ito's bluish green, which the other classes leave free.
 CONCORDANCE_STYLE = {
     "neither": theme.NOT_SIGNIFICANT,
-    "genes": "#999999",
+    "genes": "#009E73",
     "network": "#E69F00",
     "against": "#D55E00",
     "follows": "#0072B2",

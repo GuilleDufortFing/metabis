@@ -56,7 +56,7 @@ from .brand import GRADIENT_JS, OUTLINE_WIDTH, gradient_segments
 from .plot_utils import apply_academic_style, short_row_label
 
 DEFAULT_CATEGORICAL_PALETTE = OKABE_ITO
-DEFAULT_SINGLE_COLOR = OKABE_ITO[3]  # Okabe-Ito blue, for samples with no group
+DEFAULT_SINGLE_COLOR = "#0072B2"  # Okabe-Ito blue, for samples with no group
 # Category10 is kept for callers that imported it from here.
 LEGACY_CATEGORICAL_PALETTE = Category10[10]
 VARIANCE_MARKS = (0.5, 0.8)  # where the cumulative share is marked
@@ -66,10 +66,19 @@ LOADING_ROW_HEIGHT = 20
 FEATURE_REACH = 3.0  # standard deviations, as the sample heatmap clips its rows
 COMPONENT_BAR_ROWS = 5.0  # the variance bars' height, in feature rows
 LABEL_LIMIT = 30  # characters of a row name beside another figure
-# Named sources the page reads and writes: which features each row holds, and
-# the row outlined as the samples' colour.
+# Named sources the page reads and writes: which features each row holds, the
+# row outlined as the samples' colour, and the groups in focus.
 FEATURE_ROWS = "feature_rows"
 FEATURE_CHOICE = "feature_choice"
+GROUP_FOCUS = "group_focus"
+# Out of focus, a sample keeps its colour, faint and small: Vega-Lite's
+# interactive legend fades unselected series to 0.2 and CELLxGENE draws
+# unselected cells smaller. The size keeps a faint sample from reading as a
+# near-average one, and grey stays free for "average" and "no value".
+FADED_ALPHA = 0.2
+GROUP_ALPHA = 0.8  # a sample in its group's colour, translucent so overlaps show
+FADED_SIZE = 0.6  # of a sample in focus
+NO_VALUE_EDGE_WIDTH = 1.0  # a sample with no value is hollow, ringed in muted ink
 
 
 def point_size(count: int) -> float:
@@ -305,6 +314,55 @@ def _style_points(plot, source, *, color: str, size: float, label: str | None, n
         name=name,
         **legend,
     )
+
+
+FOCUS_POINTS_CODE = """
+// cb_obj holds the groups in focus; with none, every sample is.
+const focus = new Set(cb_obj.data.group_id)
+for (const source of points) {
+  const data = source.data
+  const alpha = [], size = [], edge = []
+  for (let i = 0; i < data.group_id.length; i++) {
+    const on = focus.size === 0 || focus.has(data.group_id[i])
+    alpha.push(on ? full_alpha : faded_alpha)
+    size.push(on ? full_size : full_size * faded_size)
+    // A faint hollow sample keeps a faint ring; a faint filled one needs none.
+    edge.push(on ? 1 : data.hollow[i] ? faded_alpha : 0)
+  }
+  source.data = {...data, alpha, size, edge_alpha: edge}
+}
+"""
+
+
+def _focus_columns(groups, focus, *, full_alpha: float, size: float, hollow) -> dict[str, list]:
+    """Each sample's opacity, size and edge, in focus or faded, as FOCUS_POINTS_CODE sets them."""
+    focus = set(focus)
+    on = [not focus or group in focus for group in groups]
+    return {
+        "group_id": list(groups),
+        "hollow": [bool(value) for value in hollow],
+        "alpha": [full_alpha if lit else FADED_ALPHA for lit in on],
+        "size": [size if lit else size * FADED_SIZE for lit in on],
+        "edge_alpha": [1.0 if lit else (FADED_ALPHA if empty else 0.0) for lit, empty in zip(on, hollow)],
+    }
+
+
+def _group_focus(plot, sources, focus, *, full_alpha: float, size: float) -> ColumnDataSource:
+    """The groups in focus, a source the page sets as a group is hovered or highlighted.
+
+    A callback fades every other sample in ``sources`` in the browser, so a hover
+    redraws nothing on the server and keeps the view's zoom.
+    """
+    chosen = ColumnDataSource({"group_id": list(focus)}, name=GROUP_FOCUS)
+    chosen.js_on_change(
+        "data",
+        CustomJS(
+            args=dict(points=list(sources), full_alpha=full_alpha, faded_alpha=FADED_ALPHA, full_size=size, faded_size=FADED_SIZE),
+            code=FOCUS_POINTS_CODE,
+        ),
+    )
+    plot.tags = [*plot.tags, chosen]
+    return chosen
 
 
 def _legend_outside(plot) -> None:
@@ -628,7 +686,8 @@ def _coloured_points(plot, artifact, presentation, columns, size, shown):
 
     Samples far from the mean are drawn over the rest, so a few high ones are
     never hidden under a crowd of average ones, as scanpy orders them. With
-    groups highlighted, every other sample is grey underneath them.
+    groups highlighted, every other sample keeps its colour, faint and small,
+    underneath them. A sample with no value is hollow.
     """
     colouring = presentation.colouring
     assert colouring is not None
@@ -641,12 +700,13 @@ def _coloured_points(plot, artifact, presentation, columns, size, shown):
     values = np.asarray(colouring.values, dtype=float)
     lit = set(presentation.highlight_group_ids)
     mapper = LinearColorMapper(
-        palette=feature_level_palette(), low=-FEATURE_REACH, high=FEATURE_REACH, nan_color=theme.NOT_SIGNIFICANT
+        palette=feature_level_palette(), low=-FEATURE_REACH, high=FEATURE_REACH, nan_color="#ffffff"
     )
     order = [int(i) for i in np.argsort(np.nan_to_num(np.abs(z), nan=-1.0), kind="stable") if shown[i]]
 
-    def layer(indices, fill):
+    def layer(indices):
         ids = [artifact.sample_ids[index] for index in indices]
+        hollow = ~np.isfinite(z[indices])
         source = ColumnDataSource(
             {
                 "x": artifact.coordinates[indices, columns[0]],
@@ -654,28 +714,37 @@ def _coloured_points(plot, artifact, presentation, columns, size, shown):
                 "sample_id": ids,
                 "display_label": [sample_lookup[sample_id].display_label for sample_id in ids],
                 "group": [membership[s].display_name if s in membership else "Unassigned" for s in ids],
-                "color": [membership[s].color if s in membership else theme.NOT_SIGNIFICANT for s in ids],
+                "color": [membership[s].color if s in membership else theme.INK_MUTED for s in ids],
                 "value": values[indices],
                 "z": z[indices],
+                "edge": [theme.INK_MUTED if empty else theme.MARK_EDGE for empty in hollow],
+                "edge_width": [NO_VALUE_EDGE_WIDTH if empty else 0.4 for empty in hollow],
+                **_focus_columns(
+                    [membership[s].group_id if s in membership else "" for s in ids],
+                    lit, full_alpha=1.0, size=size, hollow=hollow,
+                ),
             }
         )
         renderer = plot.scatter(
-            "x", "y", source=source, size=size, fill_color=fill,
-            line_color=theme.MARK_EDGE, line_width=0.4, name="sample_points",
+            "x", "y", source=source, size="size", fill_color=transform("z", mapper), fill_alpha="alpha",
+            line_color="edge", line_width="edge_width", line_alpha="edge_alpha", name="sample_points",
         )
         return source, renderer
 
     layers = []
     if lit:
+        # The faded samples first, so the highlighted ones are drawn over them.
         is_lit = lambda index: membership.get(artifact.sample_ids[index]) is not None and (  # noqa: E731
             membership[artifact.sample_ids[index]].group_id in lit
         )
-        layers.append(layer([i for i in order if not is_lit(i)], theme.NOT_SIGNIFICANT))
-        layers.append(layer([i for i in order if is_lit(i)], transform("z", mapper)))
+        layers.append(layer([i for i in order if not is_lit(i)]))
+        layers.append(layer([i for i in order if is_lit(i)]))
     else:
-        layers.append(layer(order, transform("z", mapper)))
+        layers.append(layer(order))
     plot.add_layout(_colour_bar(mapper, "Standardized score"), "right")
-    return [source for source, _ in layers], [renderer for _, renderer in layers]
+    sources = [source for source, _ in layers]
+    _group_focus(plot, sources, presentation.highlight_group_ids, full_alpha=1.0, size=size)
+    return sources, [renderer for _, renderer in layers]
 
 
 def plot_reduction_artifact(
@@ -686,9 +755,10 @@ def plot_reduction_artifact(
     A PCA draws ``biplot_pc_x`` against ``biplot_pc_y`` and, with
     ``show_biplot_arrows``, the strongest features as arrows; other methods draw
     their first two components. With a ``colouring`` the samples take the
-    feature's colours instead of their groups'. Highlighted groups keep their
-    colours over the rest in grey, hidden groups are left out, and the
-    separation note describes the groups drawn.
+    feature's colours instead of their groups'. Highlighted groups are drawn
+    over the rest, which keep their colours, faint and small; the page moves the
+    focus through the source named ``GROUP_FOCUS``. Hidden groups are left out,
+    and the separation note describes the groups drawn.
     """
     _validate_inputs(artifact, presentation)
     if artifact.coordinates.shape[1] < 2:
@@ -732,7 +802,7 @@ def plot_reduction_artifact(
     groups = presentation.groups or (
         ReductionGroupPresentation("", "All samples", DEFAULT_SINGLE_COLOR, tuple(artifact.sample_ids)),
     )
-    # The grey groups first, so the highlighted ones are drawn over them.
+    # The faded groups first, so the highlighted ones are drawn over them.
     layered = sorted(enumerate(groups), key=lambda item: bool(lit) and item[1].group_id in lit)
     for index, group in layered:
         if group.group_id in hidden:
@@ -757,18 +827,18 @@ def plot_reduction_artifact(
                 "y": values[:, 1],
                 "sample_id": canonical_ids,
                 "display_label": [sample_lookup[sample_id].display_label for sample_id in canonical_ids],
-                "group_id": [group.group_id] * len(indices),
                 "group": [group.display_name] * len(indices),
                 "color": [color] * len(indices),
+                **_focus_columns(
+                    [group.group_id] * len(indices), lit, full_alpha=GROUP_ALPHA, size=size, hollow=[False] * len(indices)
+                ),
             }
         )
+        legend = {"legend_label": f"{group.display_name} ({len(indices):,})"} if presentation.show_legend else {}
         point_renderers.append(
-            _style_points(
-                plot,
-                source,
-                color=theme.NOT_SIGNIFICANT if lit and group.group_id not in lit else color,
-                size=size,
-                label=f"{group.display_name} ({len(indices):,})" if presentation.show_legend else None,
+            plot.scatter(
+                "x", "y", source=source, size="size", fill_color=color, fill_alpha="alpha",
+                line_color="#ffffff", line_width=0.6, line_alpha="edge_alpha", **legend,
             )
         )
         sources.append(source)
@@ -785,7 +855,9 @@ def plot_reduction_artifact(
                 text_font_style="bold",
             )
     tooltip = _sample_tooltip(artifact, first, second)
-    if colouring is not None:
+    if colouring is None:
+        _group_focus(plot, sources, presentation.highlight_group_ids, full_alpha=GROUP_ALPHA, size=size)
+    else:
         sources, point_renderers = _coloured_points(plot, artifact, presentation, columns, size, shown)
         x_name, y_name = (label.split(" (")[0] for label in _axis_labels(artifact, first, second))
         tooltip = panel(
@@ -1198,6 +1270,58 @@ def gradient_box(plot, left: float, right: float, bottom: float, top: float, *, 
     plot.segment(
         "x0", "y0", "x1", "y1", source=ColumnDataSource(segments), line_color="color", line_width=OUTLINE_WIDTH
     )
+
+
+FOCUS_BLOCKS_CODE = """
+// cb_obj holds the groups in focus; with none, no block is covered or outlined.
+const focus = new Set(cb_obj.data.group_id)
+const blocks = covers.data, lines = outline.data
+covers.data = {...blocks, alpha: blocks.group_id.map((group) => focus.size && !focus.has(group) ? cover_alpha : 0)}
+outline.data = {...lines, alpha: lines.group_id.map((group) => focus.has(group) ? 1 : 0)}
+"""
+
+
+def group_blocks(plot, blocks, focus, *, bottom: float, top: float, band: tuple[float, float], piece: float) -> ColumnDataSource:
+    """Fade the column blocks of the groups out of focus, and outline the band of those in it.
+
+    ``blocks`` are ``(group_id, left, right)``. A block out of focus is covered in
+    white, so it shows at the strength a faded sample does on the map; a block in
+    focus has its band, from ``band[0]`` to ``band[1]``, outlined in the logo's
+    gradient. The page moves the focus through the returned source, named
+    ``GROUP_FOCUS``, as on the map.
+    """
+    focus = set(focus)
+    cover_alpha = 1 - FADED_ALPHA
+    covers = ColumnDataSource(
+        {
+            "group_id": [group for group, _, _ in blocks],
+            "left": [left for _, left, _ in blocks],
+            "right": [right for _, _, right in blocks],
+            "alpha": [cover_alpha if focus and group not in focus else 0.0 for group, _, _ in blocks],
+        }
+    )
+    plot.quad(
+        left="left", right="right", bottom=bottom, top=top, source=covers,
+        fill_color="#ffffff", fill_alpha="alpha", line_color=None,
+    )
+    lines: dict[str, list] = {"x0": [], "y0": [], "x1": [], "y1": [], "color": [], "group_id": [], "alpha": []}
+    low, high = band
+    for group, left, right in blocks:
+        segments = gradient_segments(
+            [[left + 0.2, high, right - 0.2, high, right - 0.2, low, left + 0.2, low, left + 0.2, high]], piece=piece, down=-1
+        )
+        for key, values in segments.items():
+            lines[key].extend(values)
+        lines["group_id"].extend([group] * len(segments["color"]))
+        lines["alpha"].extend([1.0 if group in focus else 0.0] * len(segments["color"]))
+    outline = ColumnDataSource(lines)
+    plot.segment("x0", "y0", "x1", "y1", source=outline, line_color="color", line_alpha="alpha", line_width=OUTLINE_WIDTH)
+    chosen = ColumnDataSource({"group_id": sorted(focus)}, name=GROUP_FOCUS)
+    chosen.js_on_change(
+        "data", CustomJS(args=dict(covers=covers, outline=outline, cover_alpha=cover_alpha), code=FOCUS_BLOCKS_CODE)
+    )
+    plot.tags = [*plot.tags, chosen]
+    return chosen
 
 
 def feature_rows_source(rows: list[list[str]], centres: list[float]) -> ColumnDataSource:
@@ -1651,8 +1775,10 @@ __all__ = [
     "feature_level_palette",
     "gradient_box",
     "gradient_choice",
+    "group_blocks",
     "FEATURE_CHOICE",
     "FEATURE_ROWS",
+    "GROUP_FOCUS",
     "ReductionColouring",
     "ReductionFeaturePresentation",
     "ReductionGroupPresentation",

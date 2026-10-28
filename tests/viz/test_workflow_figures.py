@@ -135,6 +135,9 @@ def test_scatters_draw_one_legend_entry_per_present_class():
         "Reaction changes, its genes do not (1)",
         "Genes change, reaction does not (1)",
     ]
+    # Grey is kept for "neither changes", the not significant of a comparison.
+    fills = {item.label.value.split(" (")[0]: item.renderers[0].glyph.fill_color for item in legend.items}
+    assert fills["Genes change, reaction does not"] == "#009E73"
     json_item(plot)
 
     agreement = compare_results(
@@ -146,7 +149,7 @@ def test_scatters_draw_one_legend_entry_per_present_class():
     json_item(plot)
 
 
-def test_a_hidden_group_leaves_the_heatmap_and_a_highlighted_one_is_outlined():
+def test_a_hidden_group_leaves_the_heatmap_and_a_highlighted_one_is_outlined_the_rest_faded():
     rng = np.random.default_rng(3)
     samples = [f"s{i}" for i in range(12)]
     scores = pd.DataFrame(rng.normal(size=(12, 6)), index=samples, columns=[f"R{i}" for i in range(6)])
@@ -161,8 +164,17 @@ def test_a_hidden_group_leaves_the_heatmap_and_a_highlighted_one_is_outlined():
     # B's four columns gone; A's and C's cells keep the colours scaled over all three.
     assert image_part.shape == (4, 8)
     np.testing.assert_allclose(image_part, np.delete(image_whole, [4, 5, 6, 7], axis=1))
-    outlined = [s for s in part.select({"type": ColumnDataSource}) if "x0" in s.data and len(s.data["x0"])]
-    assert outlined and min(outlined[0].data["x0"]) >= 4.0
+    sources = list(part.select({"type": ColumnDataSource}))
+    # Every group's band has an outline; only the highlighted one's is drawn.
+    (outline,) = [s for s in sources if "x0" in s.data and "group_id" in s.data]
+    lit = [x for x, alpha in zip(outline.data["x0"], outline.data["alpha"]) if alpha]
+    assert lit and min(lit) >= 4.0
+    assert {group for group, alpha in zip(outline.data["group_id"], outline.data["alpha"]) if alpha} == {"C"}
+    # The other group's columns are covered, to show at a faded sample's strength.
+    (covers,) = [s for s in sources if "left" in s.data and "alpha" in s.data]
+    assert dict(zip(covers.data["group_id"], covers.data["alpha"])) == {"A": pytest.approx(0.8), "C": 0.0}
+    (focus,) = [s for s in sources if s.name == "group_focus"]
+    assert list(focus.data["group_id"]) == ["C"] and focus.js_property_callbacks["change:data"]
     assert part.sizing_mode == "stretch_both" and whole.sizing_mode == "stretch_width"
     mapper = part.select_one({"type": LinearColorMapper})
     assert (mapper.palette[0].upper(), mapper.palette[-1].upper()) == ("#542788", "#E6AB02") and "#E0E0E0" in [c.upper() for c in mapper.palette]
