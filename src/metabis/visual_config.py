@@ -17,24 +17,24 @@ class VisualTheme:
     # grey of the rest. Single-group activity uses purple too, in another mode.
     SIGNIFICANT_PVAL: str = "#B700FF"
 
-    # Single-Group Activity Mode Colors (Experiment Analysis)
-    # Activity is a magnitude, not a direction, so its ramp is sequential rather than
-    # diverging: one ramp from white for low activity to purple for high, as
-    # single-cell viewers colour one gene's level from light to dark. Deliberately
+    # Single-Group Activity Mode Colors (Experiment Analysis), and any one
+    # feature's level against its average (the sample heatmap, a reduction
+    # coloured by a feature): purple below the average, light grey at it, gold
+    # above, as R Shiny tools draw a centred value (iSEE's purple < black <
+    # yellow, Seurat's PurpleAndYellow), with a light grey middle so the average
+    # recedes, and gold for yellow so it stands out from that grey. Deliberately
     # not the red/blue of the comparison heatmap - reusing those would invite
-    # reading "up-regulated" into a view where nothing is compared. Lightness
-    # decreases along the ramp, so "darker = more active" survives greyscale
-    # printing and most colour-vision deficiencies.
-    ACTIVITY_HIGH: str = "#B700FF"    # Purple: highest relative activity
-    # The bin machinery interpolates the middle to each end, so the middle is the
-    # exact midpoint of white and purple: the ramp is one straight line.
-    ACTIVITY_MID: str = "#DB80FF"     # Lilac: typical activity for that feature
-    ACTIVITY_LOW: str = "#FFFFFF"     # White: lowest relative activity
+    # reading "up-regulated" into a view where nothing is compared - and checked
+    # apart from them under colour-vision deficiencies (gold to red, deuteranopia,
+    # ΔE 13.8; orange, dark gold and green fall into red).
+    ACTIVITY_HIGH: str = "#E6AB02"    # Gold: highest relative activity
+    ACTIVITY_MID: str = "#E0E0E0"     # Light grey: typical activity for that feature
+    ACTIVITY_LOW: str = "#542788"     # Purple (ColorBrewer PuOr): lowest relative activity
     ACTIVITY_UNAVAILABLE: str = "#c7c7c7"  # Gray: not measured / below coverage threshold
 
     # Retained aliases: the gradient machinery names its endpoints up/down.
-    ACTIVITY_UP: str = "#B700FF"
-    ACTIVITY_DOWN: str = "#FFFFFF"
+    ACTIVITY_UP: str = "#E6AB02"
+    ACTIVITY_DOWN: str = "#542788"
 
     # General / UI
     NEUTRAL: str = "#FFFFFF"          # Standard white

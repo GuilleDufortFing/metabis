@@ -16,8 +16,8 @@ def test_group_colors_are_generated_for_a_normal_number_of_groups():
     assert len(set(colors.values())) == 3
 
 
-def test_activity_ramp_runs_white_through_amber_to_purple():
-    """Activity mode is a sequential magnitude scale, not a diverging one."""
+def test_activity_ramp_runs_purple_through_grey_to_gold():
+    """Activity mode places a level against the typical one, never as a change."""
     manager = ColorManager()
     # Two far outliers around a mass of typical values, so both extremes clip to
     # the ends of the ramp.
@@ -78,7 +78,7 @@ def test_a_standard_deviation_scale_paints_concentrated_data_all_neutral():
 
     color = _register(manager, scores, spread_method="std")
 
-    # Under a 4-SD palette, the extremes of the data barely leave the amber centre.
+    # Under a 4-SD palette, the extremes of the data barely leave the grey centre.
     assert color("r0").upper() != theme.ACTIVITY_LOW.upper()
     assert color("r59").upper() != theme.ACTIVITY_HIGH.upper()
 
@@ -89,8 +89,8 @@ def test_the_saturating_scale_stretches_the_palette_over_the_data_that_exists():
 
     color = _register(manager, scores)
 
-    # The same data now spans the whole ramp: least active is white, most active
-    # is purple, and the middle is the amber centre.
+    # The same data now spans the whole ramp: least active is purple, most active
+    # is gold, and the middle is the grey centre.
     assert color("r0").upper() == theme.ACTIVITY_LOW.upper()
     assert color("r59").upper() == theme.ACTIVITY_HIGH.upper()
     assert color("r30").upper() != color("r59").upper()

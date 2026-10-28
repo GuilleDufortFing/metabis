@@ -999,14 +999,16 @@ def _loading_palette() -> list[str]:
 
 
 def feature_level_palette() -> list[str]:
-    """One feature's level, white for low through to the activity purple for high.
+    """One feature's level against its average: purple below, light grey at it, gold above.
 
-    A level has no direction, so its scale is one ramp from light to dark, as
-    single-cell viewers colour one gene (Seurat's FeaturePlot, ShinyCell, the
-    UCSC Cell Browser), and the single-group activity graphs use the same two
-    ends.
+    The scale R Shiny tools give a centred value (iSEE's purple < black <
+    yellow, Seurat's PurpleAndYellow), with a light grey middle, and the one
+    the single-group activity graphs use. It shares no colour with the red and
+    blue of a change.
     """
-    return gradient_palette(theme.ACTIVITY_LOW, theme.ACTIVITY_HIGH, 256)
+    return gradient_palette(theme.ACTIVITY_LOW, theme.ACTIVITY_MID, 128)[:-1] + gradient_palette(
+        theme.ACTIVITY_MID, theme.ACTIVITY_HIGH, 128
+    )
 
 
 def plot_pca_loadings_artifact(

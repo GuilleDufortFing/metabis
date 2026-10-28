@@ -105,7 +105,8 @@ class StatisticsSection(HoverSection):
             group_color = "black"
 
         return (
-            f" (<span style='color:{theme.ACTIVITY_UP}; font-weight:bold;'>"
+            # The activity gold underlines the words: as text it is too light to read.
+            f" (<span style='font-weight:bold; border-bottom:2px solid {theme.ACTIVITY_UP};'>"
             f"more active direction</span> in {population} "
             f"<span style='color:{group_color};'>{escape(str(group_name))}</span>)"
         )

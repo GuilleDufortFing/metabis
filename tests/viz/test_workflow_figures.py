@@ -165,4 +165,4 @@ def test_a_hidden_group_leaves_the_heatmap_and_a_highlighted_one_is_outlined():
     assert outlined and min(outlined[0].data["x0"]) >= 4.0
     assert part.sizing_mode == "stretch_both" and whole.sizing_mode == "stretch_width"
     mapper = part.select_one({"type": LinearColorMapper})
-    assert (mapper.palette[0].upper(), mapper.palette[-1].upper()) == ("#FFFFFF", "#B700FF")
+    assert (mapper.palette[0].upper(), mapper.palette[-1].upper()) == ("#542788", "#E6AB02") and "#E0E0E0" in [c.upper() for c in mapper.palette]

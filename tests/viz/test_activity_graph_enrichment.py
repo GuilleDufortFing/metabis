@@ -243,7 +243,7 @@ def test_the_ranking_axis_always_contains_the_reference():
 
 @pytest.mark.integration
 def test_activity_colors_use_the_full_palette_on_real_data(workspace, data_manager):
-    """The bug this guards: a 4-SD palette painted every real graph amber."""
+    """The bug this guards: a 4-SD palette painted every real graph its centre colour."""
     context = data_manager.activate_activity_mode(activity_config())
     scores = context.features.activity_score
 

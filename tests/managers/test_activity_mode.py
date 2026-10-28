@@ -273,20 +273,20 @@ def test_reactions_are_colored_from_the_activity_result():
     assert low != theme.ACTIVITY_UNAVAILABLE
 
 
-def test_activity_uses_a_sequential_ramp_not_the_regulation_heatmap():
-    """Activity is a magnitude, so its ramp runs low -> typical -> high."""
+def test_activity_runs_purple_grey_gold_not_the_regulation_heatmap():
+    """Activity is a level against the typical one: purple below, grey at it, gold above."""
     manager = build_manager()
     manager.activate_activity_mode(config())
 
     high = ColorManager.hex_to_rgb(manager.get_element_color("MAR1", "reaction"))
     low = ColorManager.hex_to_rgb(manager.get_element_color("MAR2", "reaction"))
-    amber = ColorManager.hex_to_rgb(theme.ACTIVITY_MID)
+    grey = ColorManager.hex_to_rgb(theme.ACTIVITY_MID)
 
-    # Away from the amber centre, high activity darkens toward purple and low
-    # activity lightens toward white, so red and green both order the two.
-    assert high[0] < low[0]
-    assert high[1] < low[1]
-    assert high[1] < amber[1] < low[1]
+    # Away from the grey centre, high activity warms toward gold and low activity
+    # cools toward purple: red orders the two one way and blue the other.
+    assert high[0] > low[0]
+    assert high[2] < grey[2] and low[2] < grey[2] and high[2] < low[2]
+    assert high != grey and low != grey
 
     # And never the red/blue of the comparison heatmap.
     assert manager.get_element_color("MAR1", "reaction") != theme.UP_REGULATED
@@ -294,7 +294,7 @@ def test_activity_uses_a_sequential_ramp_not_the_regulation_heatmap():
 
 
 def test_positive_activity_uses_white_at_the_lowest_measured_value():
-    """An impossible negative range must not consume the white end of the ramp."""
+    """An impossible negative range must not consume the low end of the ramp."""
     manager = build_manager()
     context = manager.activate_activity_mode(config())
 
@@ -443,9 +443,10 @@ def test_the_activity_legend_never_claims_regulation():
     assert "regulated" not in legend.lower()
     assert "normalized mean" in legend.lower()
     assert "coverage threshold" not in legend.lower()
-    # The ramp is sequential, so the legend names magnitudes, not directions.
-    assert "purple = high" in legend.lower()
-    assert "white = low" in legend.lower()
+    # The legend names levels, not directions.
+    assert "gold = high" in legend.lower()
+    assert "grey = typical" in legend.lower()
+    assert "purple = low" in legend.lower()
 
 
 def test_the_activity_hover_violin_compares_the_feature_against_all_features():

@@ -533,9 +533,9 @@ def test_a_hidden_group_leaves_the_map_but_not_the_colour_scale():
     z_hidden = dict(zip(source_with(hidden, "z").data["sample_id"], source_with(hidden, "z").data["z"]))
     assert set(z_hidden) == {"s3", "s4"}
     assert all(z_hidden[sample] == z_shown[sample] for sample in z_hidden)
-    # On the one ramp a level has: white for low through to the activity purple.
+    # On a level's scale: purple below the average, light grey at it, gold above.
     (mapper,) = [m for m in hidden.select({"type": LinearColorMapper})]
-    assert (mapper.palette[0].upper(), mapper.palette[-1].upper()) == ("#FFFFFF", "#B700FF")
+    assert (mapper.palette[0].upper(), mapper.palette[-1].upper()) == ("#542788", "#E6AB02") and "#E0E0E0" in [c.upper() for c in mapper.palette]
 
 
 def test_a_highlighted_group_keeps_the_feature_colours_and_the_rest_turn_grey():

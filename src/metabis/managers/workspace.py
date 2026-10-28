@@ -177,7 +177,7 @@ class AnalysisWorkspace:
             },
             experiment_analysis_config={
                 "max_z_score": max_z_score,
-                # Sequential ramp: white (low) -> lilac (typical) -> purple (high).
+                # Purple (low) -> light grey (typical) -> gold (high).
                 # The bin machinery interpolates neutral->up and neutral->down, so the
                 # "neutral" centre is the typical activity, not an absence of signal.
                 "up_color": theme.ACTIVITY_HIGH,
