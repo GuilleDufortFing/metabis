@@ -123,6 +123,7 @@ _MODULE_EXPORTS: dict[str, tuple[str, ...]] = {
         "MetadataPredicate",
         "SampleGroup",
     ),
+    ".managers.group_palettes": ("group_palette",),
     ".managers.workspace": ("AnalysisWorkspace", "AnalysisWorkspaceMode"),
     # Graph metadata only. The artifact seam itself is the public module
     # metabis.viz.metabolic_visualization (ADR-0008).
@@ -145,6 +146,7 @@ _MODULE_EXPORTS: dict[str, tuple[str, ...]] = {
     ".viz.plot_set_enrichment": ("plot_set_enrichment_category",),
     ".viz.plot_reduction_artifact": (
         "add_arrow_colouring",
+        "add_group_picking",
         "biplot_arrow_features",
         "FEATURE_CHOICE",
         "FEATURE_ROWS",
@@ -329,6 +331,7 @@ if TYPE_CHECKING:
         MetadataPredicate,
         SampleGroup,
     )
+    from .managers.group_palettes import group_palette
     from .managers.workspace import AnalysisWorkspace, AnalysisWorkspaceMode
     from .viz.metabolic_visualization.pipeline import (
         GraphPipelineError,
@@ -349,6 +352,7 @@ if TYPE_CHECKING:
     from .viz.plot_reduction_artifact import (
         FEATURE_CHOICE,
         add_arrow_colouring,
+        add_group_picking,
         biplot_arrow_features,
         FEATURE_ROWS,
         ReductionColouring,
@@ -479,6 +483,7 @@ __all__ = [
     "subsystem_delta",
     "with_thresholds",
     "group_means",
+    "group_palette",
     "pairwise_markers",
     "top_markers",
     "plot_delta_landscape",
@@ -548,6 +553,7 @@ __all__ = [
     "plot_pca_variance_artifact",
     "reduction_colouring",
     "add_arrow_colouring",
+    "add_group_picking",
     "biplot_arrow_features",
     "plot_reaction_set_enrichment",
     "plot_set_enrichment_category",

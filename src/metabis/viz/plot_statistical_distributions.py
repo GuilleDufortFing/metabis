@@ -243,6 +243,8 @@ P_OTHER_GREY = "#dddddd"  # the client's --card-grey
 STRONGEST_NAMED = 6
 STAT_PLOT_HEIGHT = 300
 SCATTER_PLOT_HEIGHT = 340
+# The effects a volcano plot can set against the adjusted p-value.
+VOLCANO_EFFECTS = ("cohens_d", "log2_fc", "mean_difference")
 
 
 def _metric_color(data_manager, element_type: str, metric: str):
@@ -887,6 +889,7 @@ def plot_statistical_scatterplots(
     click_filename_prefix: str = "statistical_element",
     *,
     download_flag: Optional[str] = None,
+    volcano: Optional[str] = None,
     **kwargs,
 ) -> Optional[Any]:
     """Create a row of scatter plots for statistical parameters.
@@ -902,10 +905,16 @@ def plot_statistical_scatterplots(
         download_flag: The ``window`` property enabling hover-panel downloads on
             tap, for a figure embedded without a Bokeh server; see
             :func:`metabis.viz.click_behavior.add_click_behavior`.
+        volcano: An effect ('cohens_d', 'log2_fc' or 'mean_difference') to draw
+            only its volcano plot, the effect against -log10 adjusted p.
 
     Returns:
         Optional[gridplot]: The row of scatter plots if return_plot is True, otherwise None
     """
+    if volcano is not None:
+        if volcano not in VOLCANO_EFFECTS:
+            raise ValueError(f"No volcano plot for {volcano}")
+        parameters_to_plot = ["pval", volcano]
     # Get necessary components from the data_manager
     group_comparison = data_manager.get_group_comparison_artifact()
 
@@ -991,6 +1000,25 @@ def plot_statistical_scatterplots(
             ),
         },
         {
+            # Drawn alone, as the mean difference's volcano plot.
+            "params": ["pval", "mean_difference"],
+            "volcano_only": True,
+            "x_col": "mean_difference",
+            "y_col": "neg_log_adjusted_pval",
+            "x_label": "Mean difference",
+            "y_label": "-log10 adjusted p",
+            "color_col": "color_mean_difference",
+            "color_metric": "mean_difference",
+            "x_thresh": mean_difference_threshold,
+            "y_thresh": neg_log_pval_threshold,
+            "x_symmetric": True,
+            "y_symmetric": False,
+            "mask_func": lambda df: (
+                (df["adjusted_pval"] < pval_threshold)
+                & (abs(df["mean_difference"]) > (mean_difference_threshold or 0))
+            ),
+        },
+        {
             "params": ["cohens_d", "log2_fc"],
             "x_col": "cohens_d",
             "y_col": "log2_fc",
@@ -1027,6 +1055,8 @@ def plot_statistical_scatterplots(
     ]
 
     for config in plot_configs:
+        if config.get("volcano_only") and volcano is None:
+            continue
         if all(p in parameters_to_plot for p in config["params"]):
             # Calculate stats
             mask = config["mask_func"](test_results)

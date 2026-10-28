@@ -25,6 +25,7 @@ from metabis.viz.plot_reduction_artifact import (
     FEATURE_CHOICE,
     GROUP_FOCUS,
     add_arrow_colouring,
+    add_group_picking,
     FEATURE_ROWS,
     ReductionColouring,
     ReductionFeaturePresentation,
@@ -650,6 +651,18 @@ def test_the_feature_colouring_the_map_has_its_arrow_in_the_gradient_and_an_arro
     endpoints = tap.renderers[0].data_source
     (callback,) = endpoints.selected.js_property_callbacks["change:indices"]
     assert callback.args["event"] == "colour-samples" and callback.args["data_type"] == "reactions"
+
+
+def test_a_click_on_a_sample_picks_its_whole_group():
+    plot = plot_reduction_artifact(artifact(), presentation(show_sample_labels=False))
+
+    add_group_picking(plot, "pick-group")
+
+    (tap,) = [tool for tool in plot.tools if tool.__class__.__name__ == "TapTool"]
+    assert {renderer.name for renderer in tap.renderers} == {"sample_points"}
+    assert all("group_id" in renderer.data_source.data for renderer in tap.renderers)
+    assert tap.callback.args["event"] == "pick-group"
+    assert "source.selected.indices = []" in tap.callback.code
 
 
 def test_rows_the_map_draws_as_arrows_are_marked_in_the_components():

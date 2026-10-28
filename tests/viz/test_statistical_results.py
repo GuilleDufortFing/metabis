@@ -6,6 +6,7 @@ the hover-download setting from a page flag, as ``add_click_behavior`` allows.
 """
 
 import pandas as pd
+import pytest
 from bokeh.models import CustomJS, Plot
 
 from metabis import (
@@ -22,7 +23,7 @@ from metabis.managers.group_manager import GroupDefinition
 SAMPLES = ["A1", "A2", "B1", "B2"]
 
 
-def _workspace():
+def _workspace(effect_threshold=0.0):
     results = pd.DataFrame(
         {
             "adjusted_pval": [0.2, 0.01, None],
@@ -42,9 +43,9 @@ def _workspace():
     comparison._reaction_test_results = results
     comparison.define_significant_elements(
         pval_threshold=1.0,
-        cohens_d_threshold=0.0,
-        log2_fc_threshold=0.0,
-        mean_difference_threshold=0.0,
+        cohens_d_threshold=effect_threshold,
+        log2_fc_threshold=effect_threshold,
+        mean_difference_threshold=effect_threshold,
         for_genes=False,
     )
     workspace = AnalysisWorkspace()
@@ -147,3 +148,35 @@ def test_every_element_is_drawn_and_the_significant_ones_last():
     assert flags == sorted(flags)
     assert len(plots) == 4
     assert all(len(plot.below) >= 2 for plot in plots)  # the axis and the legend
+
+
+@pytest.mark.parametrize(
+    ("effect", "label"),
+    [("cohens_d", "Cohen's d"), ("log2_fc", "log2 fold change"), ("mean_difference", "Mean difference")],
+)
+@pytest.mark.parametrize("effect_threshold", [0.0, None])
+def test_a_volcano_plot_sets_one_effect_against_the_adjusted_p(effect, label, effect_threshold):
+    layout = plot_statistical_scatterplots(
+        _workspace(effect_threshold), return_plot=True, volcano=effect
+    )
+
+    plots = [plot for plot in layout.references() if isinstance(plot, Plot)]
+    assert len(plots) == 1
+    assert plots[0].xaxis[0].axis_label == label
+    assert plots[0].yaxis[0].axis_label == "-log10 adjusted p"
+
+
+def test_the_mean_difference_volcano_is_drawn_only_when_asked_for():
+    layout = plot_statistical_scatterplots(_workspace(), return_plot=True)
+
+    labels = [
+        (plot.xaxis[0].axis_label, plot.yaxis[0].axis_label)
+        for plot in layout.references()
+        if isinstance(plot, Plot)
+    ]
+    assert ("Mean difference", "-log10 adjusted p") not in labels
+
+
+def test_a_volcano_plot_needs_an_effect():
+    with pytest.raises(ValueError, match="No volcano plot for pval"):
+        plot_statistical_scatterplots(_workspace(), return_plot=True, volcano="pval")

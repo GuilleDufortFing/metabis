@@ -838,7 +838,7 @@ def plot_reduction_artifact(
         point_renderers.append(
             plot.scatter(
                 "x", "y", source=source, size="size", fill_color=color, fill_alpha="alpha",
-                line_color="#ffffff", line_width=0.6, line_alpha="edge_alpha", **legend,
+                line_color="#ffffff", line_width=0.6, line_alpha="edge_alpha", name="sample_points", **legend,
             )
         )
         sources.append(source)
@@ -1740,6 +1740,34 @@ def add_arrow_colouring(plot, data_type: str, event: str) -> None:
     )
 
 
+# A tap over both layers of a highlighted map calls back once per layer: the
+# second call of the same tap is let go.
+GROUP_PICK_CODE = """
+const source = cb_data.source
+const index = source.selected.indices[0]
+source.selected.indices = []
+if (index === undefined) return
+const tap = `${cb_data.geometries.sx},${cb_data.geometries.sy}`
+const now = Date.now()
+if (cb_obj._metabis_tap === tap && now - cb_obj._metabis_time < 500) return
+cb_obj._metabis_tap = tap
+cb_obj._metabis_time = now
+const group = source.data.group_id[index]
+if (group) window.dispatchEvent(new CustomEvent(event, {detail: {group}}))
+"""
+
+
+def add_group_picking(plot, event: str) -> None:
+    """A click on a sample dispatches ``event`` with its group, to choose the whole group.
+
+    The page then takes or drops that group, as a click on its name does: the
+    map picks groups, never single samples.
+    """
+    renderers = [renderer for renderer in plot.renderers if renderer.name == "sample_points"]
+    if renderers:
+        plot.add_tools(TapTool(renderers=renderers, callback=CustomJS(args=dict(event=event), code=GROUP_PICK_CODE)))
+
+
 def plot_pca_biplot_artifact(
     artifact: ReductionArtifact, presentation: ReductionPlotPresentation
 ):
@@ -1843,6 +1871,7 @@ def plot_pca_biplot_artifact(
 
 __all__ = [
     "add_arrow_colouring",
+    "add_group_picking",
     "biplot_arrow_features",
     "feature_level_palette",
     "gradient_box",
