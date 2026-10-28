@@ -48,15 +48,26 @@ _MODULE_EXPORTS: dict[str, tuple[str, ...]] = {
     ),
     ".analysis.landscape": (
         "DEFAULT_LANDSCAPE_DELTA",
+        "EnrichmentLandscape",
         "Landscape",
         "build_landscape",
+        "enrichment_landscape",
         "marker_reactions",
+        "select_enriched_subsystems",
         "select_landscape_subsystems",
+        "select_shared_subsystems",
         "subsystem_delta",
         "with_thresholds",
     ),
+    ".analysis.markers": (
+        "group_means",
+        "pairwise_markers",
+        "top_markers",
+    ),
     ".viz.plot_landscape": (
         "plot_delta_landscape",
+        "plot_enrichment_landscape",
+        "plot_marker_heatmap",
         "plot_sample_heatmap",
         "sample_heatmap_block",
     ),
@@ -69,6 +80,7 @@ _MODULE_EXPORTS: dict[str, tuple[str, ...]] = {
         "ComparisonMode",
         "ComparisonSideSpec",
         "GroupComparisonSpec",
+        "each_against_the_rest",
     ),
     ".analysis.dimensionality_reduction": ("ReductionKey", "ReductionResult"),
     ".analysis.h5ad_embeddings": (
@@ -246,15 +258,22 @@ if TYPE_CHECKING:
     )
     from .analysis.landscape import (
         DEFAULT_LANDSCAPE_DELTA,
+        EnrichmentLandscape,
         Landscape,
         build_landscape,
+        enrichment_landscape,
         marker_reactions,
+        select_enriched_subsystems,
         select_landscape_subsystems,
+        select_shared_subsystems,
         subsystem_delta,
         with_thresholds,
     )
+    from .analysis.markers import group_means, pairwise_markers, top_markers
     from .viz.plot_landscape import (
         plot_delta_landscape,
+        plot_enrichment_landscape,
+        plot_marker_heatmap,
         plot_sample_heatmap,
         sample_heatmap_block,
     )
@@ -267,6 +286,7 @@ if TYPE_CHECKING:
         ComparisonMode,
         ComparisonSideSpec,
         GroupComparisonSpec,
+        each_against_the_rest,
     )
     from .analysis.dimensionality_reduction import ReductionKey, ReductionResult
     from .analysis.experiment_analysis import ExperimentAnalysis
@@ -437,6 +457,7 @@ __all__ = [
     "ComparisonMode",
     "ComparisonSideSpec",
     "GroupComparisonSpec",
+    "each_against_the_rest",
     "AdjustmentColumn",
     "ComparisonAdjustment",
     # Results across comparisons: landscape, agreement, reactions against genes
@@ -447,13 +468,22 @@ __all__ = [
     "CONCORDANCE_CLASSES",
     "reaction_gene_concordance",
     "DEFAULT_LANDSCAPE_DELTA",
+    "EnrichmentLandscape",
     "Landscape",
     "build_landscape",
+    "enrichment_landscape",
     "marker_reactions",
+    "select_enriched_subsystems",
     "select_landscape_subsystems",
+    "select_shared_subsystems",
     "subsystem_delta",
     "with_thresholds",
+    "group_means",
+    "pairwise_markers",
+    "top_markers",
     "plot_delta_landscape",
+    "plot_enrichment_landscape",
+    "plot_marker_heatmap",
     "plot_sample_heatmap",
     "sample_heatmap_block",
     "plot_reaction_gene_concordance",

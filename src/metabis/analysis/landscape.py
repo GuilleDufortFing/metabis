@@ -25,11 +25,15 @@ from .subsystem_analysis import SubsystemAnalysis
 
 __all__ = [
     "DEFAULT_LANDSCAPE_DELTA",
+    "EnrichmentLandscape",
     "Landscape",
     "LandscapeRule",
     "build_landscape",
+    "enrichment_landscape",
     "marker_reactions",
+    "select_enriched_subsystems",
     "select_landscape_subsystems",
+    "select_shared_subsystems",
     "subsystem_delta",
     "with_thresholds",
 ]
@@ -118,21 +122,25 @@ def subsystem_delta(
     artifact: GroupComparisonArtifact,
     *,
     delta_config: Mapping[str, Any] | None = None,
+    for_genes: bool = False,
+    expression_data=None,
 ) -> pd.DataFrame:
     """Delta, size and significant count of every subsystem for one comparison.
 
     Rows are subsystem IDs; columns ``name``, ``category``, ``reactions``,
-    ``significant`` and ``delta``. Subsystems with no reaction in the data are
-    left out.
+    ``significant`` and ``delta``. With ``for_genes`` the subsystem's genes are
+    read instead, as the overview's gene overlay reads them, from
+    ``expression_data``; ``reactions`` and ``significant`` then count genes.
+    Subsystems with no reaction in the data are left out.
     """
     analysis = SubsystemAnalysis(
-        _DeltaInputs(metabolic_model, reaction_data),
+        _DeltaInputs(metabolic_model, reaction_data, expression_data),
         default_delta_config=dict(delta_config or DEFAULT_LANDSCAPE_DELTA),
     )
     analysis.set_group_comparison(artifact)
     rows = {}
     for subsystem in metabolic_model.get_subsystems() or []:
-        stats = analysis.get_subsystem_statistics(subsystem, for_genes=False)
+        stats = analysis.get_subsystem_statistics(subsystem, for_genes=for_genes)
         if not stats.get("is_in_model"):
             continue
         rows[str(subsystem)] = {
@@ -152,7 +160,8 @@ class Landscape:
     """Delta for every subsystem (rows) and group (columns), with each row's facts.
 
     ``significant`` counts each subsystem's significant reactions per group;
-    ``significant_reactions`` counts them over the whole model per group.
+    ``significant_reactions`` counts them over the whole model per group. In a
+    gene landscape both count genes, and ``reactions`` the subsystem's genes.
     """
 
     delta: pd.DataFrame
@@ -169,17 +178,25 @@ def build_landscape(
     artifacts: Mapping[str, GroupComparisonArtifact],
     *,
     delta_config: Mapping[str, Any] | None = None,
+    for_genes: bool = False,
+    expression_data=None,
 ) -> Landscape:
     """Delta by subsystem for each group's comparison, side by side.
 
     ``artifacts`` maps a group's label to its comparison against the rest, with
-    significance already decided (see :func:`with_thresholds`).
+    significance already decided (see :func:`with_thresholds`). With
+    ``for_genes`` the subsystems' genes are read from ``expression_data``.
     """
     if not artifacts:
         raise ValueError("The landscape needs at least one comparison")
     tables = {
         label: subsystem_delta(
-            metabolic_model, reaction_data, artifact, delta_config=delta_config
+            metabolic_model,
+            reaction_data,
+            artifact,
+            delta_config=delta_config,
+            for_genes=for_genes,
+            expression_data=expression_data,
         )
         for label, artifact in artifacts.items()
     }
@@ -196,7 +213,10 @@ def build_landscape(
         categories=first["category"],
         reactions=first["reactions"],
         significant_reactions=pd.Series(
-            {label: len(artifact.significant_reactions) for label, artifact in artifacts.items()}
+            {
+                label: len(artifact.significant_genes if for_genes else artifact.significant_reactions)
+                for label, artifact in artifacts.items()
+            }
         ),
     )
 
@@ -244,6 +264,135 @@ def select_landscape_subsystems(
     else:
         raise ValueError(f"Unknown subsystem rule {rule!r}")
     return sorted(picked, key=lambda item: (landscape.categories[item], landscape.names[item]))
+
+
+def _spread(landscape: Landscape, rows: Sequence[str]) -> pd.Series:
+    """How much each row's Delta varies across the groups, each group's mean removed."""
+    block = landscape.delta.loc[list(rows)]
+    if block.empty:
+        return pd.Series(dtype=float)
+    centred = block - block.mean(axis=0)
+    return centred.var(axis=1, ddof=1) if block.shape[1] > 1 else centred.abs().iloc[:, 0]
+
+
+def select_shared_subsystems(
+    landscapes: Sequence[Landscape],
+    *,
+    rule: LandscapeRule = "spread",
+    top: int = 25,
+    min_reactions: int = 5,
+    category: str | None = None,
+    chosen: Sequence[str] = (),
+) -> list[str]:
+    """One row choice for landscapes read side by side, reactions beside genes.
+
+    A row must be in every landscape. ``spread`` takes the subsystems varying
+    most in each landscape in turn, its first, then the next one's first, and so
+    on, since a family whose Deltas swing wider would otherwise fill every row.
+    ``category`` keeps every subsystem of one category that is large enough in
+    any landscape; ``chosen`` keeps the given IDs. Rows are ordered by category
+    and then name, as :func:`select_landscape_subsystems` orders them.
+    """
+    if not landscapes:
+        raise ValueError("Choose at least one landscape")
+    if top < 1:
+        raise ValueError("Show at least one subsystem")
+    if min_reactions < 1:
+        raise ValueError("The minimum size is at least one feature")
+    first = landscapes[0]
+    common = [item for item in first.delta.index if all(item in other.delta.index for other in landscapes[1:])]
+    large = [item for item in common if any(other.reactions[item] >= min_reactions for other in landscapes)]
+    if rule == "spread":
+        rankings = []
+        for landscape in landscapes:
+            eligible = [item for item in common if landscape.reactions[item] >= min_reactions]
+            spread = _spread(landscape, eligible)
+            rankings.append(list(spread.sort_values(ascending=False, kind="mergesort").index))
+        picked: list[str] = []
+        for position in range(max((len(ranking) for ranking in rankings), default=0)):
+            for ranking in rankings:
+                if position < len(ranking) and ranking[position] not in picked and len(picked) < top:
+                    picked.append(ranking[position])
+    elif rule == "category":
+        if not category:
+            raise ValueError("Choose a category")
+        picked = [item for item in large if first.categories[item] == category]
+    elif rule == "chosen":
+        unknown = [item for item in chosen if item not in common]
+        if unknown:
+            raise ValueError(f"No features in the data for {', '.join(unknown)}")
+        picked = list(dict.fromkeys(chosen))
+    else:
+        raise ValueError(f"Unknown subsystem rule {rule!r}")
+    return sorted(picked, key=lambda item: (first.categories[item], first.names[item]))
+
+
+@dataclass(frozen=True)
+class EnrichmentLandscape:
+    """Over-representation for every tested subsystem (rows) and group (columns).
+
+    ``enrichment`` is the signed log2 enrichment ratio of the significant
+    direction, positive among the features higher in the group and negative
+    among the lower, and NaN when neither is significant or the subsystem was
+    not tested in that comparison; ``adjusted_pval`` is that direction's, or the
+    smaller one when neither is significant; ``tested`` says whether the
+    subsystem was large enough to be tested.
+    """
+
+    enrichment: pd.DataFrame
+    adjusted_pval: pd.DataFrame
+    tested: pd.DataFrame
+    names: pd.Series
+    categories: pd.Series
+
+
+def enrichment_landscape(results: Mapping[str, pd.DataFrame]) -> EnrichmentLandscape:
+    """Each group's paired over-representation, side by side.
+
+    ``results`` maps a group's label to its ORA result table (a set-enrichment
+    artifact's ``result_frame``): two rows per tested subsystem, one for the
+    features higher in the group and one for the lower.
+    """
+    if not results:
+        raise ValueError("The enrichment landscape needs at least one comparison")
+    names: dict[str, str] = {}
+    categories: dict[str, str] = {}
+    enrichment: dict[str, dict[str, float]] = {}
+    adjusted: dict[str, dict[str, float]] = {}
+    for label, frame in results.items():
+        enrichment[label], adjusted[label] = {}, {}
+        for subsystem, rows in frame.groupby("subsystem_id", sort=False):
+            subsystem = str(subsystem)
+            names[subsystem] = str(rows["subsystem_name"].iloc[0])
+            categories[subsystem] = str(rows["category"].iloc[0] or "")
+            significant = rows[rows["is_significant"].astype(bool)]
+            if len(significant):
+                strongest = significant.iloc[significant["signed_log2_enrichment_ratio"].abs().argmax()]
+                enrichment[label][subsystem] = float(strongest["signed_log2_enrichment_ratio"])
+                adjusted[label][subsystem] = float(strongest["adjusted_pval"])
+            else:
+                enrichment[label][subsystem] = float("nan")
+                adjusted[label][subsystem] = float(rows["adjusted_pval"].min())
+    index = sorted(names, key=lambda item: (categories[item], names[item]))
+    values = pd.DataFrame(enrichment).reindex(index)
+    pvalues = pd.DataFrame(adjusted).reindex(index)
+    tested = pd.DataFrame({label: [item in enrichment[label] for item in index] for label in results}, index=index)
+    return EnrichmentLandscape(
+        enrichment=values[list(results)],
+        adjusted_pval=pvalues[list(results)],
+        tested=tested,
+        names=pd.Series(names).reindex(index),
+        categories=pd.Series(categories).reindex(index),
+    )
+
+
+def select_enriched_subsystems(landscapes: Sequence[EnrichmentLandscape]) -> list[str]:
+    """Every subsystem significant in some group of some landscape, by category and name."""
+    picked: dict[str, tuple[str, str]] = {}
+    for landscape in landscapes:
+        for item in landscape.enrichment.index[landscape.enrichment.notna().any(axis=1)]:
+            picked[item] = (landscape.categories[item], landscape.names[item])
+    return sorted(picked, key=lambda item: picked[item])
 
 
 def marker_reactions(artifacts: Mapping[str, GroupComparisonArtifact]) -> pd.DataFrame:

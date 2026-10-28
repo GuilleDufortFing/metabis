@@ -202,3 +202,102 @@ def test_markers_are_significant_higher_and_highest_in_their_group():
     first = c.iloc[0]
     assert (first.cohens_d, first.next_group, first.next_cohens_d) == (3.0, "A", 2.5)
     assert first.margin == pytest.approx(0.5)
+
+
+def _landscape(delta: dict, sizes: dict) -> "Landscape":
+    from metabis.analysis.landscape import Landscape
+
+    frame = pd.DataFrame(delta)
+    names = {item: SUBSYSTEMS[item][0] if item in SUBSYSTEMS else item for item in frame.index}
+    categories = {item: SUBSYSTEMS[item][1] if item in SUBSYSTEMS else "Other" for item in frame.index}
+    return Landscape(
+        delta=frame,
+        significant=frame.abs().mul(4).round().astype(int),
+        names=pd.Series(names),
+        categories=pd.Series(categories),
+        reactions=pd.Series(sizes),
+        significant_reactions=pd.Series({group: 1 for group in frame.columns}),
+    )
+
+
+def test_shared_rows_take_each_familys_most_varying_in_turn():
+    from metabis.analysis.landscape import select_shared_subsystems
+
+    # Reaction Deltas swing wider: by size alone, both rows would be theirs.
+    reactions = _landscape(
+        {"A": {"glyc": 1.0, "tca": 0.5, "fao": 0.2, "x": 0.0}, "B": {"glyc": -1.0, "tca": -0.5, "fao": -0.2, "x": 0.0}},
+        {"glyc": 6, "tca": 6, "fao": 6, "x": 6},
+    )
+    genes = _landscape(
+        {"A": {"glyc": 0.0, "tca": 0.0, "fao": 0.0, "x": 0.3}, "B": {"glyc": 0.0, "tca": 0.0, "fao": 0.0, "x": -0.3}},
+        {"glyc": 6, "tca": 6, "fao": 6, "x": 6},
+    )
+
+    rows = select_shared_subsystems([reactions, genes], top=2, min_reactions=5)
+
+    # Glycolysis, the reactions' first, and x, the genes' first, though the reactions'
+    # second and third vary more than any gene row.
+    assert set(rows) == {"glyc", "x"}
+    # Category, then name, as the single-landscape rule orders them.
+    assert rows == sorted(rows, key=lambda item: (reactions.categories[item], reactions.names[item]))
+
+
+def test_shared_rows_need_every_landscape_and_one_large_enough():
+    from metabis.analysis.landscape import select_shared_subsystems
+
+    reactions = _landscape({"A": {"glyc": 1.0, "tca": 0.5}}, {"glyc": 2, "tca": 6})
+    genes = _landscape({"A": {"glyc": 0.2}}, {"glyc": 8})
+
+    # TCA has no genes, so it cannot be a shared row; glycolysis is large in the genes.
+    assert select_shared_subsystems([reactions, genes], rule="category", category="Carbohydrate", min_reactions=5) == ["glyc"]
+    assert select_shared_subsystems([reactions, genes], rule="chosen", chosen=["glyc"]) == ["glyc"]
+    with pytest.raises(ValueError, match="No features in the data"):
+        select_shared_subsystems([reactions, genes], rule="chosen", chosen=["tca"])
+
+
+def test_a_gene_landscape_reads_each_subsystems_genes(monkeypatch):
+    from metabis.analysis import landscape as module
+
+    asked = []
+
+    def statistics(self, subsystem, for_genes=False):
+        asked.append(for_genes)
+        return {"is_in_model": True, "total_elements": 3, "significant_elements": 1, "delta_subsystem_score": 0.5}
+
+    monkeypatch.setattr(module.SubsystemAnalysis, "get_subsystem_statistics", statistics)
+    genes = build_landscape(_Model(), _Reactions(), {"A": with_thresholds(ARTIFACTS["A"], THRESHOLDS)}, for_genes=True)
+
+    assert set(asked) == {True}
+    assert genes.reactions.to_dict() == {"glyc": 3, "tca": 3, "fao": 3}
+    # Counted over the comparison's significant genes, none here.
+    assert genes.significant_reactions.to_dict() == {"A": 0}
+
+
+def _ora(rows):
+    columns = ["subsystem_id", "subsystem_name", "category", "direction", "signed_log2_enrichment_ratio", "adjusted_pval", "is_significant"]
+    return pd.DataFrame(rows, columns=columns)
+
+
+def test_the_enrichment_landscape_keeps_each_groups_significant_direction():
+    from metabis.analysis.landscape import enrichment_landscape, select_enriched_subsystems
+
+    results = {
+        "A": _ora([
+            ["glyc", "Glycolysis", "Carbohydrate", "target_higher", 1.2, 0.01, True],
+            ["glyc", "Glycolysis", "Carbohydrate", "target_lower", -0.3, 0.6, False],
+            ["fao", "Fatty acid oxidation", "Lipid", "target_higher", 0.2, 0.7, False],
+            ["fao", "Fatty acid oxidation", "Lipid", "target_lower", -0.4, 0.4, False],
+        ]),
+        "B": _ora([
+            ["glyc", "Glycolysis", "Carbohydrate", "target_higher", 0.1, 0.9, False],
+            ["glyc", "Glycolysis", "Carbohydrate", "target_lower", -2.0, 0.001, True],
+        ]),
+    }
+
+    landscape = enrichment_landscape(results)
+
+    assert landscape.enrichment.loc["glyc"].to_dict() == {"A": 1.2, "B": -2.0}
+    # Not significant reads NaN, with the smaller adjusted p; B never tested FAO.
+    assert pd.isna(landscape.enrichment.at["fao", "A"]) and landscape.adjusted_pval.at["fao", "A"] == 0.4
+    assert landscape.tested.loc["fao"].to_dict() == {"A": True, "B": False}
+    assert select_enriched_subsystems([landscape]) == ["glyc"]

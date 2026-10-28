@@ -203,3 +203,84 @@ def test_the_heatmaps_band_previews_and_highlights_a_group_as_its_chip_does():
     # Without the events, the band only names its groups.
     plain = plot_sample_heatmap(scores, ordered, count=4, title="Plain")
     assert "mousemove" not in plain.js_event_callbacks and "tap" not in plain.js_event_callbacks
+
+
+def _two_group_landscape():
+    delta = pd.DataFrame({"Inflamed": {"glyc": 0.5, "fao": -1.0}, "Healthy": {"glyc": -0.5, "fao": 1.0}})
+    return Landscape(
+        delta=delta,
+        significant=pd.DataFrame({"Inflamed": {"glyc": 2, "fao": 4}, "Healthy": {"glyc": 2, "fao": 4}}),
+        names=pd.Series({"glyc": "Glycolysis", "fao": "Fatty acid oxidation"}),
+        categories=pd.Series({"glyc": "Carbohydrate", "fao": "Lipid"}),
+        reactions=pd.Series({"glyc": 4, "fao": 4}),
+        significant_reactions=pd.Series({"Inflamed": 6, "Healthy": 6}),
+    )
+
+
+def test_the_delta_table_carries_the_groups_colours_and_their_other_side():
+    from metabis.viz.plot_landscape import plot_delta_landscape
+
+    plot = plot_delta_landscape(
+        _two_group_landscape(), ["glyc", "fao"], title="Genes", noun="genes",
+        against={"Inflamed": "Healthy", "Healthy": "Inflamed"},
+        group_colors={"Inflamed": "#0072B2", "Healthy": "#D55E00"},
+    )
+
+    band = next(s for s in plot.select({"type": ColumnDataSource}) if "fill_color" in s.data)
+    assert list(band.data["fill_color"]) == ["#0072B2", "#D55E00"]
+    hovers = next(s for s in plot.select({"type": ColumnDataSource}) if "hover" in s.data).data["hover"]
+    assert "Inflamed against Healthy" in hovers[0] and "of 4 genes" in hovers[0]
+    json_item(plot)
+
+
+def test_the_enrichment_table_greys_what_is_not_significant_and_dashes_what_was_not_tested():
+    from metabis.analysis.landscape import EnrichmentLandscape
+    from metabis.viz.plot_landscape import plot_enrichment_landscape
+
+    landscape = EnrichmentLandscape(
+        enrichment=pd.DataFrame({"Inflamed": {"glyc": 1.5, "fao": np.nan}, "Healthy": {"glyc": np.nan, "fao": -2.0}}),
+        adjusted_pval=pd.DataFrame({"Inflamed": {"glyc": 0.01, "fao": 0.3}, "Healthy": {"glyc": 0.5, "fao": 0.001}}),
+        tested=pd.DataFrame({"Inflamed": {"glyc": True, "fao": True}, "Healthy": {"glyc": False, "fao": True}}),
+        names=pd.Series({"glyc": "Glycolysis", "fao": "Fatty acid oxidation"}),
+        categories=pd.Series({"glyc": "Carbohydrate", "fao": "Lipid"}),
+    )
+
+    plot = plot_enrichment_landscape(landscape, ["glyc", "fao"], title="ORA")
+
+    (mapper,) = plot.select({"type": LinearColorMapper})
+    assert mapper.nan_color == "#c7c7c7" and mapper.high == 2.0
+    dashed = [r for r in plot.renderers if getattr(r.glyph, "line_dash", None) == "dashed"]
+    assert len(dashed) == 1 and len(dashed[0].data_source.data["group"]) == 1
+    hovers = [h for s in plot.select({"type": ColumnDataSource}) if "hover" in s.data for h in s.data["hover"]]
+    assert any("over-represented among the reactions higher in Inflamed" in h for h in hovers)
+    assert any("Not tested" in h for h in hovers)
+    json_item(plot)
+
+
+def test_the_marker_heatmap_draws_each_groups_block_on_a_levels_scale():
+    from metabis.viz.plot_landscape import plot_marker_heatmap
+    from metabis.viz.plot_reduction_artifact import feature_level_palette
+
+    markers = pd.DataFrame(
+        {
+            "group": ["A", "A", "C"],
+            "feature_id": ["f1", "f5", "f3"],
+            "min_cohens_d": [4.0, 2.0, 6.0],
+            "closest_group": ["B", "C", "A"],
+            "mean": [6.0, 3.0, 8.3],
+            "closest_mean": [1.3, 1.0, 1.3],
+        }
+    )
+    means = pd.DataFrame(
+        {"A": {"f1": 6.0, "f5": 3.0, "f3": 1.3}, "B": {"f1": 1.3, "f5": 1.0, "f3": 1.3}, "C": {"f1": 1.3, "f5": 1.0, "f3": 8.3}}
+    )
+
+    plot = plot_marker_heatmap(markers, means, title="Markers", labels={"f1": "One"}, group_colors={"A": "#0072B2", "B": "#D55E00", "C": "#009E73"})
+
+    assert list(plot.y_range.factors) == ["f3", "f5", "One", "Group"]
+    (mapper,) = [m for m in plot.select({"type": LinearColorMapper})]
+    assert mapper.palette == feature_level_palette()
+    # One line between A's two markers and C's one.
+    spans = [item for item in plot.center if item.__class__.__name__ == "Span"]
+    assert [span.location for span in spans] == [1]
+    json_item(plot)

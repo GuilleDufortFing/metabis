@@ -22,11 +22,12 @@ from bokeh.models import (
     HoverTool,
     LinearColorMapper,
     Range1d,
+    Span,
 )
 from bokeh.plotting import figure
 from bokeh.transform import transform
 
-from ..analysis.landscape import Landscape
+from ..analysis.landscape import EnrichmentLandscape, Landscape
 from ..managers.color_distributions import gradient_palette
 from ..managers.group_palettes import group_palette
 from ..managers.hover.panel import note, panel, row, section
@@ -44,6 +45,8 @@ from .plot_utils import apply_academic_style, short_row_label
 
 __all__ = [
     "plot_delta_landscape",
+    "plot_enrichment_landscape",
+    "plot_marker_heatmap",
     "plot_sample_heatmap",
     "sample_heatmap_block",
     "sample_heatmap_rows",
@@ -89,18 +92,73 @@ def _style_categorical(plot) -> None:
     plot.xaxis.major_label_text_color = theme.INK
 
 
+def _landscape_figure(
+    factors: Sequence[tuple[str, str]],
+    groups: Sequence[str],
+    *,
+    title: str,
+    width: int,
+    group_colors: Mapping[str, str] | None,
+):
+    """The shared frame of a subsystem by group table: rows grouped by category,
+    one column per group, and above them a band in each group's colour."""
+    band = ("", BAND_ROW)
+    rows = list(reversed(factors)) + ([band] if group_colors else [])
+    plot = apply_academic_style(
+        figure(
+            width=width,
+            height=ROW_HEIGHT * len(rows) + 150,
+            x_range=FactorRange(factors=list(groups)),
+            y_range=FactorRange(factors=rows, range_padding=0.0),
+            title=title,
+            tools="save,reset",
+            x_axis_location="above",
+            sizing_mode="stretch_width",
+        ),
+        suppress_grid=True,
+    )
+    _style_categorical(plot)
+    plot.yaxis.group_text_color = theme.INK_MUTED
+    plot.yaxis.group_text_font_style = "normal"
+    plot.yaxis.group_text_font_size = "11px"
+    plot.yaxis.group_label_orientation = "horizontal"
+    plot.yaxis.separator_line_color = theme.GRID_LINE
+    plot.xaxis.major_label_orientation = 0.6 if len(groups) > 6 else 0.0
+    if group_colors:
+        plot.rect(
+            x=list(groups),
+            y=[band] * len(groups),
+            width=1,
+            height=0.8,
+            fill_color=[group_colors.get(group, theme.NOT_SIGNIFICANT) for group in groups],
+            line_color="#ffffff",
+            line_width=1,
+        )
+    return plot
+
+
+def _against(group: str, against: Mapping[str, str] | None) -> str:
+    return f"{group} against {(against or {}).get(group, 'all other samples')}"
+
+
 def plot_delta_landscape(
     landscape: Landscape,
     subsystems: Sequence[str],
     *,
     title: str,
     width: int = 900,
+    noun: str = "reactions",
+    against: Mapping[str, str] | None = None,
+    group_colors: Mapping[str, str] | None = None,
 ):
     """Delta of the chosen subsystems (rows) in every group (columns).
 
     Rows are grouped by category, as ``select_landscape_subsystems`` orders
     them. A cell is +1 when every reaction of the subsystem is significantly
     higher in the group than in the rest, and -1 when every one is lower.
+    ``noun`` names the features counted (``genes`` for a gene landscape),
+    ``against`` each group's other side, and ``group_colors`` a band over the
+    columns in the groups' colours.
     """
     if not subsystems:
         raise ValueError("No subsystem meets the rule: lower the minimum size or pick another rule")
@@ -124,33 +182,14 @@ def plot_delta_landscape(
                         row(
                             "Significant",
                             f"{int(landscape.significant.at[item, group])} of "
-                            f"{int(landscape.reactions[item])} reactions",
+                            f"{int(landscape.reactions[item])} {noun}",
                         ),
                     ),
-                    note(f"{escape(group)} against all other samples"),
+                    note(escape(_against(group, against))),
                 )
             )
     mapper = LinearColorMapper(palette=_diverging_palette(), low=-1.0, high=1.0)
-    plot = apply_academic_style(
-        figure(
-            width=width,
-            height=ROW_HEIGHT * len(factors) + 150,
-            x_range=FactorRange(factors=groups),
-            y_range=FactorRange(factors=list(reversed(factors)), range_padding=0.0),
-            title=title,
-            tools="save,reset",
-            x_axis_location="above",
-            sizing_mode="stretch_width",
-        ),
-        suppress_grid=True,
-    )
-    _style_categorical(plot)
-    plot.yaxis.group_text_color = theme.INK_MUTED
-    plot.yaxis.group_text_font_style = "normal"
-    plot.yaxis.group_text_font_size = "11px"
-    plot.yaxis.group_label_orientation = "horizontal"
-    plot.yaxis.separator_line_color = theme.GRID_LINE
-    plot.xaxis.major_label_orientation = 0.6 if len(groups) > 6 else 0.0
+    plot = _landscape_figure(factors, groups, title=title, width=width, group_colors=group_colors)
     renderer = plot.rect(
         x="group",
         y="y",
@@ -162,6 +201,178 @@ def plot_delta_landscape(
         line_width=1,
     )
     plot.add_layout(_color_bar(mapper, "Delta"), "right")
+    plot.add_tools(HoverTool(renderers=[renderer], tooltips="@hover{safe}"))
+    return plot
+
+
+def plot_enrichment_landscape(
+    landscape: EnrichmentLandscape,
+    subsystems: Sequence[str],
+    *,
+    title: str,
+    width: int = 900,
+    noun: str = "reactions",
+    against: Mapping[str, str] | None = None,
+    group_colors: Mapping[str, str] | None = None,
+):
+    """Over-representation of the chosen subsystems (rows) in every group (columns).
+
+    A cell is the signed log2 enrichment of the significant direction: red when
+    the subsystem is over-represented among the features higher in the group,
+    blue among the lower. Grey is not significant, as everywhere a comparison is
+    drawn; white with a dashed edge was not tested, too few of its features
+    being measured. Laid out as :func:`plot_delta_landscape`.
+    """
+    if not subsystems:
+        raise ValueError("No subsystem is over-represented in any group")
+    groups = [str(group) for group in landscape.enrichment.columns]
+    factors = [
+        (landscape.categories[item] or "Uncategorized", landscape.names[item]) for item in subsystems
+    ]
+    tested: dict[str, list] = {key: [] for key in ("y", "group", "value", "hover")}
+    untested: dict[str, list] = {key: [] for key in ("y", "group", "hover")}
+    for item, factor in zip(subsystems, factors):
+        for group in groups:
+            head = (row("Subsystem", escape(landscape.names[item])), row("Group", escape(group)))
+            if not bool(landscape.tested.at[item, group]):
+                untested["y"].append(factor)
+                untested["group"].append(group)
+                untested["hover"].append(
+                    panel(*head, section(row("Not tested", f"too few measured {noun}")), note(escape(_against(group, against))))
+                )
+                continue
+            value = float(landscape.enrichment.at[item, group])
+            significant = np.isfinite(value)
+            verdict = (
+                f"over-represented among the {noun} {'higher' if value > 0 else 'lower'} in {group}"
+                if significant
+                else "not significant"
+            )
+            tested["y"].append(factor)
+            tested["group"].append(group)
+            tested["value"].append(value if significant else float("nan"))
+            tested["hover"].append(
+                panel(
+                    *head,
+                    section(
+                        row("Result", escape(verdict)),
+                        row("Signed log2 enrichment", f"{value:+.2f}" if significant else "-"),
+                        row("Adjusted p", f"{float(landscape.adjusted_pval.at[item, group]):.3g}"),
+                    ),
+                    note(escape(_against(group, against))),
+                )
+            )
+    finite = [abs(v) for v in tested["value"] if np.isfinite(v)]
+    reach = max(finite + [1.0])
+    mapper = LinearColorMapper(palette=_diverging_palette(), low=-reach, high=reach, nan_color=theme.NOT_SIGNIFICANT)
+    plot = _landscape_figure(factors, groups, title=title, width=width, group_colors=group_colors)
+    renderers = [
+        plot.rect(
+            x="group", y="y", width=1, height=1, source=ColumnDataSource(tested),
+            fill_color=transform("value", mapper), line_color="#ffffff", line_width=1,
+        )
+    ]
+    if untested["y"]:
+        renderers.append(
+            plot.rect(
+                x="group", y="y", width=0.92, height=0.84, source=ColumnDataSource(untested),
+                fill_color="#ffffff", line_color=theme.INK_MUTED, line_dash="dashed", line_width=1,
+            )
+        )
+    plot.add_layout(_color_bar(mapper, "Signed log2 enrichment"), "right")
+    plot.add_tools(HoverTool(renderers=renderers, tooltips="@hover{safe}"))
+    return plot
+
+
+def plot_marker_heatmap(
+    markers: pd.DataFrame,
+    means: pd.DataFrame,
+    *,
+    title: str,
+    labels: Mapping[str, str] | None = None,
+    group_colors: Mapping[str, str] | None = None,
+    width: int = 640,
+):
+    """Each group's markers (rows, grouped by group) by group (columns).
+
+    ``markers`` are the rows to draw, as :func:`metabis.analysis.markers.top_markers`
+    gives them; ``means`` the features' group means, features by groups. A cell
+    is the group's mean standardized across the groups, on a level's scale, as
+    the OSCA book's heatmap of markers centres each row. A band above the
+    columns carries the groups' colours, and a line closes each group's block.
+    """
+    if markers.empty:
+        raise ValueError("No feature is higher in one group than in every other")
+    labels = dict(labels or {})
+    groups = [str(group) for group in means.columns]
+    names: list[str] = []
+    for feature in markers["feature_id"]:
+        name = str(labels.get(feature, feature))
+        name = short_row_label(name, 0, 40)
+        while name in names:
+            name += "\u200b"
+        names.append(name)
+    block = means.loc[list(markers["feature_id"]), groups].astype(float)
+    spread = block.std(axis=1, ddof=1).replace(0, 1.0)
+    standardized = block.sub(block.mean(axis=1), axis=0).div(spread, axis=0).clip(-FEATURE_REACH, FEATURE_REACH)
+    cells: dict[str, list] = {key: [] for key in ("x", "y", "z", "hover")}
+    for name, (_, marker) in zip(names, markers.iterrows()):
+        feature = marker["feature_id"]
+        for group in groups:
+            cells["x"].append(group)
+            cells["y"].append(name)
+            cells["z"].append(float(standardized.at[feature, group]))
+            cells["hover"].append(
+                panel(
+                    row("Feature", escape(str(labels.get(feature, feature)))),
+                    row("ID", escape(str(feature))),
+                    row("Marker of", escape(str(marker["group"]))),
+                    section(
+                        row(f"Mean in {escape(group)}", f"{float(block.at[feature, group]):.4g}"),
+                        row("Standardized", f"{float(standardized.at[feature, group]):+.2f}"),
+                    ),
+                    section(
+                        row("Smallest Cohen's d", f"{float(marker['min_cohens_d']):.2f}"),
+                        row("Closest group", escape(str(marker["closest_group"]))),
+                    ),
+                )
+            )
+    mapper = LinearColorMapper(palette=feature_level_palette(), low=-FEATURE_REACH, high=FEATURE_REACH)
+    rows = list(reversed(names)) + ([BAND_ROW] if group_colors else [])
+    plot = apply_academic_style(
+        figure(
+            width=width,
+            height=ROW_HEIGHT * len(rows) + 150,
+            x_range=FactorRange(factors=groups),
+            y_range=FactorRange(factors=rows, range_padding=0.0),
+            title=title,
+            tools="save,reset",
+            x_axis_location="above",
+            sizing_mode="stretch_width",
+        ),
+        suppress_grid=True,
+    )
+    _style_categorical(plot)
+    plot.xaxis.major_label_orientation = 0.6 if len(groups) > 4 else 0.0
+    if group_colors:
+        plot.rect(
+            x=groups, y=[BAND_ROW] * len(groups), width=1, height=0.8,
+            fill_color=[group_colors.get(group, theme.NOT_SIGNIFICANT) for group in groups],
+            line_color="#ffffff", line_width=1,
+        )
+    renderer = plot.rect(
+        x="x", y="y", width=1, height=1, source=ColumnDataSource(cells),
+        fill_color=transform("z", mapper), line_color="#ffffff", line_width=1,
+    )
+    # A line under each group's block of markers, counted from the top.
+    edge = 0
+    sizes = markers["group"].value_counts(sort=False)
+    for group in groups:
+        count = int(sizes.get(group, 0))
+        edge += count
+        if count and 0 < edge < len(names):
+            plot.add_layout(Span(location=len(names) - edge, dimension="width", line_color=theme.INK, line_width=1))
+    plot.add_layout(_color_bar(mapper, "Group mean, standardized"), "right")
     plot.add_tools(HoverTool(renderers=[renderer], tooltips="@hover{safe}"))
     return plot
 

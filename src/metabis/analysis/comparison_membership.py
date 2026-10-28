@@ -93,6 +93,56 @@ class GroupComparisonSpec:
         )
 
 
+def each_against_the_rest(
+    sides: Sequence[tuple[str, Sequence[str]]],
+) -> tuple[GroupComparisonSpec, ...]:
+    """Each chosen side against the other chosen sides together.
+
+    ``sides`` are ``(label, base_group_ids)``: a group, or several joined under
+    one label. Each side is compared with the union of the others, as scanpy
+    compares a group with "the rest", here among the chosen samples only. Two
+    sides make one comparison, the first against the second, since the other
+    would be its mirror image. Sides may not share a base group, so no sample
+    is on both sides of a comparison.
+    """
+    resolved = [(str(label).strip(), _group_id_tuple(groups)) for label, groups in sides]
+    if len(resolved) < 2:
+        raise ValueError("Choose at least two groups to compare")
+    labels = [label for label, _groups in resolved]
+    if any(not label for label in labels) or len(set(labels)) != len(labels):
+        raise ValueError("Each chosen group needs a name of its own")
+    seen: dict[str, str] = {}
+    for label, groups in resolved:
+        for group_id in groups:
+            if group_id in seen and seen[group_id] != label:
+                raise ValueError(f"{group_id} is in both {seen[group_id]} and {label}")
+            seen[group_id] = label
+    if len(resolved) == 2:
+        (first, first_groups), (second, second_groups) = resolved
+        return (
+            GroupComparisonSpec.pairwise(
+                first_groups, second_groups, target_label=first, baseline_label=second
+            ),
+        )
+    specs = []
+    for index, (label, groups) in enumerate(resolved):
+        others = [side for position, side in enumerate(resolved) if position != index]
+        rest = (
+            " + ".join(other for other, _groups in others)
+            if len(others) <= 3
+            else f"the other {len(others)} groups"
+        )
+        specs.append(
+            GroupComparisonSpec.pairwise(
+                groups,
+                [group_id for _other, other_groups in others for group_id in other_groups],
+                target_label=label,
+                baseline_label=rest,
+            )
+        )
+    return tuple(specs)
+
+
 def overlapping_samples(
     left: Sequence[str], right: Sequence[str]
 ) -> tuple[str, ...]:
@@ -259,5 +309,6 @@ __all__ = [
     "ComparisonSideSpec",
     "GroupComparisonSpec",
     "REST_DISPLAY_LABEL",
+    "each_against_the_rest",
     "overlapping_samples",
 ]
