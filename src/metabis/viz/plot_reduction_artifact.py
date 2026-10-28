@@ -1026,18 +1026,14 @@ def _loading_columns(
     artifact: ReductionArtifact,
     presentation: ReductionPlotPresentation,
     *,
-    per_component: bool = False,
     plotted: tuple[int, ...] = (),
 ):
     """The components shown and the strongest features over them, one row per direction.
 
     The first ``loading_component_count`` components are shown, with any of the
-    ``plotted`` ones beyond them. With ``per_component``, as PCAtools'
-    plotloadings looks "across each specified principal component", features are
-    each component's ``loading_feature_count`` strongest, listed component by
-    component; otherwise they are chosen by ``loading_sort_component``'s absolute
-    loadings when it is set, or by their absolute loadings summed over the shown
-    components. Features that load identically on the shown components (several
+    ``plotted`` ones beyond them. The ``loading_feature_count`` features are
+    chosen by ``loading_sort_component``'s absolute loadings when it is set, or
+    by their absolute loadings summed over the shown components. Features that load identically on the shown components (several
     reactions Compass scores alike, one flux through a chain) share a row named
     after the first, so the rows show distinct directions rather than one
     direction repeated. Returns the shown components, numbered from 1, and each
@@ -1061,11 +1057,7 @@ def _loading_columns(
         return taken
 
     sort = presentation.loading_sort_component
-    if per_component:
-        chosen = []
-        for row in shown:
-            chosen.extend(key for key in strongest(np.abs(row), feature_count) if key not in chosen)
-    elif sort is not None:
+    if sort is not None:
         if sort > loadings.shape[0]:
             raise ValueError(f"PC for sorting must be between 1 and {loadings.shape[0]}")
         chosen = strongest(np.abs(loadings[sort - 1]), feature_count)
@@ -1394,10 +1386,9 @@ def plot_pca_components_artifact(
     the strongest features' loadings on it, as ComplexHeatmap sets a bar
     annotation over a heatmap's columns (Gu, Eils and Schlesner 2016): a
     component's bar and its column share one position, so how much a component
-    explains reads beside which features make it. Each shown component's
-    ``loading_feature_count`` strongest features are rows, as PCAtools'
-    plotloadings chooses them (see :func:`_loading_columns`), named short, the
-    full name in the hover. The ``plotted`` components (numbered from 1) are
+    explains reads beside which features make it. Rows are chosen and merged as
+    in :func:`plot_pca_loadings_artifact`, and named short, the full name in the
+    hover. The ``plotted`` components (numbered from 1) are
     shown, beyond the first ones if need be, and outlined in the logo's
     gradient. A row holding one of ``arrow_features``, the features the map draws
     as arrows, is marked ➚, and an arrow's feature that is not among the rows
@@ -1413,7 +1404,7 @@ def plot_pca_components_artifact(
     assert artifact.pca.loadings is not None and artifact.pca.explained_variance_ratio is not None
     if artifact.pca.loadings.size == 0:
         raise ValueError("Loadings matrix is empty")
-    numbers, groups = _loading_columns(artifact, presentation, per_component=True, plotted=plotted)
+    numbers, groups = _loading_columns(artifact, presentation, plotted=plotted)
     placed = {index for members in groups for index in members}
     groups += [
         [artifact.feature_names.index(feature)]

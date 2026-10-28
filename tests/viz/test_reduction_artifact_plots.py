@@ -629,21 +629,23 @@ def test_rows_the_map_draws_as_arrows_are_marked_in_the_components():
     assert "Display R1 \u279a" in labels and "Display R2" in labels
 
 
-def test_the_components_list_each_components_strongest_features_and_every_arrow():
-    """As PCAtools' plotloadings looks across each component; every feature the
-    map draws as an arrow is listed too, marked."""
+def test_the_components_show_the_plotted_ones_and_list_every_arrow():
+    """The rows are the strongest summed over the shown components; the plotted
+    components are always shown, and every feature the map draws as an arrow is
+    listed, marked."""
     plot = plot_pca_components_artifact(
         artifact(),
-        presentation(loading_component_count=2, loading_feature_count=1),
+        presentation(loading_component_count=2, loading_feature_count=2, loading_sort_component=None),
         plotted=(1, 3),
-        arrow_features=("R1",),
+        arrow_features=("R2",),
         component_event="plot-component",
     )
 
-    # PC3, plotted, is shown beyond the first two, with its own strongest, R3.
+    # PC3, plotted, is shown beyond the first two.
     assert list(plot.x_range.factors) == ["PC1", "PC2", "PC3"]
     labels = [plot.yaxis[0].major_label_overrides[y] for y in sorted(plot.yaxis[0].major_label_overrides, reverse=True)]
-    assert labels == ["Display R1 \u279a", "Display R2", "Display R3"]
+    # R1 and R3 load most over PC1 to PC3 (1.2 each); R2, an arrow, gets a row at the foot.
+    assert labels == ["Display R1", "Display R3", "Display R2 \u279a"]
     # A click on the third bar plots PC3, the component in that column.
     (tap,) = plot.js_event_callbacks["tap"]
     assert tap.args["numbers"] == [1, 2, 3]
@@ -654,5 +656,6 @@ def test_an_arrow_outside_the_components_rows_gets_a_row_of_its_own():
         artifact(), presentation(loading_component_count=2, loading_feature_count=1), arrow_features=("R3",)
     )
 
-    labels = list(plot.yaxis[0].major_label_overrides.values())
-    assert "Display R3 \u279a" in labels and len(labels) == 3
+    labels = [plot.yaxis[0].major_label_overrides[y] for y in sorted(plot.yaxis[0].major_label_overrides, reverse=True)]
+    # The one strongest row, then the arrow's own at the foot.
+    assert labels == ["Display R1", "Display R3 \u279a"]
