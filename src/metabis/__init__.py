@@ -132,6 +132,8 @@ _MODULE_EXPORTS: dict[str, tuple[str, ...]] = {
     ".viz.plot_reaction_set_enrichment": ("plot_reaction_set_enrichment",),
     ".viz.plot_set_enrichment": ("plot_set_enrichment_category",),
     ".viz.plot_reduction_artifact": (
+        "add_arrow_colouring",
+        "biplot_arrow_features",
         "FEATURE_CHOICE",
         "FEATURE_ROWS",
         "ReductionColouring",
@@ -326,6 +328,8 @@ if TYPE_CHECKING:
     from .viz.plot_reaction_set_enrichment import plot_reaction_set_enrichment
     from .viz.plot_reduction_artifact import (
         FEATURE_CHOICE,
+        add_arrow_colouring,
+        biplot_arrow_features,
         FEATURE_ROWS,
         ReductionColouring,
         ReductionFeaturePresentation,
@@ -513,6 +517,8 @@ __all__ = [
     "plot_pca_loadings_artifact",
     "plot_pca_variance_artifact",
     "reduction_colouring",
+    "add_arrow_colouring",
+    "biplot_arrow_features",
     "plot_reaction_set_enrichment",
     "plot_set_enrichment_category",
     "plot_reaction_violins",

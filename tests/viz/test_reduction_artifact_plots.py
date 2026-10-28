@@ -5,7 +5,7 @@ from dataclasses import FrozenInstanceError, replace
 
 import numpy as np
 import pytest
-from bokeh.models import ColumnDataSource, Plot
+from bokeh.models import ColumnDataSource, LinearColorMapper, Plot
 
 from metabis.analysis.artifacts import (
     AnalysisArtifactMetadata,
@@ -21,6 +21,7 @@ from metabis.analysis.dimensionality_reduction import (
 from metabis.analysis_workspace import RevisionKind, WorkspaceRevisions
 from metabis.viz.plot_reduction_artifact import (
     FEATURE_CHOICE,
+    add_arrow_colouring,
     FEATURE_ROWS,
     ReductionColouring,
     ReductionFeaturePresentation,
@@ -230,10 +231,13 @@ def test_loadings_are_a_heatmap_of_the_strongest_features_on_the_first_component
     assert list(plot.x_range.factors) == ["PC1 (60.0%)", "PC2 (30.0%)"]
     assert list(reversed(plot.y_range.factors)) == ["Display R1", "Display R2"]
     assert _cells(plot) == {("R1", "PC1"): 0.9, ("R1", "PC2"): 0.1, ("R2", "PC1"): 0.2, ("R2", "PC2"): -0.8}
-    # On the app's own scale, blue through white to red, symmetric about zero.
+    # On ColorBrewer's brown, white and teal, symmetric about zero: never the red
+    # and blue of a change, since a loading's sign flips with its component.
     mapper = plot.select_one({"type": LinearColorMapper})
     assert (mapper.low, mapper.high) == (-0.9, 0.9)
-    assert (mapper.palette[0], mapper.palette[-1]) == ("#0000FF", "#FF0000") and "#FFFFFF" in mapper.palette
+    colours = [colour.lower() for colour in mapper.palette]
+    assert (colours[0], colours[-1]) == ("#543005", "#003c30") and "#f5f5f5" in colours
+    assert not {"#0000ff", "#ff0000"} & set(colours)
     assert "ordered by |PC1|" in plot.title.text
 
 
@@ -313,11 +317,12 @@ def test_sample_labels_name_only_the_points_a_box_selection_picks():
     assert any(tool.__class__.__name__ == "BoxSelectTool" for tool in labelled.tools)
     assert not unlabelled.select({"name": "selection_labels"})
     # The arrow tips keep their own labels either way.
-    assert [
+    tip_labels = [
         renderer.data_source
         for renderer in unlabelled.renderers
         if getattr(getattr(renderer, "glyph", None), "text", None) == "display_label"
-    ] == [source_with(unlabelled, "magnitude")]
+    ]
+    assert tip_labels and all("magnitude" in source.data and "sample_id" not in source.data for source in tip_labels)
 
 
 def test_the_biplot_draws_one_arrow_per_direction():
@@ -448,15 +453,24 @@ def test_the_components_figure_sets_variance_bars_over_the_loadings_columns():
     cells = source_with(plot, "loading")
     assert len(cells.data["loading"]) == 9
     assert sorted(plot.yaxis[0].major_label_overrides.values()) == ["Display R1", "Display R2", "Display R3"]
-    # PC1 and PC3 outlined, and the chosen feature's row empty until a click.
+    # PC1 and PC3 outlined in the logo's gradient, as short segments over each
+    # column; the chosen feature's row empty until a click outlines it.
     choice = next(source for source in sources(plot) if source.name == FEATURE_CHOICE)
+    (redraw,) = choice.js_property_callbacks["change:data"]
     assert list(choice.data["y"]) == []
-    outlines = [
-        list(renderer.data_source.data["x"])[0]
-        for renderer in plot.renderers
-        if renderer.data_source is not choice and getattr(renderer.glyph, "line_width", None) == 2.5
-    ]
-    assert outlines == ["PC1", "PC3"]
+    # The outline is redrawn from the rows the choice now holds, read from the
+    # changed source itself: the callback's arguments are only the outline's.
+    assert "cb_obj.data.y" in redraw.code and set(redraw.args) == {"outline", "left", "right"}
+    boxes = sorted(
+        (round(min(source.data["x0"]), 2), round(max(source.data["x0"]), 2))
+        for source in sources(plot)
+        if "x0" in source.data and len(source.data["x0"])
+    )
+    assert boxes == [(0.02, 0.98), (2.02, 2.98)]
+    from metabis.viz.brand import gradient_color
+
+    colours = {colour for source in sources(plot) if "x0" in source.data for colour in source.data["color"]}
+    assert colours <= {gradient_color(step / 1000) for step in range(1001)}
     rows = next(tag for tag in plot.tags if getattr(tag, "name", None) == FEATURE_ROWS)
     assert sorted(rows.data["feature"]) == ["R1", "R2", "R3"]
     (callback,) = plot.js_event_callbacks["tap"]
@@ -486,3 +500,83 @@ def test_the_components_figure_names_long_rows_short_and_counts_alike_features()
     labels = sorted(plot.yaxis[0].major_label_overrides.values())
     assert labels == ["A reaction named at far great\u2026 (+1)", "Display R3"]
     assert not plot.js_event_callbacks
+
+
+def _fills(plot):
+    """Each sample layer's fill and its samples, in the order drawn."""
+    return [
+        (renderer.glyph.fill_color, list(renderer.data_source.data["sample_id"]))
+        for renderer in plot.renderers
+        if hasattr(renderer, "data_source") and "sample_id" in renderer.data_source.data
+        and len(renderer.data_source.data["sample_id"])
+    ]
+
+
+def test_highlighted_groups_keep_their_colours_over_the_rest_in_grey_as_the_cell_browser_draws():
+    plot = plot_reduction_artifact(
+        artifact(), presentation(highlight_group_ids=("g2",), show_legend=False, show_sample_labels=False)
+    )
+
+    # The grey group first, so the highlighted one is drawn over it.
+    assert _fills(plot) == [("#c7c7c7", ["s1", "s2"]), ("#445566", ["s3", "s4"])]
+    assert not plot.legend or not plot.legend[0].items
+
+
+def test_a_hidden_group_leaves_the_map_but_not_the_colour_scale():
+    colouring = ReductionColouring("R9", "A reaction", "reactions", (1.0, 2.0, 3.0, 10.0))
+    shown = plot_reduction_artifact(artifact(), presentation(colouring=colouring, show_sample_labels=False))
+    hidden = plot_reduction_artifact(
+        artifact(), presentation(colouring=colouring, hidden_group_ids=("g1",), show_sample_labels=False)
+    )
+
+    z_shown = dict(zip(source_with(shown, "z").data["sample_id"], source_with(shown, "z").data["z"]))
+    z_hidden = dict(zip(source_with(hidden, "z").data["sample_id"], source_with(hidden, "z").data["z"]))
+    assert set(z_hidden) == {"s3", "s4"}
+    assert all(z_hidden[sample] == z_shown[sample] for sample in z_hidden)
+    # On the one ramp a level has: white for low through to the activity purple.
+    (mapper,) = [m for m in hidden.select({"type": LinearColorMapper})]
+    assert (mapper.palette[0].upper(), mapper.palette[-1].upper()) == ("#FFFFFF", "#B700FF")
+
+
+def test_a_highlighted_group_keeps_the_feature_colours_and_the_rest_turn_grey():
+    colouring = ReductionColouring("R9", "A reaction", "reactions", (1.0, 2.0, 3.0, 10.0))
+
+    plot = plot_reduction_artifact(
+        artifact(), presentation(colouring=colouring, highlight_group_ids=("g1",), show_sample_labels=False)
+    )
+
+    (grey, lit) = _fills(plot)
+    assert grey == ("#c7c7c7", ["s3", "s4"])
+    assert sorted(lit[1]) == ["s1", "s2"] and lit[0] != "#c7c7c7"
+
+
+def test_the_feature_colouring_the_map_has_its_arrow_in_the_gradient_and_an_arrow_click_colours():
+    colouring = ReductionColouring("R3", "Display R3", "reactions", (1.0, 2.0, 3.0, 4.0))
+    plot = plot_reduction_artifact(
+        artifact(),
+        presentation(show_biplot_arrows=True, biplot_top_arrows=1, colouring=colouring, show_sample_labels=False),
+    )
+
+    (endpoints,) = [r for r in plot.renderers if r.name == "arrow_endpoints"]
+    tips = endpoints.data_source
+    # R3 is not the one automatic arrow, but it colours the samples, so it is drawn.
+    assert "R3" in list(tips.data["feature_id"]) and len(tips.data["feature_id"]) == 2
+    gradient = [s for s in sources(plot) if "x0" in s.data and len(s.data["x0"])]
+    # It starts at the origin, in short segments along the gradient.
+    assert gradient and (gradient[0].data["x0"][0], gradient[0].data["y0"][0]) == (0.0, 0.0)
+    add_arrow_colouring(plot, "reactions", "colour-samples")
+    (tap,) = [tool for tool in plot.tools if tool.__class__.__name__ == "TapTool"]
+    endpoints = tap.renderers[0].data_source
+    (callback,) = endpoints.selected.js_property_callbacks["change:indices"]
+    assert callback.args["event"] == "colour-samples" and callback.args["data_type"] == "reactions"
+
+
+def test_rows_the_map_draws_as_arrows_are_marked_in_the_components():
+    plot = plot_pca_components_artifact(
+        artifact(),
+        presentation(loading_component_count=3, loading_feature_count=3),
+        arrow_features=("R1",),
+    )
+
+    labels = set(plot.yaxis[0].major_label_overrides.values())
+    assert "Display R1 \u279a" in labels and "Display R2" in labels

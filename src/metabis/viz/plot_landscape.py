@@ -31,7 +31,14 @@ from ..managers.color_distributions import gradient_palette
 from ..managers.group_palettes import group_palette
 from ..managers.hover.panel import note, panel, row, section
 from ..visual_config import theme
-from .plot_reduction_artifact import FEATURE_CHOICE, FEATURE_REACH, FEATURE_TAP_CODE, feature_rows_source
+from .plot_reduction_artifact import (
+    FEATURE_REACH,
+    FEATURE_TAP_CODE,
+    feature_level_palette,
+    feature_rows_source,
+    gradient_box,
+    gradient_choice,
+)
 from .plot_utils import apply_academic_style, short_row_label
 
 __all__ = [
@@ -212,6 +219,9 @@ def plot_sample_heatmap(
     data_type: str = "reactions",
     label_limit: int | None = None,
     feature_event: str | None = None,
+    highlight_groups: Sequence[str] = (),
+    hidden_groups: Sequence[str] = (),
+    fill: bool = False,
 ):
     """The most variable reactions or genes (rows) across samples (columns), z-scored.
 
@@ -223,8 +233,14 @@ def plot_sample_heatmap(
 
     With ``label_limit`` the row names are cut to that many characters, for a
     heatmap set beside another figure; the hover keeps the full name and ID. A
-    click on a row outlines it and dispatches ``feature_event`` with the
-    feature, so the page can colour a reduction by it.
+    click on a row outlines it in the logo's gradient and dispatches
+    ``feature_event`` with the feature, so the page can colour a reduction by it.
+
+    Rows are chosen and scaled over every grouped sample; ``hidden_groups``
+    then leave the figure, so hiding a group changes no other cell's colour.
+    The bands of ``highlight_groups`` are outlined in the logo's gradient.
+    With ``fill`` the figure takes its container's height, its rows dividing
+    it, rather than a height of its own.
     """
     noun = "Reaction" if data_type == "reactions" else "Gene"
     labels = dict(labels or {})
@@ -257,11 +273,19 @@ def plot_sample_heatmap(
     # Three standard deviations either way, always: a reduction coloured by a
     # feature uses the same scale, so a dot has the colour of its cell.
     reach = FEATURE_REACH
+    hidden = set(hidden_groups)
+    keep = [index for index, sample in enumerate(samples) if sample_groups[sample] not in hidden]
+    if not keep:
+        raise ValueError("Every group is hidden")
+    samples = [samples[index] for index in keep]
+    values, z = values[keep], z[keep]
     n_samples, n_rows = len(samples), len(rows)
     # Image rows run bottom to top: the most variable reaction is drawn last, on top.
     image = np.clip(z.T[::-1], -reach, reach).astype(np.float32)
 
-    mapper = LinearColorMapper(palette=_diverging_palette(), low=-reach, high=reach)
+    # A level, white for low through purple for high, as the reduction coloured
+    # by one feature is drawn.
+    mapper = LinearColorMapper(palette=feature_level_palette(), low=-reach, high=reach)
     plot = apply_academic_style(
         figure(
             width=width,
@@ -270,7 +294,7 @@ def plot_sample_heatmap(
             y_range=Range1d(0, n_rows + 1, bounds=(0, n_rows + 1)),
             title=title,
             tools="save,xpan,xwheel_zoom,reset",
-            sizing_mode="stretch_width",
+            sizing_mode="stretch_both" if fill else "stretch_width",
         ),
         suppress_grid=True,
     )
@@ -312,6 +336,9 @@ def plot_sample_heatmap(
         fill_color="color", line_color="#ffffff", line_width=1,
         source=ColumnDataSource(segments),
     )
+    for group, left, right in zip(segments["group"], segments["left"], segments["right"]):
+        if group in set(highlight_groups):
+            gradient_box(plot, left + 0.2, right - 0.2, n_rows + 0.06, n_rows + 0.94, piece=max(n_samples / 120, 0.05))
     # A group is named on the band where its segment is wide enough to hold the
     # name; the hover names the rest.
     named = [
@@ -365,11 +392,7 @@ def plot_sample_heatmap(
         ),
     )
     plot.add_layout(_color_bar(mapper, "Standardized score"), "right")
-    choice = ColumnDataSource({"y": []}, name=FEATURE_CHOICE)
-    plot.rect(
-        x=n_samples / 2, y="y", width=n_samples, height=1, source=choice,
-        fill_color=None, line_color=theme.SELECTED, line_width=2.5,
-    )
+    choice = gradient_choice(plot, 0, n_samples)
     plot.tags = [*plot.tags, feature_rows_source(rows, [n_rows - 1 - index + 0.5 for index in range(n_rows)])]
     if feature_event:
         plot.js_on_event(

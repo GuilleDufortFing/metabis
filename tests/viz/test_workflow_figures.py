@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import pytest
 from bokeh.embed import json_item
-from bokeh.models import HoverTool, Legend, LinearColorMapper
+from bokeh.models import ColumnDataSource, HoverTool, Legend, LinearColorMapper
 
 from metabis.analysis.agreement import ResultEffects, compare_results
 from metabis.analysis.landscape import Landscape
@@ -144,3 +144,25 @@ def test_scatters_draw_one_legend_entry_per_present_class():
     plot = plot_result_agreement(agreement, labels={})
     assert plot.title.text.startswith("Spearman's rho of Cohen's d over 3 shared features")
     json_item(plot)
+
+
+def test_a_hidden_group_leaves_the_heatmap_and_a_highlighted_one_is_outlined():
+    rng = np.random.default_rng(3)
+    samples = [f"s{i}" for i in range(12)]
+    scores = pd.DataFrame(rng.normal(size=(12, 6)), index=samples, columns=[f"R{i}" for i in range(6)])
+    groups = {sample: ("A", "B", "C")[i % 3] for i, sample in enumerate(samples)}
+    ordered = {sample: group for group in ("A", "B", "C") for sample, own in groups.items() if own == group}
+
+    whole = plot_sample_heatmap(scores, ordered, count=4, title="All")
+    part = plot_sample_heatmap(scores, ordered, count=4, title="Part", hidden_groups=("B",), highlight_groups=("C",), fill=True)
+
+    image_whole = next(r for r in whole.renderers if r.glyph.__class__.__name__ == "Image").data_source.data["image"][0]
+    image_part = next(r for r in part.renderers if r.glyph.__class__.__name__ == "Image").data_source.data["image"][0]
+    # B's four columns gone; A's and C's cells keep the colours scaled over all three.
+    assert image_part.shape == (4, 8)
+    np.testing.assert_allclose(image_part, np.delete(image_whole, [4, 5, 6, 7], axis=1))
+    outlined = [s for s in part.select({"type": ColumnDataSource}) if "x0" in s.data and len(s.data["x0"])]
+    assert outlined and min(outlined[0].data["x0"]) >= 4.0
+    assert part.sizing_mode == "stretch_both" and whole.sizing_mode == "stretch_width"
+    mapper = part.select_one({"type": LinearColorMapper})
+    assert (mapper.palette[0].upper(), mapper.palette[-1].upper()) == ("#FFFFFF", "#B700FF")

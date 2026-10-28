@@ -311,7 +311,7 @@ def activity_legend_text(
     element = "reactions" if family is ActivityOverlay.REACTION else "genes"
     return (
         f"Coloring {element} by their normalized {config.summary.value} in "
-        f"'{config.group_id}'. Purple = high, amber = typical, white = low within "
+        f"'{config.group_id}'. Purple = high, lilac = typical, white = low within "
         f"this {element[:-1]} family."
     )
 

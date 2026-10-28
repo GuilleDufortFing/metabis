@@ -19,13 +19,16 @@ class VisualTheme:
 
     # Single-Group Activity Mode Colors (Experiment Analysis)
     # Activity is a magnitude, not a direction, so its ramp is sequential rather than
-    # diverging: low activity is white, typical activity is amber, high activity is
-    # purple. Deliberately not the red/blue of the comparison heatmap - reusing those
-    # would invite reading "up-regulated" into a view where nothing is compared.
-    # Lightness decreases monotonically along the ramp, so "darker = more active"
-    # survives greyscale printing and most colour-vision deficiencies.
+    # diverging: one ramp from white for low activity to purple for high, as
+    # single-cell viewers colour one gene's level from light to dark. Deliberately
+    # not the red/blue of the comparison heatmap - reusing those would invite
+    # reading "up-regulated" into a view where nothing is compared. Lightness
+    # decreases along the ramp, so "darker = more active" survives greyscale
+    # printing and most colour-vision deficiencies.
     ACTIVITY_HIGH: str = "#B700FF"    # Purple: highest relative activity
-    ACTIVITY_MID: str = "#FFC300"     # Amber: typical activity for that feature
+    # The bin machinery interpolates the middle to each end, so the middle is the
+    # exact midpoint of white and purple: the ramp is one straight line.
+    ACTIVITY_MID: str = "#DB80FF"     # Lilac: typical activity for that feature
     ACTIVITY_LOW: str = "#FFFFFF"     # White: lowest relative activity
     ACTIVITY_UNAVAILABLE: str = "#c7c7c7"  # Gray: not measured / below coverage threshold
 

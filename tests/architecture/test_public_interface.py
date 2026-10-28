@@ -136,6 +136,8 @@ EXPECTED_ROOT_ALL = frozenset(
         "plot_reaction_violins",
         "plot_reduction_artifact",
         "reduction_colouring",
+        "add_arrow_colouring",
+        "biplot_arrow_features",
         "FEATURE_CHOICE",
         "FEATURE_ROWS",
         "ReductionColouring",

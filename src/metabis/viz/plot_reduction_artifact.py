@@ -33,11 +33,12 @@ from bokeh.models import (
     LinearColorMapper,
     Range1d,
     Span,
+    TapTool,
     Title,
     VeeHead,
 )
 from bokeh.transform import transform
-from bokeh.palettes import Category10
+from bokeh.palettes import BrBG, Category10
 from bokeh.plotting import figure
 
 from ..analysis.dimensionality_reduction import ReductionArtifact
@@ -51,6 +52,7 @@ from .plot_reduced_dimension import (
     calculate_cluster_metrics,
     get_metric_interpretation,
 )
+from .brand import GRADIENT_JS, OUTLINE_WIDTH, gradient_segments
 from .plot_utils import apply_academic_style, short_row_label
 
 DEFAULT_CATEGORICAL_PALETTE = OKABE_ITO
@@ -144,6 +146,13 @@ class ReductionPlotPresentation:
     # strongest features as arrows when asked.
     show_biplot_arrows: bool = False
     colouring: ReductionColouring | None = None
+    # As the UCSC Cell Browser recolours checked groups: highlighted groups keep
+    # their colours and every other sample is grey. Hidden groups are not drawn,
+    # though the colouring's scale stays that of every grouped sample.
+    highlight_group_ids: tuple[str, ...] = ()
+    hidden_group_ids: tuple[str, ...] = ()
+    # A page that names the groups beside the plot draws no legend in it.
+    show_legend: bool = True
 
     def __post_init__(self) -> None:
         if not isinstance(self.samples, tuple) or not all(
@@ -278,8 +287,12 @@ def _unitless_axes(plot) -> None:
         axis.major_tick_line_color = None
 
 
-def _style_points(plot, source, *, color: str, size: float, label: str, name: str | None = None):
-    """One group's points: translucent, with a white edge so overlaps show."""
+def _style_points(plot, source, *, color: str, size: float, label: str | None, name: str | None = None):
+    """One group's points: translucent, with a white edge so overlaps show.
+
+    ``label`` names the group in the legend; without one the group has no entry.
+    """
+    legend = {"legend_label": label} if label else {}
     return plot.scatter(
         "x",
         "y",
@@ -289,8 +302,8 @@ def _style_points(plot, source, *, color: str, size: float, label: str, name: st
         fill_alpha=0.8,
         line_color="#ffffff",
         line_width=0.6,
-        legend_label=label,
         name=name,
+        **legend,
     )
 
 
@@ -525,6 +538,9 @@ def build_reduction_presentation(
     biplot_arrow_scale: float = 1.5,
     show_biplot_arrows: bool = False,
     colour_by: tuple[str, str] | None = None,
+    highlight_group_ids: tuple[str, ...] = (),
+    hidden_group_ids: tuple[str, ...] = (),
+    show_legend: bool = True,
     include_feature_hover: bool = True,
     features: tuple[ReductionFeaturePresentation, ...] | None = None,
 ) -> ReductionPlotPresentation:
@@ -559,6 +575,9 @@ def build_reduction_presentation(
         biplot_top_arrows=biplot_top_arrows,
         biplot_arrow_scale=biplot_arrow_scale,
         show_biplot_arrows=show_biplot_arrows,
+        highlight_group_ids=tuple(highlight_group_ids),
+        hidden_group_ids=tuple(hidden_group_ids),
+        show_legend=show_legend,
         colouring=(
             reduction_colouring(data_manager, artifact, *colour_by) if colour_by is not None else None
         ),
@@ -604,11 +623,12 @@ def _colour_bar(mapper, title: str) -> ColorBar:
     )
 
 
-def _coloured_points(plot, artifact, presentation, columns, size):
-    """Every sample in one layer, coloured by the feature, the extremes drawn last.
+def _coloured_points(plot, artifact, presentation, columns, size, shown):
+    """The shown samples coloured by the feature, the extremes drawn last.
 
     Samples far from the mean are drawn over the rest, so a few high ones are
-    never hidden under a crowd of average ones, as scanpy orders them.
+    never hidden under a crowd of average ones, as scanpy orders them. With
+    groups highlighted, every other sample is grey underneath them.
     """
     colouring = presentation.colouring
     assert colouring is not None
@@ -618,35 +638,44 @@ def _coloured_points(plot, artifact, presentation, columns, size):
         for sample_id in group.sample_ids:
             membership.setdefault(sample_id, group)
     z = standardized_colouring(colouring, artifact.sample_ids, presentation.groups)
-    order = np.argsort(np.nan_to_num(np.abs(z), nan=-1.0), kind="stable")
-    ids = [artifact.sample_ids[index] for index in order]
-    source = ColumnDataSource(
-        {
-            "x": artifact.coordinates[order, columns[0]],
-            "y": artifact.coordinates[order, columns[1]],
-            "sample_id": ids,
-            "display_label": [sample_lookup[sample_id].display_label for sample_id in ids],
-            "group": [membership[s].display_name if s in membership else "Unassigned" for s in ids],
-            "color": [membership[s].color if s in membership else theme.NOT_SIGNIFICANT for s in ids],
-            "value": np.asarray(colouring.values, dtype=float)[order],
-            "z": z[order],
-        }
-    )
+    values = np.asarray(colouring.values, dtype=float)
+    lit = set(presentation.highlight_group_ids)
     mapper = LinearColorMapper(
-        palette=_loading_palette(), low=-FEATURE_REACH, high=FEATURE_REACH, nan_color=theme.NOT_SIGNIFICANT
+        palette=feature_level_palette(), low=-FEATURE_REACH, high=FEATURE_REACH, nan_color=theme.NOT_SIGNIFICANT
     )
-    renderer = plot.scatter(
-        "x",
-        "y",
-        source=source,
-        size=size,
-        fill_color=transform("z", mapper),
-        line_color=theme.MARK_EDGE,
-        line_width=0.4,
-        name="sample_points",
-    )
+    order = [int(i) for i in np.argsort(np.nan_to_num(np.abs(z), nan=-1.0), kind="stable") if shown[i]]
+
+    def layer(indices, fill):
+        ids = [artifact.sample_ids[index] for index in indices]
+        source = ColumnDataSource(
+            {
+                "x": artifact.coordinates[indices, columns[0]],
+                "y": artifact.coordinates[indices, columns[1]],
+                "sample_id": ids,
+                "display_label": [sample_lookup[sample_id].display_label for sample_id in ids],
+                "group": [membership[s].display_name if s in membership else "Unassigned" for s in ids],
+                "color": [membership[s].color if s in membership else theme.NOT_SIGNIFICANT for s in ids],
+                "value": values[indices],
+                "z": z[indices],
+            }
+        )
+        renderer = plot.scatter(
+            "x", "y", source=source, size=size, fill_color=fill,
+            line_color=theme.MARK_EDGE, line_width=0.4, name="sample_points",
+        )
+        return source, renderer
+
+    layers = []
+    if lit:
+        is_lit = lambda index: membership.get(artifact.sample_ids[index]) is not None and (  # noqa: E731
+            membership[artifact.sample_ids[index]].group_id in lit
+        )
+        layers.append(layer([i for i in order if not is_lit(i)], theme.NOT_SIGNIFICANT))
+        layers.append(layer([i for i in order if is_lit(i)], transform("z", mapper)))
+    else:
+        layers.append(layer(order, transform("z", mapper)))
     plot.add_layout(_colour_bar(mapper, "Standardized score"), "right")
-    return source, renderer
+    return [source for source, _ in layers], [renderer for _, renderer in layers]
 
 
 def plot_reduction_artifact(
@@ -657,7 +686,9 @@ def plot_reduction_artifact(
     A PCA draws ``biplot_pc_x`` against ``biplot_pc_y`` and, with
     ``show_biplot_arrows``, the strongest features as arrows; other methods draw
     their first two components. With a ``colouring`` the samples take the
-    feature's colours instead of their groups'.
+    feature's colours instead of their groups'. Highlighted groups keep their
+    colours over the rest in grey, hidden groups are left out, and the
+    separation note describes the groups drawn.
     """
     _validate_inputs(artifact, presentation)
     if artifact.coordinates.shape[1] < 2:
@@ -687,6 +718,12 @@ def plot_reduction_artifact(
         )
     )
     size = point_size(len(artifact.sample_ids))
+    hidden = set(presentation.hidden_group_ids)
+    lit = set(presentation.highlight_group_ids)
+    hidden_samples = {
+        sample for group in presentation.groups if group.group_id in hidden for sample in group.sample_ids
+    }
+    shown = [sample_id not in hidden_samples for sample_id in artifact.sample_ids]
 
     separation_coordinates: list[np.ndarray] = []
     separation_labels: list[str] = []
@@ -695,7 +732,11 @@ def plot_reduction_artifact(
     groups = presentation.groups or (
         ReductionGroupPresentation("", "All samples", DEFAULT_SINGLE_COLOR, tuple(artifact.sample_ids)),
     )
-    for index, group in enumerate(groups):
+    # The grey groups first, so the highlighted ones are drawn over them.
+    layered = sorted(enumerate(groups), key=lambda item: bool(lit) and item[1].group_id in lit)
+    for index, group in layered:
+        if group.group_id in hidden:
+            continue
         member_set = set(group.sample_ids)
         indices = [
             row for row, sample_id in enumerate(artifact.sample_ids) if sample_id in member_set
@@ -723,7 +764,11 @@ def plot_reduction_artifact(
         )
         point_renderers.append(
             _style_points(
-                plot, source, color=color, size=size, label=f"{group.display_name} ({len(indices):,})"
+                plot,
+                source,
+                color=theme.NOT_SIGNIFICANT if lit and group.group_id not in lit else color,
+                size=size,
+                label=f"{group.display_name} ({len(indices):,})" if presentation.show_legend else None,
             )
         )
         sources.append(source)
@@ -741,8 +786,7 @@ def plot_reduction_artifact(
             )
     tooltip = _sample_tooltip(artifact, first, second)
     if colouring is not None:
-        source, renderer = _coloured_points(plot, artifact, presentation, columns, size)
-        sources, point_renderers = [source], [renderer]
+        sources, point_renderers = _coloured_points(plot, artifact, presentation, columns, size, shown)
         x_name, y_name = (label.split(" (")[0] for label in _axis_labels(artifact, first, second))
         tooltip = panel(
             row("ID", "@sample_id"),
@@ -939,11 +983,30 @@ def _loading_columns(artifact: ReductionArtifact, presentation: ReductionPlotPre
 
 
 def _loading_palette() -> list[str]:
-    """The app's own scale, blue through white to red, as its Delta and effects are drawn."""
-    half = 128
-    return gradient_palette(theme.DOWN_REGULATED, theme.NEUTRAL, half)[:-1] + gradient_palette(
-        theme.NEUTRAL, theme.UP_REGULATED, half
-    )
+    """ColorBrewer's brown, white and teal (BrBG) for a loading, symmetric about zero.
+
+    A loading's sign flips with its component and says nothing of higher or
+    lower, so it is not drawn in the red and blue of a change between groups.
+    BrBG is a diverging scheme ColorBrewer marks colour-blind safe.
+    """
+    stops = list(BrBG[11])
+    if stops[0].lower() == "#003c30":  # Bokeh lists it teal first
+        stops.reverse()
+    palette: list[str] = []
+    for start, end in zip(stops, stops[1:]):
+        palette.extend(gradient_palette(start, end, 26)[:-1])
+    return palette + [stops[-1]]
+
+
+def feature_level_palette() -> list[str]:
+    """One feature's level, white for low through to the activity purple for high.
+
+    A level has no direction, so its scale is one ramp from light to dark, as
+    single-cell viewers colour one gene (Seurat's FeaturePlot, ShinyCell, the
+    UCSC Cell Browser), and the single-group activity graphs use the same two
+    ends.
+    """
+    return gradient_palette(theme.ACTIVITY_LOW, theme.ACTIVITY_HIGH, 256)
 
 
 def plot_pca_loadings_artifact(
@@ -1086,6 +1149,55 @@ if (y >= 0 && y < rows.length) {
 """
 
 
+GRADIENT_OUTLINE_CODE = GRADIENT_JS + """
+const out = {x0: [], y0: [], x1: [], y1: [], color: []}
+const width = right - left
+// cb_obj is the choice whose rows changed.
+for (const y of cb_obj.data.y) {
+  const top = y + 0.5, bottom = y - 0.5
+  const corners = [[left, top], [right, top], [right, bottom], [left, bottom], [left, top]]
+  for (let side = 0; side < 4; side++) {
+    const [ax, ay] = corners[side], [bx, by] = corners[side + 1]
+    const pieces = side % 2 === 0 ? 64 : 4
+    for (let i = 0; i < pieces; i++) {
+      const x0 = ax + (bx - ax) * i / pieces, y0 = ay + (by - ay) * i / pieces
+      const x1 = ax + (bx - ax) * (i + 1) / pieces, y1 = ay + (by - ay) * (i + 1) / pieces
+      const t = (((x0 + x1) / 2 - left) / width + (top - (y0 + y1) / 2)) / 2
+      out.x0.push(x0); out.y0.push(y0); out.x1.push(x1); out.y1.push(y1)
+      out.color.push(metabisGradient(t))
+    }
+  }
+}
+outline.data = out
+"""
+
+
+def gradient_choice(plot, left: float, right: float) -> ColumnDataSource:
+    """The chosen row's outline, in the logo's gradient, from ``left`` to ``right``.
+
+    The page and the figure's own clicks set the returned source's ``y`` (row
+    centres, rows one unit tall); a callback redraws the outline as short
+    segments, since Bokeh strokes a line in one colour.
+    """
+    choice = ColumnDataSource({"y": []}, name=FEATURE_CHOICE)
+    outline = ColumnDataSource({"x0": [], "y0": [], "x1": [], "y1": [], "color": []})
+    plot.segment("x0", "y0", "x1", "y1", source=outline, line_color="color", line_width=OUTLINE_WIDTH)
+    choice.js_on_change(
+        "data", CustomJS(args=dict(outline=outline, left=left, right=right), code=GRADIENT_OUTLINE_CODE)
+    )
+    return choice
+
+
+def gradient_box(plot, left: float, right: float, bottom: float, top: float, *, piece: float) -> None:
+    """A fixed outline in the logo's gradient, for a selection drawn with the figure."""
+    segments = gradient_segments(
+        [[left, top, right, top, right, bottom, left, bottom, left, top]], piece=piece, down=-1
+    )
+    plot.segment(
+        "x0", "y0", "x1", "y1", source=ColumnDataSource(segments), line_color="color", line_width=OUTLINE_WIDTH
+    )
+
+
 def feature_rows_source(rows: list[list[str]], centres: list[float]) -> ColumnDataSource:
     """Every feature a row holds beside the row's centre, so the page can outline
     the row of whichever feature colours the samples."""
@@ -1101,6 +1213,7 @@ def plot_pca_components_artifact(
     presentation: ReductionPlotPresentation,
     *,
     plotted: tuple[int, ...] = (),
+    arrow_features: tuple[str, ...] = (),
     feature_event: str | None = None,
     component_event: str | None = None,
 ):
@@ -1112,7 +1225,9 @@ def plot_pca_components_artifact(
     component's bar and its column share one position, so how much a component
     explains reads beside which features make it. Rows are chosen and merged as
     in :func:`plot_pca_loadings_artifact`, and named short, the full name in the
-    hover. The ``plotted`` components (numbered from 1) are outlined.
+    hover. The ``plotted`` components (numbered from 1) are outlined in the
+    logo's gradient, and a row holding one of ``arrow_features``, the features
+    the map draws as arrows, is marked ➚.
 
     A click on a row outlines it and dispatches ``feature_event`` with the
     feature; a click on a bar dispatches ``component_event`` with the component.
@@ -1136,11 +1251,15 @@ def plot_pca_components_artifact(
     # Rows run top to bottom from the strongest; row i is centred at n - i - 0.5,
     # so the arrays below are kept bottom to top, as the y axis counts.
     names, labels, ticks, hovers, ids = [], [], [], [], []
+    arrowed = set(arrow_features)
     for members in groups:
         first = artifact.feature_names[members[0]]
         feature = lookup[first]
         names.append(feature.display_label)
-        ticks.append(short_row_label(feature.display_label, len(members) - 1, LABEL_LIMIT))
+        tick = short_row_label(feature.display_label, len(members) - 1, LABEL_LIMIT)
+        if arrowed & {artifact.feature_names[i] for i in members}:
+            tick += " \u279a"
+        ticks.append(tick)
         hover = (
             hover_panel_inner(feature.hover_html)
             if feature.hover_html
@@ -1202,17 +1321,11 @@ def plot_pca_components_artifact(
         x="component", y="label_y", text="share", source=bars,
         text_align="center", text_baseline="bottom", text_font_size="10px", text_color=theme.INK,
     )
+    # A factor's column spans one unit from its index, in the plot's own units.
     for component in plotted:
         if 1 <= component <= count:
-            plot.rect(
-                x=[components[component - 1]], y=[(base + tall + 1.6) / 2], width=0.98,
-                height=base + tall + 1.6, fill_color=None, line_color=theme.SELECTED, line_width=2.5,
-            )
-    choice = ColumnDataSource({"y": []}, name=FEATURE_CHOICE)
-    plot.rect(
-        x=count / 2, y="y", width=count, height=1, source=choice,
-        fill_color=None, line_color=theme.SELECTED, line_width=2.5,
-    )
+            gradient_box(plot, component - 0.98, component - 0.02, 0.02, base + tall + 1.6, piece=0.25)
+    choice = gradient_choice(plot, 0.02, count - 0.02)
     rows = feature_rows_source(
         [[artifact.feature_names[i] for i in members] for members in groups],
         [n - index - 0.5 for index in range(n)],
@@ -1286,11 +1399,25 @@ def biplot_arrows(loadings_x: np.ndarray, loadings_y: np.ndarray, limit: int | N
     return chosen[:limit] if limit is not None else chosen
 
 
+def biplot_arrow_features(artifact: ReductionArtifact, pc_x: int, pc_y: int, limit: int | None) -> tuple[str, ...]:
+    """The features a PCA map on ``pc_x`` and ``pc_y`` draws as its automatic arrows."""
+    if artifact.pca is None or artifact.pca.loadings is None:
+        return ()
+    loadings = artifact.pca.loadings
+    if max(pc_x, pc_y) > loadings.shape[0]:
+        return ()
+    chosen = biplot_arrows(loadings[pc_x - 1], loadings[pc_y - 1], limit)
+    return tuple(artifact.feature_names[index] for index in chosen)
+
+
 def _draw_arrows(plot, artifact: ReductionArtifact, presentation, columns, score_range: float) -> None:
     """The strongest features as arrows from the origin, each named at its tip.
 
     Arrows are scaled so the longest reaches a fifth of the samples' spread
     times ``biplot_arrow_scale``; see :func:`biplot_arrows` for which are drawn.
+    The feature colouring the samples, when the PCA was fitted on it, is drawn
+    too, whether or not it is among them: in the logo's gradient, wider, and
+    named in bold, so the arrow and the colours read as one choice.
     """
     assert artifact.pca is not None and artifact.pca.loadings is not None
     x_index, y_index = columns
@@ -1304,6 +1431,16 @@ def _draw_arrows(plot, artifact: ReductionArtifact, presentation, columns, score
     scale = score_range / max_loading * 0.20 * presentation.biplot_arrow_scale
     feature_lookup = _feature_lookup(presentation)
     chosen = biplot_arrows(loadings_x, loadings_y, presentation.biplot_top_arrows)
+    colouring = presentation.colouring
+    focus = None
+    if (
+        colouring is not None
+        and colouring.data_type == str(artifact.key.data_type)
+        and colouring.feature_id in artifact.feature_names
+    ):
+        focus = artifact.feature_names.index(colouring.feature_id)
+        if focus not in chosen:
+            chosen = [*chosen, focus]
     arrows = pd.DataFrame(
         {
             "x_end": loadings_x[chosen] * scale,
@@ -1338,6 +1475,8 @@ def _draw_arrows(plot, artifact: ReductionArtifact, presentation, columns, score
     arrows["x_offset"] = [4 if x >= 0 else -4 for x in arrows["x_end"]]
     arrows["y_offset"] = [-3 if y >= 0 else 3 for y in arrows["y_end"]]
     arrow_source = ColumnDataSource(arrows)
+    focus_id = artifact.feature_names[focus] if focus is not None else None
+    plain = ColumnDataSource(arrows[arrows["feature_id"] != focus_id])
     arrow_color = theme.INK_MUTED
     plot.add_layout(
         Arrow(
@@ -1346,27 +1485,61 @@ def _draw_arrows(plot, artifact: ReductionArtifact, presentation, columns, score
             y_start="y_start",
             x_end="x_end",
             y_end="y_end",
-            source=arrow_source,
+            source=plain,
             line_color=arrow_color,
             line_width=1.5,
         )
     )
-    arrow_hover_renderer = plot.scatter(
-        x="x_end", y="y_end", source=arrow_source, size=10, alpha=0, name="arrow_endpoints"
+    label = dict(
+        x="x_end", y="y_end", text="display_label", text_font_size="11px", text_color=theme.INK,
+        text_align="align", text_baseline="baseline", x_offset="x_offset", y_offset="y_offset",
     )
-    plot.text(
-        x="x_end",
-        y="y_end",
-        text="display_label",
-        source=arrow_source,
-        text_font_size="11px",
-        text_color=theme.INK,
-        text_align="align",
-        text_baseline="baseline",
-        x_offset="x_offset",
-        y_offset="y_offset",
+    plot.text(source=plain, **label)
+    if focus_id is not None:
+        tip = arrows[arrows["feature_id"] == focus_id].iloc[0]
+        x_end, y_end = float(tip["x_end"]), float(tip["y_end"])
+        gradient = gradient_segments([[0.0, 0.0, x_end, y_end]], piece=score_range / 150, down=-1)
+        plot.segment(
+            "x0", "y0", "x1", "y1", source=ColumnDataSource(gradient), line_color="color", line_width=OUTLINE_WIDTH,
+        )
+        head = theme.SELECTED_END
+        plot.add_layout(
+            Arrow(
+                end=VeeHead(size=10, fill_color=head, line_color=head, line_width=1),
+                x_start=x_end * 0.98, y_start=y_end * 0.98, x_end=x_end, y_end=y_end, line_alpha=0,
+            )
+        )
+        plot.text(source=ColumnDataSource(arrows[arrows["feature_id"] == focus_id]), text_font_style="bold", **label)
+    arrow_hover_renderer = plot.scatter(
+        x="x_end", y="y_end", source=arrow_source, size=12, alpha=0, name="arrow_endpoints"
     )
     plot.add_tools(HoverTool(tooltips="@hover{safe}", renderers=[arrow_hover_renderer], name="arrow_hover"))
+
+
+ARROW_TAP_CODE = """
+const index = source.selected.indices[0]
+if (index === undefined) return
+const feature = source.data.feature_id[index]
+const label = source.data.display_label[index]
+source.selected.indices = []
+window.dispatchEvent(new CustomEvent(event, {detail: {feature, label, data_type}}))
+"""
+
+
+def add_arrow_colouring(plot, data_type: str, event: str) -> None:
+    """A click on an arrow's tip dispatches ``event`` with its feature, as a row's click does.
+
+    The page then colours the samples by that feature, and the map draws its
+    arrow in the gradient. A map without arrows is left as it is.
+    """
+    renderers = [renderer for renderer in plot.renderers if renderer.name == "arrow_endpoints"]
+    if not renderers:
+        return
+    source = renderers[0].data_source
+    plot.add_tools(TapTool(renderers=renderers))
+    source.selected.js_on_change(
+        "indices", CustomJS(args=dict(source=source, event=event, data_type=data_type), code=ARROW_TAP_CODE)
+    )
 
 
 def plot_pca_biplot_artifact(
@@ -1471,6 +1644,11 @@ def plot_pca_biplot_artifact(
 
 
 __all__ = [
+    "add_arrow_colouring",
+    "biplot_arrow_features",
+    "feature_level_palette",
+    "gradient_box",
+    "gradient_choice",
     "FEATURE_CHOICE",
     "FEATURE_ROWS",
     "ReductionColouring",
