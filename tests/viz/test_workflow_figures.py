@@ -178,3 +178,28 @@ def test_a_hidden_group_leaves_the_heatmap_and_a_highlighted_one_is_outlined_the
     assert part.sizing_mode == "stretch_both" and whole.sizing_mode == "stretch_width"
     mapper = part.select_one({"type": LinearColorMapper})
     assert (mapper.palette[0].upper(), mapper.palette[-1].upper()) == ("#542788", "#E6AB02") and "#E0E0E0" in [c.upper() for c in mapper.palette]
+
+
+def test_the_heatmaps_band_previews_and_highlights_a_group_as_its_chip_does():
+    rng = np.random.default_rng(3)
+    samples = [f"s{i}" for i in range(12)]
+    scores = pd.DataFrame(rng.normal(size=(12, 6)), index=samples, columns=[f"R{i}" for i in range(6)])
+    ordered = {sample: ("A", "B", "C")[i // 4] for i, sample in enumerate(samples)}
+
+    plot = plot_sample_heatmap(
+        scores, ordered, count=4, title="Band", group_event="pick", group_preview_event="preview"
+    )
+
+    (tap,) = plot.js_event_callbacks["tap"]
+    blocks = tap.args["blocks"]
+    assert tap.args["group_event"] == "pick" and tap.args["base"] == 4
+    assert (list(blocks.data["group_id"]), list(blocks.data["left"]), list(blocks.data["right"])) == (
+        ["A", "B", "C"], [0, 4, 8], [4, 8, 12]
+    )
+    # Moving over the band previews its group; leaving the figure ends it.
+    (moved,) = plot.js_event_callbacks["mousemove"]
+    (left,) = plot.js_event_callbacks["mouseleave"]
+    assert moved is left and moved.args["event"] == "preview" and moved.args["blocks"] is blocks
+    # Without the events, the band only names its groups.
+    plain = plot_sample_heatmap(scores, ordered, count=4, title="Plain")
+    assert "mousemove" not in plain.js_event_callbacks and "tap" not in plain.js_event_callbacks

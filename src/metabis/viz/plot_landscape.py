@@ -32,6 +32,7 @@ from ..managers.group_palettes import group_palette
 from ..managers.hover.panel import note, panel, row, section
 from ..visual_config import theme
 from .plot_reduction_artifact import (
+    BAND_PREVIEW_CODE,
     FEATURE_REACH,
     FEATURE_TAP_CODE,
     feature_level_palette,
@@ -222,6 +223,8 @@ def plot_sample_heatmap(
     highlight_groups: Sequence[str] = (),
     hidden_groups: Sequence[str] = (),
     fill: bool = False,
+    group_event: str | None = None,
+    group_preview_event: str | None = None,
 ):
     """The most variable reactions or genes (rows) across samples (columns), z-scored.
 
@@ -240,7 +243,10 @@ def plot_sample_heatmap(
     then leave the figure, so hiding a group changes no other cell's colour.
     With ``highlight_groups`` the other groups' columns fade and the highlighted
     bands are outlined in the logo's gradient; the page moves the focus through
-    the source named ``GROUP_FOCUS``, as on the map.
+    the source named ``GROUP_FOCUS``, as on the map. A click on a group's segment
+    of the band dispatches ``group_event`` with the group, and the pointer on
+    one ``group_preview_event`` (with no group as it leaves), so the band works
+    as the page's group chips do.
     With ``fill`` the figure takes its container's height, its rows dividing
     it, rather than a height of its own.
     """
@@ -392,7 +398,7 @@ def plot_sample_heatmap(
     )
     plot.add_layout(_color_bar(mapper, "Standardized score"), "right")
     # Under the chosen row's outline, so a faded block never hides it.
-    group_blocks(
+    blocks = group_blocks(
         plot,
         list(zip(segments["group"], segments["left"], segments["right"])),
         highlight_groups,
@@ -403,7 +409,7 @@ def plot_sample_heatmap(
     )
     choice = gradient_choice(plot, 0, n_samples)
     plot.tags = [*plot.tags, feature_rows_source(rows, [n_rows - 1 - index + 0.5 for index in range(n_rows)])]
-    if feature_event:
+    if feature_event or group_event:
         plot.js_on_event(
             "tap",
             CustomJS(
@@ -417,8 +423,15 @@ def plot_sample_heatmap(
                     component_event=None,
                     base=n_rows,
                     count=0,
+                    numbers=[],
+                    group_event=group_event,
+                    blocks=blocks,
                 ),
                 code=FEATURE_TAP_CODE,
             ),
         )
+    if group_preview_event:
+        preview = CustomJS(args=dict(blocks=blocks, base=n_rows, event=group_preview_event), code=BAND_PREVIEW_CODE)
+        plot.js_on_event("mousemove", preview)
+        plot.js_on_event("mouseleave", preview)
     return plot

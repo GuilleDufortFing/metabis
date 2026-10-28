@@ -155,9 +155,9 @@ class ReductionPlotPresentation:
     # strongest features as arrows when asked.
     show_biplot_arrows: bool = False
     colouring: ReductionColouring | None = None
-    # As the UCSC Cell Browser recolours checked groups: highlighted groups keep
-    # their colours and every other sample is grey. Hidden groups are not drawn,
-    # though the colouring's scale stays that of every grouped sample.
+    # Highlighted groups are drawn over the rest, which fade in their own colours.
+    # Hidden groups are not drawn, though the colouring's scale stays that of
+    # every grouped sample.
     highlight_group_ids: tuple[str, ...] = ()
     hidden_group_ids: tuple[str, ...] = ()
     # A page that names the groups beside the plot draws no legend in it.
@@ -1022,36 +1022,60 @@ def plot_pca_variance_artifact(
     return _apply_presentation_style(plot, presentation)
 
 
-def _loading_columns(artifact: ReductionArtifact, presentation: ReductionPlotPresentation):
-    """The strongest features over the shown components, one row per direction.
+def _loading_columns(
+    artifact: ReductionArtifact,
+    presentation: ReductionPlotPresentation,
+    *,
+    per_component: bool = False,
+    plotted: tuple[int, ...] = (),
+):
+    """The components shown and the strongest features over them, one row per direction.
 
-    ``loading_sort_component`` orders the features by that component's absolute
-    loadings, or by default by their absolute loadings summed over the shown
+    The first ``loading_component_count`` components are shown, with any of the
+    ``plotted`` ones beyond them. With ``per_component``, as PCAtools'
+    plotloadings looks "across each specified principal component", features are
+    each component's ``loading_feature_count`` strongest, listed component by
+    component; otherwise they are chosen by ``loading_sort_component``'s absolute
+    loadings when it is set, or by their absolute loadings summed over the shown
     components. Features that load identically on the shown components (several
     reactions Compass scores alike, one flux through a chain) share a row named
     after the first, so the rows show distinct directions rather than one
-    direction repeated. Returns the component count and each row's members.
+    direction repeated. Returns the shown components, numbered from 1, and each
+    row's members.
     """
     assert artifact.pca is not None and artifact.pca.loadings is not None
     loadings = artifact.pca.loadings
-    component_count = min(presentation.loading_component_count, loadings.shape[0])
-    shown = loadings[:component_count]
+    first = range(1, min(presentation.loading_component_count, loadings.shape[0]) + 1)
+    components = sorted({*first, *(c for c in plotted if 1 <= c <= loadings.shape[0])})
+    shown = loadings[[component - 1 for component in components]]
+    keys = [tuple(column) for column in np.round(shown.T, 9)]
+    feature_count = min(presentation.loading_feature_count, loadings.shape[1])
+
+    def strongest(strength: np.ndarray, limit: int) -> list[tuple]:
+        taken: list[tuple] = []
+        for index in np.argsort(-strength, kind="stable"):
+            if len(taken) >= limit:
+                break
+            if keys[index] not in taken:
+                taken.append(keys[index])
+        return taken
+
     sort = presentation.loading_sort_component
-    if sort is not None:
+    if per_component:
+        chosen = []
+        for row in shown:
+            chosen.extend(key for key in strongest(np.abs(row), feature_count) if key not in chosen)
+    elif sort is not None:
         if sort > loadings.shape[0]:
             raise ValueError(f"PC for sorting must be between 1 and {loadings.shape[0]}")
-        strength = np.abs(loadings[sort - 1])
+        chosen = strongest(np.abs(loadings[sort - 1]), feature_count)
     else:
-        strength = np.sum(np.abs(shown), axis=0)
-    feature_count = min(presentation.loading_feature_count, loadings.shape[1])
-    members: dict[tuple, list[int]] = {}
-    for index in np.argsort(-strength, kind="stable"):
-        key = tuple(np.round(shown[:, index], 9))
+        chosen = strongest(np.sum(np.abs(shown), axis=0), feature_count)
+    members: dict[tuple, list[int]] = {key: [] for key in chosen}
+    for index, key in enumerate(keys):
         if key in members:
-            members[key].append(int(index))
-        elif len(members) < feature_count:
-            members[key] = [int(index)]
-    return component_count, list(members.values())
+            members[key].append(index)
+    return components, list(members.values())
 
 
 def _loading_palette() -> list[str]:
@@ -1099,14 +1123,15 @@ def plot_pca_loadings_artifact(
     assert artifact.pca.loadings is not None
     if artifact.pca.loadings.size == 0:
         raise ValueError("Loadings matrix is empty")
-    component_count, groups = _loading_columns(artifact, presentation)
+    numbers, groups = _loading_columns(artifact, presentation)
+    component_count = len(numbers)
     loadings = artifact.pca.loadings
     feature_lookup = _feature_lookup(presentation)
     variance = artifact.pca.explained_variance_ratio
-    components = [f"PC{index + 1}" for index in range(component_count)]
+    components = [f"PC{number}" for number in numbers]
     component_labels = [
-        f"PC{index + 1} ({variance[index] * 100:.1f}%)" if variance is not None and len(variance) > index else f"PC{index + 1}"
-        for index in range(component_count)
+        f"PC{number} ({variance[number - 1] * 100:.1f}%)" if variance is not None and len(variance) >= number else f"PC{number}"
+        for number in numbers
     ]
 
     rows, used = [], set()
@@ -1132,10 +1157,10 @@ def plot_pca_loadings_artifact(
         )
         if twins:
             hover += section(row("Loading alike", escape(twins)))
-        for component, label in enumerate(component_labels):
+        for number, label in zip(numbers, component_labels):
             cells["feature"].append(name)
             cells["component"].append(label)
-            cells["loading"].append(float(loadings[component, group[0]]))
+            cells["loading"].append(float(loadings[number - 1, group[0]]))
             cells["feature_id"].append(first)
             cells["display_label"].append(presentation_of.display_label)
             cells["hover"].append(hover)
@@ -1217,8 +1242,12 @@ if (y >= 0 && y < rows.length) {
 } else if (component_event && y >= base) {
   const column = Math.floor(cb_obj.x)
   if (column >= 0 && column < count) {
-    window.dispatchEvent(new CustomEvent(component_event, {detail: {component: column + 1, data_type}}))
+    window.dispatchEvent(new CustomEvent(component_event, {detail: {component: numbers[column], data_type}}))
   }
+} else if (group_event && y >= base && y < base + 1) {
+  // A group's segment of the heatmap's band: the group, as its chip names it.
+  const at = blocks.data.left.findIndex((left, i) => cb_obj.x >= left && cb_obj.x < blocks.data.right[i])
+  if (at >= 0) window.dispatchEvent(new CustomEvent(group_event, {detail: {group: blocks.data.group_id[at]}}))
 }
 """
 
@@ -1287,8 +1316,9 @@ def group_blocks(plot, blocks, focus, *, bottom: float, top: float, band: tuple[
     ``blocks`` are ``(group_id, left, right)``. A block out of focus is covered in
     white, so it shows at the strength a faded sample does on the map; a block in
     focus has its band, from ``band[0]`` to ``band[1]``, outlined in the logo's
-    gradient. The page moves the focus through the returned source, named
-    ``GROUP_FOCUS``, as on the map.
+    gradient. The page moves the focus through a source named ``GROUP_FOCUS``, as
+    on the map. Returns the covers' source, whose ``group_id``, ``left`` and
+    ``right`` let a pointer find the group under it.
     """
     focus = set(focus)
     cover_alpha = 1 - FADED_ALPHA
@@ -1321,7 +1351,22 @@ def group_blocks(plot, blocks, focus, *, bottom: float, top: float, band: tuple[
         "data", CustomJS(args=dict(covers=covers, outline=outline, cover_alpha=cover_alpha), code=FOCUS_BLOCKS_CODE)
     )
     plot.tags = [*plot.tags, chosen]
-    return chosen
+    return covers
+
+
+BAND_PREVIEW_CODE = """
+// The pointer on a group's segment of the band previews that group, as resting
+// on its chip does; anywhere else, or leaving the figure, ends the preview.
+let group = null
+if (cb_obj.event_name !== 'mouseleave' && cb_obj.y >= base && cb_obj.y < base + 1) {
+  const at = blocks.data.left.findIndex((left, i) => cb_obj.x >= left && cb_obj.x < blocks.data.right[i])
+  if (at >= 0) group = blocks.data.group_id[at]
+}
+if (group !== (blocks.previewed ?? null)) {
+  blocks.previewed = group
+  window.dispatchEvent(new CustomEvent(event, {detail: {group}}))
+}
+"""
 
 
 def feature_rows_source(rows: list[list[str]], centres: list[float]) -> ColumnDataSource:
@@ -1349,11 +1394,14 @@ def plot_pca_components_artifact(
     the strongest features' loadings on it, as ComplexHeatmap sets a bar
     annotation over a heatmap's columns (Gu, Eils and Schlesner 2016): a
     component's bar and its column share one position, so how much a component
-    explains reads beside which features make it. Rows are chosen and merged as
-    in :func:`plot_pca_loadings_artifact`, and named short, the full name in the
-    hover. The ``plotted`` components (numbered from 1) are outlined in the
-    logo's gradient, and a row holding one of ``arrow_features``, the features
-    the map draws as arrows, is marked ➚.
+    explains reads beside which features make it. Each shown component's
+    ``loading_feature_count`` strongest features are rows, as PCAtools'
+    plotloadings chooses them (see :func:`_loading_columns`), named short, the
+    full name in the hover. The ``plotted`` components (numbered from 1) are
+    shown, beyond the first ones if need be, and outlined in the logo's
+    gradient. A row holding one of ``arrow_features``, the features the map draws
+    as arrows, is marked ➚, and an arrow's feature that is not among the rows
+    gets a row of its own at the foot, so every arrow on the map is listed.
 
     A click on a row outlines it and dispatches ``feature_event`` with the
     feature; a click on a bar dispatches ``component_event`` with the component.
@@ -1365,12 +1413,20 @@ def plot_pca_components_artifact(
     assert artifact.pca.loadings is not None and artifact.pca.explained_variance_ratio is not None
     if artifact.pca.loadings.size == 0:
         raise ValueError("Loadings matrix is empty")
-    count, groups = _loading_columns(artifact, presentation)
+    numbers, groups = _loading_columns(artifact, presentation, per_component=True, plotted=plotted)
+    placed = {index for members in groups for index in members}
+    groups += [
+        [artifact.feature_names.index(feature)]
+        for feature in arrow_features
+        if feature in artifact.feature_names and artifact.feature_names.index(feature) not in placed
+    ]
+    count = len(numbers)
     loadings = artifact.pca.loadings
     lookup = _feature_lookup(presentation)
-    variance = np.asarray(artifact.pca.explained_variance_ratio[:count], dtype=float)
-    cumulative = np.cumsum(artifact.pca.explained_variance_ratio)[:count]
-    components = [f"PC{index + 1}" for index in range(count)]
+    positions = [number - 1 for number in numbers]
+    variance = np.asarray(artifact.pca.explained_variance_ratio, dtype=float)[positions]
+    cumulative = np.cumsum(artifact.pca.explained_variance_ratio)[positions]
+    components = [f"PC{number}" for number in numbers]
     noun = "reaction" if str(artifact.key.data_type).lower() == "reactions" else "gene"
     n = len(groups)
 
@@ -1398,10 +1454,10 @@ def plot_pca_components_artifact(
         ids.append(first)
     cells: dict[str, list] = {"component": [], "y": [], "loading": [], "hover": []}
     for index, members in enumerate(groups):
-        for column, component in enumerate(components):
+        for position, component in zip(positions, components):
             cells["component"].append(component)
             cells["y"].append(n - index - 0.5)
-            cells["loading"].append(float(loadings[column, members[0]]))
+            cells["loading"].append(float(loadings[position, members[0]]))
             cells["hover"].append(hovers[index])
     reach = max([abs(value) for value in cells["loading"]] + [1e-9])
     mapper = LinearColorMapper(palette=_loading_palette(), low=-reach, high=reach)
@@ -1449,8 +1505,9 @@ def plot_pca_components_artifact(
     )
     # A factor's column spans one unit from its index, in the plot's own units.
     for component in plotted:
-        if 1 <= component <= count:
-            gradient_box(plot, component - 0.98, component - 0.02, 0.02, base + tall + 1.6, piece=0.25)
+        if component in numbers:
+            column = numbers.index(component) + 1
+            gradient_box(plot, column - 0.98, column - 0.02, 0.02, base + tall + 1.6, piece=0.25)
     choice = gradient_choice(plot, 0.02, count - 0.02)
     rows = feature_rows_source(
         [[artifact.feature_names[i] for i in members] for members in groups],
@@ -1496,6 +1553,9 @@ def plot_pca_components_artifact(
                     component_event=component_event,
                     base=base,
                     count=count,
+                    numbers=numbers,
+                    group_event=None,
+                    blocks=None,
                 ),
                 code=FEATURE_TAP_CODE,
             ),
@@ -1523,6 +1583,13 @@ def biplot_arrows(loadings_x: np.ndarray, loadings_y: np.ndarray, limit: int | N
             chosen.append(int(members[np.argmax(magnitudes[members])]))
     chosen.sort(key=lambda index: -magnitudes[index])
     return chosen[:limit] if limit is not None else chosen
+
+
+def arrow_ties(loadings_x: np.ndarray, loadings_y: np.ndarray, chosen: list[int]) -> list[int]:
+    """How many other features load as each chosen arrow does, on both axes."""
+    keys = np.round(np.column_stack([loadings_x, loadings_y]), 9)
+    _, inverse, counts = np.unique(keys, axis=0, return_inverse=True, return_counts=True)
+    return [int(counts[inverse[index]]) - 1 for index in chosen]
 
 
 def biplot_arrow_features(artifact: ReductionArtifact, pc_x: int, pc_y: int, limit: int | None) -> tuple[str, ...]:
@@ -1578,6 +1645,11 @@ def _draw_arrows(plot, artifact: ReductionArtifact, presentation, columns, score
         }
     )
     arrows["display_label"] = [feature_lookup[value].display_label for value in arrows["feature_id"]]
+    # A feature leading others that load as it does is named at its tip as its row is, "(+N)".
+    arrows["tip_label"] = [
+        label + (f" (+{ties})" if ties else "")
+        for label, ties in zip(arrows["display_label"], arrow_ties(loadings_x, loadings_y, chosen))
+    ]
     # The feature's own panel, as the graphs show it, with its loadings added.
     arrows["hover"] = [
         (extend(feature_lookup[feature].hover_html, facts) if feature_lookup[feature].hover_html
@@ -1617,7 +1689,7 @@ def _draw_arrows(plot, artifact: ReductionArtifact, presentation, columns, score
         )
     )
     label = dict(
-        x="x_end", y="y_end", text="display_label", text_font_size="11px", text_color=theme.INK,
+        x="x_end", y="y_end", text="tip_label", text_font_size="11px", text_color=theme.INK,
         text_align="align", text_baseline="baseline", x_offset="x_offset", y_offset="y_offset",
     )
     plot.text(source=plain, **label)
@@ -1776,6 +1848,7 @@ __all__ = [
     "gradient_box",
     "gradient_choice",
     "group_blocks",
+    "BAND_PREVIEW_CODE",
     "FEATURE_CHOICE",
     "FEATURE_ROWS",
     "GROUP_FOCUS",

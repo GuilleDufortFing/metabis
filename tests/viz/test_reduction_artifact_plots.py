@@ -323,7 +323,7 @@ def test_sample_labels_name_only_the_points_a_box_selection_picks():
     tip_labels = [
         renderer.data_source
         for renderer in unlabelled.renderers
-        if getattr(getattr(renderer, "glyph", None), "text", None) == "display_label"
+        if getattr(getattr(renderer, "glyph", None), "text", None) == "tip_label"
     ]
     assert tip_labels and all("magnitude" in source.data and "sample_id" not in source.data for source in tip_labels)
 
@@ -337,6 +337,15 @@ def test_the_biplot_draws_one_arrow_per_direction():
 
     assert biplot_arrows(x, y, None) == [0, 3]
     assert biplot_arrows(x, y, 1) == [0]
+
+
+def test_an_arrow_leading_features_that_load_alike_is_named_with_their_count():
+    from metabis.viz.plot_reduction_artifact import arrow_ties, biplot_arrows
+
+    # Two features load alike on both axes: one arrow, named "(+1)" at its tip.
+    x, y = np.array([0.7, 0.7, 0.1]), np.array([0.2, 0.2, 0.9])
+    chosen = biplot_arrows(x, y, None)
+    assert chosen == [2, 0] and arrow_ties(x, y, chosen) == [0, 1]
 
 
 def test_presentation_is_frozen_and_must_exactly_align_with_artifact():
@@ -618,3 +627,32 @@ def test_rows_the_map_draws_as_arrows_are_marked_in_the_components():
 
     labels = set(plot.yaxis[0].major_label_overrides.values())
     assert "Display R1 \u279a" in labels and "Display R2" in labels
+
+
+def test_the_components_list_each_components_strongest_features_and_every_arrow():
+    """As PCAtools' plotloadings looks across each component; every feature the
+    map draws as an arrow is listed too, marked."""
+    plot = plot_pca_components_artifact(
+        artifact(),
+        presentation(loading_component_count=2, loading_feature_count=1),
+        plotted=(1, 3),
+        arrow_features=("R1",),
+        component_event="plot-component",
+    )
+
+    # PC3, plotted, is shown beyond the first two, with its own strongest, R3.
+    assert list(plot.x_range.factors) == ["PC1", "PC2", "PC3"]
+    labels = [plot.yaxis[0].major_label_overrides[y] for y in sorted(plot.yaxis[0].major_label_overrides, reverse=True)]
+    assert labels == ["Display R1 \u279a", "Display R2", "Display R3"]
+    # A click on the third bar plots PC3, the component in that column.
+    (tap,) = plot.js_event_callbacks["tap"]
+    assert tap.args["numbers"] == [1, 2, 3]
+
+
+def test_an_arrow_outside_the_components_rows_gets_a_row_of_its_own():
+    plot = plot_pca_components_artifact(
+        artifact(), presentation(loading_component_count=2, loading_feature_count=1), arrow_features=("R3",)
+    )
+
+    labels = list(plot.yaxis[0].major_label_overrides.values())
+    assert "Display R3 \u279a" in labels and len(labels) == 3

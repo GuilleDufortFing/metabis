@@ -162,3 +162,5 @@ def test_group_colors_leave_out_the_greys_and_the_level_gold():
 
     assert not [color for color in OKABE_ITO + SCANPY_20 if grey(color)]
     assert "#E69F00" not in OKABE_ITO
+    # Two groups take a cool and a warm, Okabe-Ito's blue and vermillion.
+    assert OKABE_ITO[:2] == ("#0072B2", "#D55E00")

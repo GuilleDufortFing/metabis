@@ -6,6 +6,11 @@ without four of its colours, each of which already says something else:
 its orange is the gold of a high level (ΔE 2.9), its grey the "not significant",
 "average" and "no data" greys, its black fades to that grey when other groups
 are highlighted, and its yellow vanishes on the white plot background.
+The first two are its blue and vermillion, a cool against a warm, as two groups
+are told apart in scanpy and Tableau (blue and orange) and ggplot2 (salmon and
+teal): ΔE 31 apart, and at least 22 under every colour-vision deficiency.
+Vermillion is near the comparison's red for deuteranopes; the two meet only
+where the group is named beside its colour.
 More groups take scanpy's defaults, which leave grey out as well, in scanpy's
 own order of use: its 20-colour palette (Vega's category20 adjusted for colour
 blindness), Zeileis et al.'s 28 colours, then the 102 colours of "godsnot"
@@ -15,11 +20,11 @@ blindness), Zeileis et al.'s 28 colours, then the 102 colours of "godsnot"
 from __future__ import annotations
 
 OKABE_ITO = (
-    "#56B4E9",  # sky blue
-    "#009E73",  # bluish green
     "#0072B2",  # blue
     "#D55E00",  # vermillion
+    "#009E73",  # bluish green
     "#CC79A7",  # reddish purple
+    "#56B4E9",  # sky blue
 )
 
 SCANPY_20 = (
