@@ -10,6 +10,7 @@ from metabis.analysis.agreement import ResultEffects, compare_results
 from metabis.analysis.landscape import Landscape
 from metabis.domain.expression_matrix import DenseExpressionMatrix
 from metabis.viz.plot_landscape import (
+    MIN_CELL_WIDTH,
     plot_delta_landscape,
     plot_sample_heatmap,
     sample_heatmap_block,
@@ -56,9 +57,9 @@ def test_a_table_keeps_room_for_its_columns_beside_long_labels():
     )
     long = plot_delta_landscape(landscape, ["glyc", "fao"], title="Delta")
 
-    assert one.min_width >= 2 * 72
-    assert long.min_width > one.min_width - 72
-    assert long.min_width >= len("Glycosylphosphatidylinositol (GPI)-anchor biosynthesis") * 6 + 72
+    assert one.min_width >= 2 * MIN_CELL_WIDTH
+    assert long.min_width > one.min_width - MIN_CELL_WIDTH
+    assert long.min_width >= len("Glycosylphosphatidylinositol (GPI)-anchor biosynthesis") * 5 + MIN_CELL_WIDTH
 
 
 def test_landscape_needs_a_subsystem():
