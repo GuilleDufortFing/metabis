@@ -107,6 +107,7 @@ EXPECTED_ROOT_ALL = frozenset(
         "GraphPipelineError",
         "GraphRunMetadata",
         "PipelinePhaseMetric",
+        "outline_elements",
         "plot_metabolic_graph",
         # Plotting
         "COMPARTMENT_MAPS",

@@ -141,6 +141,7 @@ _MODULE_EXPORTS: dict[str, tuple[str, ...]] = {
         "plot_subsystem_influence_summary",
         "plot_subsystem_ranking_by_influence",
     ),
+    ".viz.graph_marks": ("outline_elements",),
     ".viz.plot_metabolic_graph": ("plot_metabolic_graph",),
     ".viz.plot_reaction_set_enrichment": ("plot_reaction_set_enrichment",),
     ".viz.plot_set_enrichment": ("plot_set_enrichment_category",),
@@ -347,6 +348,7 @@ if TYPE_CHECKING:
         plot_subsystem_influence_summary,
         plot_subsystem_ranking_by_influence,
     )
+    from .viz.graph_marks import outline_elements
     from .viz.plot_metabolic_graph import plot_metabolic_graph
     from .viz.plot_reaction_set_enrichment import plot_reaction_set_enrichment
     from .viz.plot_reduction_artifact import (
@@ -516,6 +518,7 @@ __all__ = [
     "GraphPipelineError",
     "GraphRunMetadata",
     "PipelinePhaseMetric",
+    "outline_elements",
     "plot_metabolic_graph",
     # Plotting
     "COMPARTMENT_MAPS",
