@@ -283,7 +283,11 @@ class DataProvider:
         Returns:
             Dict containing statistical information
         """
-        if not self.group_comparison_artifact:
+        # A comparison run without expression data has no gene to report.
+        if (
+            not self.group_comparison_artifact
+            or self.group_comparison_artifact.get_test_results(for_genes=True) is None
+        ):
             return {"has_comparison_data": False}
 
         stats = self.group_comparison_artifact.get_statistical_info(
