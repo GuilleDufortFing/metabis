@@ -57,6 +57,10 @@ __all__ = [
 HEATMAP_CANDIDATES = 2000
 
 ROW_HEIGHT = 20
+# A table's columns keep at least this width, so labels never squeeze them out:
+# a narrow page scrolls the figure instead. 11px Arial advances about 6.2px a character.
+MIN_CELL_WIDTH = 72
+LABEL_CHAR_WIDTH = 6.2
 SAMPLE_ROW_HEIGHT = 14
 BAND_ROW = "Group"
 
@@ -92,6 +96,12 @@ def _style_categorical(plot) -> None:
     plot.xaxis.major_label_text_color = theme.INK
 
 
+def _min_width(label_columns: Sequence[Sequence[str]], groups: int) -> int:
+    """The width that leaves every column ``MIN_CELL_WIDTH`` beside its row labels and colour bar."""
+    labels = sum(max((len(label) for label in column), default=0) * LABEL_CHAR_WIDTH + 24 for column in label_columns)
+    return int(labels + groups * MIN_CELL_WIDTH + 110)
+
+
 def _landscape_figure(
     factors: Sequence[tuple[str, str]],
     groups: Sequence[str],
@@ -114,6 +124,7 @@ def _landscape_figure(
             tools="save,reset",
             x_axis_location="above",
             sizing_mode="stretch_width",
+            min_width=_min_width([[category for category, _ in factors], [name for _, name in factors]], len(groups)),
         ),
         suppress_grid=True,
     )
@@ -349,6 +360,7 @@ def plot_marker_heatmap(
             tools="save,reset",
             x_axis_location="above",
             sizing_mode="stretch_width",
+            min_width=_min_width([names], len(groups)),
         ),
         suppress_grid=True,
     )

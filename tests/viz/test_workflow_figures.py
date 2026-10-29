@@ -41,6 +41,26 @@ def test_landscape_rows_are_grouped_by_category():
     json_item(plot)
 
 
+def test_a_table_keeps_room_for_its_columns_beside_long_labels():
+    """Two-level row labels must not squeeze a single comparison's column to nothing:
+    the figure keeps a width for the labels and each column, and a page scrolls it."""
+    one = plot_delta_landscape(_landscape(), ["glyc", "fao"], title="Delta")
+    landscape = _landscape()
+    landscape = Landscape(
+        delta=landscape.delta[["A"]],
+        significant=landscape.significant[["A"]],
+        names=landscape.names.replace({"Glycolysis": "Glycosylphosphatidylinositol (GPI)-anchor biosynthesis"}),
+        categories=landscape.categories,
+        reactions=landscape.reactions,
+        significant_reactions=landscape.significant_reactions[["A"]],
+    )
+    long = plot_delta_landscape(landscape, ["glyc", "fao"], title="Delta")
+
+    assert one.min_width >= 2 * 72
+    assert long.min_width > one.min_width - 72
+    assert long.min_width >= len("Glycosylphosphatidylinositol (GPI)-anchor biosynthesis") * 6 + 72
+
+
 def test_landscape_needs_a_subsystem():
     with pytest.raises(ValueError, match="No subsystem meets the rule"):
         plot_delta_landscape(_landscape(), [], title="Delta")
