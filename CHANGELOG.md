@@ -48,6 +48,22 @@ and releases follow [Semantic Versioning](https://semver.org/).
   example data, so the notebooks and the deployed server cannot diverge on how
   the Th17 files were built.
 
+### Fixed
+
+- A source reaction now maps to Human1 through any one of the identifiers Human1
+  lists for a reaction (`HMR_8572;RE0944C`) and through Recon3D's bracket
+  spelling of a Recon1 or Recon2 compartment (`EX_glc(e)` as `EX_glc[e]`), ahead
+  of the legacy BiGG aliases. The Compass Th17 example leaves 247 of its 6,941
+  source reactions unmapped instead of 1,010.
+- The reaction-orientation files under `model_interoperability/model_alignments`
+  disagreed with the models they name: against Compass's Recon2, the RECON2 file
+  called 723 of 881 reversed reactions aligned and 75 of its 233 reversals were
+  not. The RECON1, RECON2, RECON2.2, RECON3D and HMR2.0 files are now read from
+  each published source model's stoichiometry, paired as the loader pairs them,
+  by `scripts/regenerate_model_alignments.py`, which pins every source by
+  SHA-256 and can be rerun with `--check`. HMR1.0, with no public source, is
+  unchanged and holds no reversal.
+
 ## [1.0.0] - 2026-07-27
 
 This is the first stable release of the supported public interface.
