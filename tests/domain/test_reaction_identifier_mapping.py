@@ -11,7 +11,7 @@ import pandas as pd
 import pytest
 
 from metabis import MetabolicModel, ReactionPreprocessingConfig, ReactionTransform
-from metabis.domain.reaction_data import ReactionData
+from metabis.domain.reaction_data import ReactionData, _identifier_spellings
 
 resolve = ReactionData._resolve_reaction_id_collisions
 
@@ -142,7 +142,7 @@ def test_an_uncontested_reaction_produces_no_collision_record():
 
 
 # `GLYCTDle` and `GLYCt` both claim `MAR00444` in the shipped crosswalk - one of
-# the 39 contests present in the bundled Th17 data.
+# the contests present in the bundled Th17 data.
 CONTESTED = {
     "GLYCTDle_pos": [1.0, 1.0, 1.0],
     "GLYCt_pos": [9.0, 9.0, 9.0],
@@ -219,3 +219,67 @@ def test_mapping_is_injective_so_no_source_can_overwrite_another(tmp_path, model
     assert len(set(mapping.values())) == len(mapping)
     # And only the winner's values reach the frame.
     assert reaction_data.get_reaction_df()["MAR00444"].tolist() == [9.0, 9.0, 9.0]
+
+
+# --- Identifiers Human1 lists, and Recon2's spelling of them ----------------
+
+
+def recon2(tmp_path, model, columns, name="recon2.tsv"):
+    """Load a dual Recon2-named file read through Human1's Recon3D annotation."""
+    return load(
+        write_dual(tmp_path, columns, name=name),
+        model,
+        reaction_name_format="rxnRecon3DID",
+        check_old_identifiers=True,
+    )
+
+
+def test_a_recon2_compartment_is_also_read_in_recon3d_brackets():
+    assert _identifier_spellings("EX_glc(e)") == ["EX_glc(e)", "EX_glc[e]"]
+    assert _identifier_spellings("GLCt1r") == ["GLCt1r"]
+
+
+def test_an_identifier_listed_beside_others_maps_to_its_reaction(tmp_path, model):
+    # Human1 annotates MAR08572 as "HMR_8572;RE0944C". No file carries that
+    # string; a Recon2 file carries RE0944C.
+    frame = recon2(tmp_path, model, {"RE0944C_pos": [1.0, 2.0, 3.0]}).get_reaction_df()
+
+    assert list(frame.columns) == ["MAR08572"]
+
+
+def test_a_recon2_exchange_maps_through_its_recon3d_spelling(tmp_path, model):
+    # Recon2 writes EX_10fthf(e); Human1's Recon3D annotation, EX_10fthf[e].
+    frame = recon2(
+        tmp_path, model, {"EX_10fthf(e)_pos": [1.0, 2.0, 3.0]}
+    ).get_reaction_df()
+
+    assert list(frame.columns) == ["MAR09205"]
+
+
+def test_a_whole_annotation_keeps_its_reaction_over_a_list_naming_another(
+    tmp_path, model
+):
+    # RE3422C is MAR01334's whole annotation and one entry of MAR01338's
+    # "HMR_1338;RE3422C". The whole match decides, as it did before lists were read.
+    frame = recon2(tmp_path, model, {"RE3422C_pos": [1.0, 2.0, 3.0]}).get_reaction_df()
+
+    assert list(frame.columns) == ["MAR01334"]
+
+
+def test_human1s_own_identifier_outranks_the_legacy_table(tmp_path, model):
+    # The legacy table lists EX_ac(e), acetate exchange, under MAR09086 and also
+    # under MAR09239, the exchange of heptaglutamyl-folate, and its last claim
+    # used to win. Human1's Recon3D annotation names only MAR09086.
+    loaded = recon2(tmp_path, model, {"EX_ac(e)_pos": [1.0, 2.0, 3.0]})
+
+    assert list(loaded.get_reaction_df().columns) == ["MAR09086"]
+    assert loaded.mapping_stats["unmapped_count"] == 0
+
+
+def test_the_legacy_table_is_not_read_under_another_spelling(tmp_path, model):
+    # Respelled, EX_Rtotal(e) would meet the legacy table's EX_Rtotal[e], which
+    # it files under the exchange of ribose.
+    loaded = recon2(tmp_path, model, {"EX_Rtotal(e)_pos": [1.0, 2.0, 3.0]})
+
+    assert loaded.get_reaction_df().empty
+    assert loaded.mapping_stats["unmapped_count"] == 1

@@ -1,4 +1,5 @@
 import os
+import re
 from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
@@ -10,6 +11,19 @@ from .preprocessing import (
     preprocess_reactions,
     signed_cuberoot,
 )
+
+# Recon1 and Recon2 write a reaction's compartment in parentheses, ``EX_glc(e)``;
+# Recon3D - and so Human1's Recon3D annotation - writes it in brackets,
+# ``EX_glc[e]``.
+_PARENTHESIZED_COMPARTMENT = re.compile(r"\(([A-Za-z0-9]+)\)$")
+
+
+def _identifier_spellings(source_id: str) -> List[str]:
+    """Return a source reaction ID, then the same ID as Recon3D spells it."""
+    match = _PARENTHESIZED_COMPARTMENT.search(source_id)
+    if not match:
+        return [source_id]
+    return [source_id, f"{source_id[: match.start()]}[{match.group(1)}]"]
 
 
 class ReactionData:
@@ -177,6 +191,30 @@ class ReactionData:
             for old_id, claiming in self._load_old_identifier_claims().items()
         }
 
+    def _load_annotation_claims(self, reaction_name_format: str) -> Dict[str, List[str]]:
+        """Load which Human1 reactions list each identifier of one format.
+
+        Human1 lists several identifiers for some reactions, joined by ``;`` -
+        ``HMR_8572;RE0944C`` - and each of them names that reaction, so each is
+        indexed on its own. Claims are in model order, the order in which the
+        model's own index resolves an identifier that several reactions share.
+
+        Returns:
+            Dictionary mapping identifier -> list of rxn_ids (MAR IDs) listing it.
+        """
+        claims: Dict[str, List[str]] = {}
+        for mar_id, annotation in zip(
+            self.metabolic_model.get_reactions(format="mar_id"),
+            self.metabolic_model.get_reactions(format=reaction_name_format),
+        ):
+            if not isinstance(annotation, str):
+                continue
+            for identifier in annotation.split(";"):
+                identifier = identifier.strip()
+                if identifier:
+                    claims.setdefault(identifier, []).append(mar_id)
+        return claims
+
     def _map_base_reactions_to_model(
         self,
         reaction_columns: List[str],
@@ -194,6 +232,16 @@ class ReactionData:
         supply that reaction's values, so the choice is made here, once, by an
         explicit policy rather than by whichever column happened to come last in the
         file. See :meth:`_resolve_reaction_id_collisions` for the policy.
+
+        Each source ID is looked up in three tiers, the first that matches deciding
+        its Human1 reaction: a Human1 reaction's whole annotation in the input
+        format; then one identifier of a listed annotation, or the ID with its
+        compartment respelled (see :func:`_identifier_spellings`); then, with
+        ``check_old_identifiers``, the legacy BiGG table. Only the last is a
+        high-effort match. The legacy table is read under the source's own
+        spelling alone: respelled, Recon2's exchanges land in a block of it copied
+        from misannotated Human1 reactions (``EX_Rtotal[e]`` names the exchange of
+        ribose there).
 
         Args:
             reaction_columns: Raw column names from CSV
@@ -223,10 +271,12 @@ class ReactionData:
                 # Single mode: columns are already base IDs
                 base_ids.add(col)
 
-        # 2. Get all Human1 reactions in the input format for quick lookup
+        # 2. Get all Human1 reactions in the input format for quick lookup, as whole
+        #    annotations and as the identifiers a listed annotation names
         model_reactions_in_input_format = set(
             self.metabolic_model.get_reactions(format=reaction_name_format)
         )
+        annotation_claims = self._load_annotation_claims(reaction_name_format)
 
         # 3. Load old identifiers mapping if high-effort mode enabled
         old_identifier_claims: Dict[str, List[str]] = {}
@@ -238,6 +288,15 @@ class ReactionData:
         unmapped = []
 
         for base_id in sorted(base_ids):
+            listed = next(
+                (s for s in _identifier_spellings(base_id) if s in annotation_claims),
+                None,
+            )
+            # How many Human1 reactions does this source claim? A source listed by
+            # one reaction is specific to it; a lumped source listed by twelve is a
+            # poor representative of any single one.
+            claimed = set(old_identifier_claims.get(base_id, ()))
+
             # Low effort: Check if base_id exists in model reactions (input format)
             if base_id in model_reactions_in_input_format:
                 mar_id = self.metabolic_model.translate_reaction(
@@ -246,7 +305,15 @@ class ReactionData:
                     output_format="mar_id",
                 )
                 high_effort = False
-            elif check_old_identifiers and base_id in old_identifier_claims:
+            elif listed is not None:
+                # Still Human1's own identifier, listed beside others or spelled
+                # as another model spells it. It outranks the legacy table, which
+                # inherits BiGG's errors: there EX_ac(e), acetate exchange, is also
+                # listed under the exchange of heptaglutamyl-folate.
+                mar_id = annotation_claims[listed][-1]
+                claimed.update(annotation_claims[listed])
+                high_effort = False
+            elif base_id in old_identifier_claims:
                 # High effort: Try old identifiers mapping (if enabled)
                 mar_id = old_identifier_claims[base_id][-1]
                 high_effort = True
@@ -258,10 +325,6 @@ class ReactionData:
                 unmapped.append(base_id)
                 continue
 
-            # How many Human1 reactions does this source claim? A source listed by
-            # one reaction is specific to it; a lumped source listed by twelve is a
-            # poor representative of any single one.
-            claimed = set(old_identifier_claims.get(base_id, ()))
             claimed.add(mar_id)
             candidates.setdefault(mar_id, []).append(
                 {
