@@ -352,7 +352,7 @@ def add_fitting_label_callback(plot, label_source, focus):
         const data = labels.data
         const kinds = focus.data.kind
         const matches = focus.data.id.filter((id, i) => kinds[i] === 'match')
-        const named = new Set(focus.data.id.filter((id, i) => kinds[i] === 'focus'))
+        const named = new Set(focus.data.id.filter((id, i) => kinds[i] === 'focus' || kinds[i] === 'hover'))
         if (matches.length <= named_matches) matches.forEach((id) => named.add(id))
         const category = focus.data.id.find((id, i) => kinds[i] === 'category') ?? null
         const alpha = []

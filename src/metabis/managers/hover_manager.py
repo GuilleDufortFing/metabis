@@ -15,6 +15,7 @@ from .element_presentation import (
 from .hover import presets
 from .hover.models import HoverContext
 from .hover.panel import PANEL_STYLE
+from .hover.sections.subsystem_info import subsystem_hover_data
 from .workspace_mode import AnalysisWorkspaceMode
 
 logger = logging.getLogger(__name__)
@@ -485,22 +486,9 @@ class HoverManager:
 
         model_subsystem = self.data_provider.metabolic_model.get_subsystem(subsystem_name)
         display_name = model_subsystem.name if model_subsystem else subsystem_name
-
-        subsystem_data["subsystem_display_name"] = display_name
-
-        # Add/normalize fields expected by SubsystemSection without dropping dicts
-        total_metric_values = subsystem_data.get("total_metric_values", {})
-        net_direction_scores = subsystem_data.get("net_direction_scores", {})
-        subsystem_data["subsystem_name"] = subsystem_name
-        subsystem_data["impact_score"] = subsystem_data.get("impact_score", 0.0)
-        subsystem_data["n_significant"] = subsystem_data.get(
-            "significant_elements", 0
+        subsystem_data = subsystem_hover_data(
+            subsystem_data, subsystem_name=subsystem_name, display_name=display_name, metric=subsystem_metric
         )
-        subsystem_data["n_total"] = subsystem_data.get("total_elements", 0)
-        subsystem_data["net_direction_score"] = net_direction_scores.get(
-            subsystem_metric, 0.0
-        )
-        subsystem_data["total_metric_value"] = total_metric_values.get(subsystem_metric, 0.0)
 
         # Create context for hover building
         context = self._create_context(

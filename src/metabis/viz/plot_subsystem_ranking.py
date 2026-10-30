@@ -124,7 +124,8 @@ def subsystem_hovers(
 ) -> Dict[str, str]:
     """Each subsystem's hover as its node has it in the network, for its diamond.
 
-    Without the colour reference's picture, which every row would otherwise carry.
+    Without the colour reference's picture, which every row would otherwise carry:
+    the ranking draws it once on the hover tool (:func:`subsystem_delta_reference`).
     """
     getter = getattr(data_manager, "get_element_hover", None)
     if not callable(getter):
@@ -142,6 +143,30 @@ def subsystem_hovers(
         except Exception:
             continue
     return hovers
+
+
+def subsystem_delta_reference(
+    data_manager,
+    subsystem_ids: List[str],
+    *,
+    for_genes: bool = False,
+    metric: str = "cohens_d",
+) -> Optional[GradientColorReference]:
+    """The distribution the network's subsystem colours come from, as their nodes' hovers draw it.
+
+    One reference for a ranking's diamonds, marked with each one's Delta score, in
+    place of a picture in every row; ``None`` when no distribution is registered.
+    """
+    if not subsystem_ids:
+        return None
+    return build_reference_from_distribution(
+        getattr(data_manager, "color_manager", None),
+        mode=AnalysisWorkspaceMode.GROUP_COMPARISON,
+        element_type="subsystem_genes" if for_genes else "subsystem",
+        element_id=subsystem_ids[0],
+        metric_name=metric,
+        metric_label="ΔS",
+    )
 
 
 def _finish(layout, return_plot: bool):
@@ -376,6 +401,12 @@ def plot_subsystem_comparison(
             delta_options,
         )
         if groups is None
+        else None,
+        # As the network's nodes, which the diamonds take their colours from.
+        reference=subsystem_delta_reference(
+            data_manager, list(scores), for_genes=for_genes, metric=(delta_options or {}).get("metric", metric)
+        )
+        if groups is None and score_colors is None
         else None,
     )
     layout = ranking_layout(rows, names, plot, score)

@@ -2,8 +2,10 @@
 
 The two figures are embedded separately, so they cannot share a data source.
 Instead each holds a source named :data:`FOCUS_SOURCE`, with one row per
-highlighted subsystem: ``kind`` is ``"focus"`` for the subsystem pointed at or
-pinned, ``"match"`` for each match of a search, ``"search"`` (with no ``id``)
+highlighted subsystem: ``kind`` is ``"focus"`` for the subsystem pinned, or
+pointed at while none is, ``"hover"`` for one pointed at while another is pinned
+(outlined in grey, with nothing following it), ``"match"`` for each match of a
+search, ``"search"`` (with no ``id``)
 while a search is active, and ``"category"`` (its ``id`` the category's name) for
 a selected category. The page writes it, and each figure redraws its own
 highlight from it. Pointing at a subsystem in either figure dispatches
@@ -17,10 +19,12 @@ web/src/bokeh/subsystemLink.ts.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Optional
 
 from bokeh.models import ColumnDataSource, CustomJS, HoverTool
 
+from ..visual_config import theme
 from .brand import GRADIENT_JS, OUTLINE_WIDTH, SELECTED_HEXAGON
 
 FOCUS_EVENT = "metabis:subsystem-focus"
@@ -37,18 +41,43 @@ NETWORK_OUTLINE = "metabis-network-outline"
 CATEGORY_HEX_REACH = 12
 
 
+@dataclass(frozen=True)
+class LinkEvents:
+    """The window events one page's linked figures speak in.
+
+    A page stays mounted while another is shown, so two pages' figures must not
+    share events: step 4's network and ranking use the defaults, and step 3's
+    figures events of their own (:func:`link_events`).
+    """
+
+    focus: str = FOCUS_EVENT
+    category: str = CATEGORY_EVENT
+    # A tap on a row or a node; None leaves taps to the figure's own tools.
+    navigate: Optional[str] = None
+
+
+def link_events(page: str) -> LinkEvents:
+    """Events of their own for one page's figures: ``metabis:<page>-focus`` and so on."""
+    return LinkEvents(
+        focus=f"metabis:{page}-focus",
+        category=f"metabis:{page}-category",
+        navigate=f"metabis:{page}-navigate",
+    )
+
+
 def focus_source() -> ColumnDataSource:
     return ColumnDataSource({"id": [], "kind": []}, name=FOCUS_SOURCE)
 
 
-def focus_dispatch(source: ColumnDataSource, id_field: str = "id") -> CustomJS:
+def focus_dispatch(source: ColumnDataSource, id_field: str = "id", event: str = FOCUS_EVENT) -> CustomJS:
     """A hover callback that names the subsystem under the pointer, once per change."""
     return CustomJS(
-        args=dict(source=source, field=id_field, event=FOCUS_EVENT),
+        args=dict(source=source, field=id_field, event=event),
         code="""
         const index = cb_data.index.indices[0]
         const id = index === undefined ? null : source.data[field][index]
-        const key = '__metabisFocus'
+        // Each event keeps its own last value, so two pages never mute each other.
+        const key = '__metabisFocus:' + event
         if (window[key] === id) return
         window[key] = id
         window.dispatchEvent(new CustomEvent(event, {detail: {id, kind: id === null ? 'leave' : 'hover'}}))
@@ -149,6 +178,7 @@ def add_network_focus_link(plot, nodes: Optional[ColumnDataSource] = None) -> Op
                 hexes=hexes,
                 badge=badge,
                 hexagon=SELECTED_HEXAGON,
+                grey=theme.INK_MUTED,
             ),
             code=GRADIENT_JS
             + """
@@ -164,6 +194,14 @@ def add_network_focus_link(plot, nodes: Optional[ColumnDataSource] = None) -> Op
             if (index >= 0) {
               // On the subsystem's own rim, as a highlighter over its edge.
               metabisRing(outline, nodes.data.x[index], nodes.data.y[index], nodes.data.radius[index], down)
+            }
+            // One pointed at while another is kept: a grey ring, where the pointer is.
+            for (const id of focus.data.id.filter((id, i) => kinds[i] === 'hover')) {
+              const j = ids.indexOf(id)
+              if (j < 0) continue
+              const from = outline.color.length
+              metabisRing(outline, nodes.data.x[j], nodes.data.y[j], nodes.data.radius[j], down)
+              for (let k = from; k < outline.color.length; k++) outline.color[k] = grey
             }
             const base = nodes.data.base_alpha
             const members = nodes.data.category ?? []
@@ -324,11 +362,13 @@ __all__ = [
     "CATEGORY_EVENT",
     "CATEGORY_HEXES",
     "FOCUS_EVENT",
+    "LinkEvents",
     "attach",
     "FOCUS_SOURCE",
     "NETWORK_OUTLINE",
     "add_network_focus_link",
     "focus_dispatch",
     "focus_source",
+    "link_events",
     "navigation_dispatch",
 ]

@@ -17,10 +17,14 @@ from metabis.analysis.comparison_membership import (
     GroupComparisonSpec,
 )
 from metabis.analysis.landscape import (
+    FeatureLandscape,
     build_landscape,
+    feature_landscape,
     marker_reactions,
     select_landscape_subsystems,
+    select_varying_features,
     subsystem_delta,
+    subsystem_delta_ranking,
     with_thresholds,
 )
 from metabis.analysis_workspace import RevisionKind, WorkspaceRevisions
@@ -157,12 +161,28 @@ def test_subsystem_delta_is_signed_significant_count_over_all_reactions():
     assert table.loc["glyc", "reactions"] == 4
     assert table.loc["tca", "delta"] == 0.0
     assert table.loc["fao", "name"] == "Fatty acid oxidation"
+    # What its node's hover says in the network: its significant share, its net
+    # direction and how its Delta was computed.
+    hover = table.loc["glyc", "hover"]
+    assert "3 out of 4 (75.0%)" in hover and "Net direction" in hover and "= <strong>-0.750</strong>" in hover
+
+
+def test_one_comparisons_delta_table_is_step_4s_ranking_strongest_first():
+    table = subsystem_delta_ranking(_Model(), _Reactions(), with_thresholds(ARTIFACTS["B"], THRESHOLDS))
+    delta = subsystem_delta(_Model(), _Reactions(), with_thresholds(ARTIFACTS["B"], THRESHOLDS))
+
+    assert list(table.columns[:6]) == ["subsystem", "delta_score", "abs_delta_score", "n_significant", "n_total", "prop_significant"]
+    assert table["abs_delta_score"].is_monotonic_decreasing
+    glyc = table.set_index("subsystem").loc["glyc"]
+    assert glyc["delta_score"] == pytest.approx(delta.loc["glyc", "delta"])
+    assert (glyc["n_significant"], glyc["n_total"], glyc["prop_significant"]) == (3, 4, 0.75)
 
 
 def test_landscape_places_every_group_side_by_side():
     landscape = build_landscape(_Model(), _Reactions(), _thresholded())
 
     assert list(landscape.delta.columns) == ["A", "B", "C"]
+    assert list(landscape.hovers.columns) == ["A", "B", "C"] and "Net direction" in landscape.hovers.loc["glyc", "A"]
     assert landscape.delta.loc["glyc", "A"] == 1.0
     assert landscape.delta.loc["fao", "C"] == 1.0
     assert landscape.significant_reactions.to_dict() == {"A": 9, "B": 3, "C": 4}
@@ -188,6 +208,40 @@ def test_category_and_chosen_rules():
     assert select_landscape_subsystems(landscape, rule="chosen", chosen=["fao", "glyc"]) == ["glyc", "fao"]
     with pytest.raises(ValueError, match="No reactions in the data"):
         select_landscape_subsystems(landscape, rule="chosen", chosen=["missing"])
+
+
+def test_the_feature_landscape_reads_each_comparisons_d_and_its_verdict():
+    landscape = feature_landscape(_thresholded())
+
+    assert list(landscape.effect.columns) == ["A", "B", "C"]
+    assert landscape.effect.loc["R7", "C"] == 3.0
+    assert bool(landscape.significant.loc["R1", "B"]) and not bool(landscape.significant.loc["R10", "A"])
+    assert landscape.adjusted_pval.loc["R10", "C"] == SIG
+
+
+def test_the_features_varying_most_across_groups_read_as_each_groups_block():
+    landscape = feature_landscape(_thresholded())
+
+    # R7 swings from -0.5 in B to 3.0 in C; then R1, R2 and R3, A against B.
+    # A's block comes first, its largest d first, then C's.
+    assert select_varying_features(landscape, top=4) == ["R1", "R2", "R3", "R7"]
+    # R10 is significant only in C, and varies least.
+    assert select_varying_features(landscape, top=10)[-1] == "R10"
+
+
+def test_one_comparisons_features_rank_by_the_size_of_d_and_a_reverse_reaction_counts_once():
+    index = ["R1", "R1_back", "R2", "R3", "R4"]
+    landscape = FeatureLandscape(
+        effect=pd.DataFrame({"A": [0.5, -0.5, -2.0, 1.0, 3.0]}, index=index),
+        adjusted_pval=pd.DataFrame({"A": [SIG, SIG, SIG, SIG, NOT]}, index=index),
+        significant=pd.DataFrame({"A": [True, True, True, True, False]}, index=index),
+    )
+
+    # R4 is not significant; R2 is largest, but lower, so last.
+    assert select_varying_features(landscape, top=3) == ["R3", "R1", "R2"]
+    assert len(select_varying_features(landscape, top=10)) == 3
+    with pytest.raises(ValueError, match="at least one feature"):
+        select_varying_features(landscape, top=0)
 
 
 def test_markers_are_significant_higher_and_highest_in_their_group():
@@ -279,7 +333,10 @@ def _ora(rows):
 
 
 def test_the_enrichment_landscape_keeps_each_groups_significant_direction():
-    from metabis.analysis.landscape import enrichment_landscape, select_enriched_subsystems
+    from metabis.analysis.landscape import (
+        enrichment_landscape,
+        select_enriched_subsystems,
+    )
 
     results = {
         "A": _ora([
@@ -301,3 +358,117 @@ def test_the_enrichment_landscape_keeps_each_groups_significant_direction():
     assert pd.isna(landscape.enrichment.at["fao", "A"]) and landscape.adjusted_pval.at["fao", "A"] == 0.4
     assert landscape.tested.loc["fao"].to_dict() == {"A": True, "B": False}
     assert select_enriched_subsystems([landscape]) == ["glyc"]
+
+
+def test_the_enriched_rows_can_be_the_most_significant_few():
+    from metabis.analysis.landscape import (
+        enrichment_landscape,
+        select_enriched_subsystems,
+    )
+
+    results = {
+        "A": _ora([
+            ["glyc", "Glycolysis", "Carbohydrate", "target_higher", 1.2, 0.02, True],
+            ["glyc", "Glycolysis", "Carbohydrate", "target_lower", -0.3, 0.6, False],
+            ["tca", "TCA cycle", "Energy", "target_higher", 0.9, 0.001, True],
+            ["tca", "TCA cycle", "Energy", "target_lower", -0.1, 0.9, False],
+            ["fao", "Fatty acid oxidation", "Lipid", "target_higher", 0.2, 0.7, False],
+            ["fao", "Fatty acid oxidation", "Lipid", "target_lower", -0.8, 0.04, True],
+        ]),
+    }
+    landscape = enrichment_landscape(results)
+
+    # The two smallest adjusted p, then drawn by category and name.
+    assert select_enriched_subsystems([landscape], top=2) == ["glyc", "tca"]
+    assert select_enriched_subsystems([landscape]) == ["glyc", "tca", "fao"]
+    with pytest.raises(ValueError, match="at least one"):
+        select_enriched_subsystems([landscape], top=0)
+
+
+def test_one_comparisons_rows_take_the_strongest_delta_in_either_family():
+    from metabis.analysis.landscape import select_comparison_subsystems
+
+    reactions = _landscape({"A": {"glyc": 0.3, "tca": -0.9, "fao": 0.1, "x": 1.0}}, {"glyc": 6, "tca": 6, "fao": 6, "x": 2})
+    genes = _landscape({"A": {"glyc": -0.95, "fao": 0.2}}, {"glyc": 6, "fao": 6})
+    families = {"reaction": reactions, "gene": genes}
+
+    # x swings furthest but is too small; glycolysis is strongest through its genes.
+    assert select_comparison_subsystems(families, "A", top=2) == ["glyc", "tca"]
+    assert select_comparison_subsystems({"reaction": reactions}, "A", top=2) == ["tca", "glyc"]
+    assert select_comparison_subsystems(families, "A", rule="every", min_reactions=5) == ["glyc", "tca", "fao"]
+    assert select_comparison_subsystems(families, "A", rule="category", category="Lipid") == ["fao"]
+    assert select_comparison_subsystems(families, "A", rule="chosen", chosen=["x", "tca"]) == ["x", "tca"]
+    with pytest.raises(ValueError, match="No features in the data"):
+        select_comparison_subsystems(families, "A", rule="chosen", chosen=["nope"])
+
+
+def test_one_comparisons_over_represented_rows_come_most_significant_first():
+    from metabis.analysis.landscape import (
+        enrichment_landscape,
+        select_comparison_subsystems,
+    )
+
+    reactions = _landscape({"A": {"glyc": 0.3, "tca": -0.9, "fao": 0.1}}, {"glyc": 6, "tca": 6, "fao": 6})
+    ora = enrichment_landscape({
+        "A": _ora([
+            ["glyc", "Glycolysis", "Carbohydrate", "target_higher", 1.2, 0.02, True],
+            ["glyc", "Glycolysis", "Carbohydrate", "target_lower", -0.3, 0.6, False],
+            ["fao", "Fatty acid oxidation", "Lipid", "target_higher", 0.2, 0.7, False],
+            ["fao", "Fatty acid oxidation", "Lipid", "target_lower", -0.8, 0.004, True],
+            ["tca", "TCA cycle", "Energy", "target_higher", 0.2, 0.5, False],
+            ["tca", "TCA cycle", "Energy", "target_lower", -0.1, 0.9, False],
+        ]),
+    })
+
+    rows = select_comparison_subsystems({"reaction": reactions}, "A", rule="ora", top=5, enrichment={"reaction": ora})
+
+    assert rows == ["fao", "glyc"]
+
+
+class _MembersModel(_Model):
+    def get_genes_for_subsystem(self, subsystem):
+        return {"glyc": ["G1", "G2", "G9"], "tca": ["G2"], "fao": []}[subsystem]
+
+
+def test_a_subsystems_members_are_its_tested_features_one_direction_each():
+    from metabis.analysis.landscape import subsystem_members
+    from metabis.analysis.reaction_direction import ReactionDirectionCriterion
+
+    frame = pd.DataFrame(
+        {
+            "cohens_d": [0.5, 0.2, 0.1, 0.3, 0.4],
+            "adjusted_pval": [0.01] * 5,
+            "group_1_mean": [1.0, 3.0, 1.0, 1.0, 1.0],
+            "group_2_mean": [2.0, 0.5, 1.0, 1.0, 1.0],
+        },
+        index=["R1", "R1_back", "R2", "R5", "R6"],
+    )
+    from dataclasses import replace
+
+    def resized(artifact, genes=None):
+        sizes = {"reactions": len(frame), "genes": len(genes) if genes is not None else 0}
+        metadata = replace(
+            artifact.metadata,
+            dimensions=tuple(
+                ArtifactDimension(d.name, sizes.get(d.name, d.size), d.label) for d in artifact.metadata.dimensions
+            ),
+        )
+        return replace(
+            artifact,
+            metadata=metadata,
+            reaction_results=PlainTable.capture(frame),
+            gene_results=PlainTable.capture(genes) if genes is not None else None,
+            gene_thresholds=ComparisonThresholds(None, None, None, None) if genes is not None else None,
+        )
+
+    artifact = resized(ARTIFACTS["A"])
+    genes = pd.DataFrame({"cohens_d": [0.1, 0.2]}, index=["G1", "G2"])
+
+    by_baseline = subsystem_members(_MembersModel(), artifact)
+    by_target = subsystem_members(_MembersModel(), artifact, criterion=ReactionDirectionCriterion.DOMINANT_IN_TARGET)
+
+    # R1 counts once, in the direction more active in the population named.
+    assert by_baseline == {"glyc": ("R1", "R2"), "tca": ("R5", "R6")}
+    assert by_target == {"glyc": ("R1_back", "R2"), "tca": ("R5", "R6")}
+    with_genes = resized(ARTIFACTS["A"], genes)
+    assert subsystem_members(_MembersModel(), with_genes, for_genes=True) == {"glyc": ("G1", "G2"), "tca": ("G2",)}

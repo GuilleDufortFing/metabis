@@ -1,6 +1,39 @@
+from typing import Any, Mapping
+
 from ...workspace_mode import AnalysisWorkspaceMode
 from ..interfaces import HoverSection
 from ..models import HoverContext, HoverData
+
+
+def subsystem_hover_data(
+    statistics: Mapping[str, Any], *, subsystem_name: str, display_name: str, metric: str
+) -> dict[str, Any]:
+    """A subsystem's statistics (SubsystemAnalysis.get_subsystem_statistics) as its hover reads them."""
+    data = dict(statistics)
+    data["subsystem_display_name"] = display_name
+    data["subsystem_name"] = subsystem_name
+    data["impact_score"] = data.get("impact_score", 0.0)
+    data["n_significant"] = data.get("significant_elements", 0)
+    data["n_total"] = data.get("total_elements", 0)
+    data["net_direction_score"] = data.get("net_direction_scores", {}).get(metric, 0.0)
+    data["total_metric_value"] = data.get("total_metric_values", {}).get(metric, 0.0)
+    return data
+
+
+def subsystem_facts(
+    statistics: Mapping[str, Any], *, subsystem_name: str, display_name: str, metric: str, for_genes: bool = False
+) -> str:
+    """A subsystem's facts as its node's hover in the network gives them, without the colour reference."""
+    context = HoverContext(
+        mode=AnalysisWorkspaceMode.GROUP_COMPARISON,
+        hover_type="subsystem",
+        element_type="subsystem",
+        subsystem_metric=metric,
+        color_metric=metric,
+        for_genes=for_genes,
+    )
+    data = subsystem_hover_data(statistics, subsystem_name=subsystem_name, display_name=display_name, metric=metric)
+    return SubsystemSection().build(data, context)
 
 
 class SubsystemSection(HoverSection):

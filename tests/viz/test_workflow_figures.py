@@ -7,11 +7,12 @@ from bokeh.embed import json_item
 from bokeh.models import ColumnDataSource, HoverTool, Legend, LinearColorMapper
 
 from metabis.analysis.agreement import ResultEffects, compare_results
-from metabis.analysis.landscape import Landscape
 from metabis.domain.expression_matrix import DenseExpressionMatrix
 from metabis.viz.plot_landscape import (
+    LABEL_CHAR_WIDTH,
     MIN_CELL_WIDTH,
-    plot_delta_landscape,
+    TILT,
+    plot_feature_landscape,
     plot_sample_heatmap,
     sample_heatmap_block,
     sample_heatmap_rows,
@@ -22,49 +23,21 @@ from metabis.viz.plot_result_scatter import (
 )
 
 
-def _landscape():
-    index = ["glyc", "tca", "fao"]
-    return Landscape(
-        delta=pd.DataFrame({"A": [1.0, 0.5, 0.25], "B": [-0.75, 0.0, 0.0]}, index=index),
-        significant=pd.DataFrame({"A": [4, 1, 1], "B": [3, 0, 0]}, index=index),
-        names=pd.Series(["Glycolysis", "TCA cycle", "Fatty acid oxidation"], index=index),
-        categories=pd.Series(["Carbohydrate", "Energy", "Lipid"], index=index),
-        reactions=pd.Series([4, 2, 4], index=index),
-        significant_reactions=pd.Series({"A": 9, "B": 3}),
+def test_many_groups_tilt_their_names_over_narrow_columns():
+    from metabis.analysis.landscape import FeatureLandscape
+
+    groups = [f"Cell type {number} | Healthy" for number in range(7)]
+    landscape = FeatureLandscape(
+        effect=pd.DataFrame({group: [0.5] for group in groups}, index=["R1"]),
+        adjusted_pval=pd.DataFrame({group: [0.01] for group in groups}, index=["R1"]),
+        significant=pd.DataFrame({group: [True] for group in groups}, index=["R1"]),
     )
 
+    plot = plot_feature_landscape(landscape, ["R1"], title="Varying")
 
-def test_landscape_rows_are_grouped_by_category():
-    plot = plot_delta_landscape(_landscape(), ["glyc", "fao"], title="Delta")
-
-    assert list(plot.y_range.factors) == [("Lipid", "Fatty acid oxidation"), ("Carbohydrate", "Glycolysis")]
-    assert list(plot.x_range.factors) == ["A", "B"]
-    json_item(plot)
-
-
-def test_a_table_keeps_room_for_its_columns_beside_long_labels():
-    """Two-level row labels must not squeeze a single comparison's column to nothing:
-    the figure keeps a width for the labels and each column, and a page scrolls it."""
-    one = plot_delta_landscape(_landscape(), ["glyc", "fao"], title="Delta")
-    landscape = _landscape()
-    landscape = Landscape(
-        delta=landscape.delta[["A"]],
-        significant=landscape.significant[["A"]],
-        names=landscape.names.replace({"Glycolysis": "Glycosylphosphatidylinositol (GPI)-anchor biosynthesis"}),
-        categories=landscape.categories,
-        reactions=landscape.reactions,
-        significant_reactions=landscape.significant_reactions[["A"]],
-    )
-    long = plot_delta_landscape(landscape, ["glyc", "fao"], title="Delta")
-
-    assert one.min_width >= 2 * MIN_CELL_WIDTH
-    assert long.min_width > one.min_width - MIN_CELL_WIDTH
-    assert long.min_width >= len("Glycosylphosphatidylinositol (GPI)-anchor biosynthesis") * 5 + MIN_CELL_WIDTH
-
-
-def test_landscape_needs_a_subsystem():
-    with pytest.raises(ValueError, match="No subsystem meets the rule"):
-        plot_delta_landscape(_landscape(), [], title="Delta")
+    assert list(plot.x_range.factors) == groups
+    assert plot.xaxis[0].major_label_orientation == TILT
+    assert plot.min_width <= 2 * len("Cell type 0 | Healthy") * LABEL_CHAR_WIDTH + 7 * MIN_CELL_WIDTH + 200
 
 
 def test_identical_profiles_share_a_heatmap_row():
@@ -226,58 +199,6 @@ def test_the_heatmaps_band_previews_and_highlights_a_group_as_its_chip_does():
     assert "mousemove" not in plain.js_event_callbacks and "tap" not in plain.js_event_callbacks
 
 
-def _two_group_landscape():
-    delta = pd.DataFrame({"Inflamed": {"glyc": 0.5, "fao": -1.0}, "Healthy": {"glyc": -0.5, "fao": 1.0}})
-    return Landscape(
-        delta=delta,
-        significant=pd.DataFrame({"Inflamed": {"glyc": 2, "fao": 4}, "Healthy": {"glyc": 2, "fao": 4}}),
-        names=pd.Series({"glyc": "Glycolysis", "fao": "Fatty acid oxidation"}),
-        categories=pd.Series({"glyc": "Carbohydrate", "fao": "Lipid"}),
-        reactions=pd.Series({"glyc": 4, "fao": 4}),
-        significant_reactions=pd.Series({"Inflamed": 6, "Healthy": 6}),
-    )
-
-
-def test_the_delta_table_carries_the_groups_colours_and_their_other_side():
-    from metabis.viz.plot_landscape import plot_delta_landscape
-
-    plot = plot_delta_landscape(
-        _two_group_landscape(), ["glyc", "fao"], title="Genes", noun="genes",
-        against={"Inflamed": "Healthy", "Healthy": "Inflamed"},
-        group_colors={"Inflamed": "#0072B2", "Healthy": "#D55E00"},
-    )
-
-    band = next(s for s in plot.select({"type": ColumnDataSource}) if "fill_color" in s.data)
-    assert list(band.data["fill_color"]) == ["#0072B2", "#D55E00"]
-    hovers = next(s for s in plot.select({"type": ColumnDataSource}) if "hover" in s.data).data["hover"]
-    assert "Inflamed against Healthy" in hovers[0] and "of 4 genes" in hovers[0]
-    json_item(plot)
-
-
-def test_the_enrichment_table_greys_what_is_not_significant_and_dashes_what_was_not_tested():
-    from metabis.analysis.landscape import EnrichmentLandscape
-    from metabis.viz.plot_landscape import plot_enrichment_landscape
-
-    landscape = EnrichmentLandscape(
-        enrichment=pd.DataFrame({"Inflamed": {"glyc": 1.5, "fao": np.nan}, "Healthy": {"glyc": np.nan, "fao": -2.0}}),
-        adjusted_pval=pd.DataFrame({"Inflamed": {"glyc": 0.01, "fao": 0.3}, "Healthy": {"glyc": 0.5, "fao": 0.001}}),
-        tested=pd.DataFrame({"Inflamed": {"glyc": True, "fao": True}, "Healthy": {"glyc": False, "fao": True}}),
-        names=pd.Series({"glyc": "Glycolysis", "fao": "Fatty acid oxidation"}),
-        categories=pd.Series({"glyc": "Carbohydrate", "fao": "Lipid"}),
-    )
-
-    plot = plot_enrichment_landscape(landscape, ["glyc", "fao"], title="ORA")
-
-    (mapper,) = plot.select({"type": LinearColorMapper})
-    assert mapper.nan_color == "#c7c7c7" and mapper.high == 2.0
-    dashed = [r for r in plot.renderers if getattr(r.glyph, "line_dash", None) == "dashed"]
-    assert len(dashed) == 1 and len(dashed[0].data_source.data["group"]) == 1
-    hovers = [h for s in plot.select({"type": ColumnDataSource}) if "hover" in s.data for h in s.data["hover"]]
-    assert any("over-represented among the reactions higher in Inflamed" in h for h in hovers)
-    assert any("Not tested" in h for h in hovers)
-    json_item(plot)
-
-
 def test_the_marker_heatmap_draws_each_groups_block_on_a_levels_scale():
     from metabis.viz.plot_landscape import plot_marker_heatmap
     from metabis.viz.plot_reduction_artifact import feature_level_palette
@@ -296,12 +217,113 @@ def test_the_marker_heatmap_draws_each_groups_block_on_a_levels_scale():
         {"A": {"f1": 6.0, "f5": 3.0, "f3": 1.3}, "B": {"f1": 1.3, "f5": 1.0, "f3": 1.3}, "C": {"f1": 1.3, "f5": 1.0, "f3": 8.3}}
     )
 
-    plot = plot_marker_heatmap(markers, means, title="Markers", labels={"f1": "One"}, group_colors={"A": "#0072B2", "B": "#D55E00", "C": "#009E73"})
+    plot = plot_marker_heatmap(
+        markers, means, title="Markers", labels={"f1": "One", "f5": "One"}, group_colors={"A": "#0072B2", "B": "#D55E00", "C": "#009E73"}
+    )
 
-    assert list(plot.y_range.factors) == ["f3", "f5", "One", "Group"]
+    # A name two markers share carries each one's ID.
+    assert list(plot.y_range.factors) == ["f3", "One [f5]", "One [f1]", "Group"]
     (mapper,) = [m for m in plot.select({"type": LinearColorMapper})]
     assert mapper.palette == feature_level_palette()
     # One line between A's two markers and C's one.
     spans = [item for item in plot.center if item.__class__.__name__ == "Span"]
     assert [span.location for span in spans] == [1]
     json_item(plot)
+
+
+def test_the_feature_table_colours_each_significant_d_and_greys_the_rest():
+    from metabis.analysis.landscape import FeatureLandscape
+
+    index = ["R1", "R2", "R7"]
+    landscape = FeatureLandscape(
+        effect=pd.DataFrame({"A": [1.5, 1.2, 2.5], "B": [-1.0, -1.1, -0.5], "C": [0.1, -0.1, 3.0]}, index=index),
+        adjusted_pval=pd.DataFrame({"A": [0.01] * 3, "B": [0.01, 0.01, 0.5], "C": [0.5, 0.5, 0.01]}, index=index),
+        significant=pd.DataFrame({"A": [True] * 3, "B": [True, True, False], "C": [False, False, True]}, index=index),
+    )
+
+    plot = plot_feature_landscape(
+        landscape, ["R1", "R2", "R7"], title="Cohen's d",
+        labels={"R1": "chloride transport (e→c)", "R2": "chloride transport (e→c)", "R7": "Exchange of putrescine"},
+        against={"C": "A + B"}, group_colors={"A": "#0072B2", "B": "#D55E00", "C": "#009E73"},
+    )
+
+    # Two transports of one name are told apart by their IDs.
+    assert list(plot.y_range.factors) == [
+        "Exchange of putrescine", "chloride transport (e→c) [R2]", "chloride transport (e→c) [R1]", "Group",
+    ]
+    (mapper,) = plot.select({"type": LinearColorMapper})
+    assert mapper.nan_color == "#c7c7c7" and mapper.low == -mapper.high
+    cells = next(s for s in plot.select({"type": ColumnDataSource}) if "value" in s.data).data
+    greyed = [np.isnan(value) for value in cells["value"]]
+    assert sum(greyed) == 3
+    assert any("higher in C" in hover and "C against A + B" in hover for hover in cells["hover"])
+    # One line between A's block of two and C's of one.
+    spans = [item for item in plot.center if item.__class__.__name__ == "Span"]
+    assert [span.location for span in spans] == [1]
+    json_item(plot)
+
+
+def test_the_feature_table_needs_a_feature():
+    from metabis.analysis.landscape import FeatureLandscape
+
+    empty = FeatureLandscape(effect=pd.DataFrame({"A": []}), adjusted_pval=pd.DataFrame({"A": []}), significant=pd.DataFrame({"A": []}))
+    with pytest.raises(ValueError, match="No genes are significant in any group"):
+        plot_feature_landscape(empty, [], title="Cohen's d", noun="genes")
+
+
+def test_reactions_against_their_genes_follow_the_subsystem_in_focus():
+    from metabis.viz.subsystem_link import FOCUS_SOURCE
+
+    table = pd.DataFrame(
+        {
+            "feature_id": ["R1", "R2"],
+            "reaction_effect": [1.0, 0.5],
+            "gene_effect": [0.8, 0.0],
+            "strongest_gene": ["G1", "G2"],
+            "genes": [1, 1],
+            "significant_genes": [1, 0],
+            "status": ["follows", "network"],
+        }
+    )
+    plot = plot_reaction_gene_concordance(
+        table, reaction_labels={}, gene_labels={}, title="R", members={"R1": ["glyc"]}, categories={"glyc": "Carbohydrate"}
+    )
+
+    focus = next(tag for tag in plot.tags if getattr(tag, "name", None) == FOCUS_SOURCE)
+    callback = focus.js_property_callbacks["change:data"][0]
+    # Each class keeps its colour when drawn over the veil.
+    assert sorted(callback.args["colors"]) == sorted(["#0072B2", "#E69F00"])
+    assert callback.args["floor"] is None
+    json_item(plot)
+
+
+def test_a_marker_row_tells_the_page_its_feature_and_its_group():
+    from bokeh.models import CustomJS
+
+    from metabis.analysis.landscape import FeatureLandscape
+    from metabis.viz.plot_landscape import (
+        marker_events,
+        plot_feature_landscape,
+        plot_marker_heatmap,
+    )
+
+    markers = pd.DataFrame(
+        {"group": ["A", "C"], "feature_id": ["f1", "f3"], "min_cohens_d": [4.0, 6.0], "closest_group": ["B", "A"], "mean": [6.0, 8.3], "closest_mean": [1.3, 1.3]}
+    )
+    means = pd.DataFrame({"A": {"f1": 6.0, "f3": 1.3}, "B": {"f1": 1.3, "f3": 1.3}, "C": {"f1": 1.3, "f3": 8.3}})
+    index = ["R1", "R7"]
+    landscape = FeatureLandscape(
+        effect=pd.DataFrame({"A": [1.5, 0.2], "B": [-1.0, -0.5], "C": [0.1, 3.0]}, index=index),
+        adjusted_pval=pd.DataFrame({"A": [0.01, 0.5], "B": [0.01, 0.5], "C": [0.5, 0.01]}, index=index),
+        significant=pd.DataFrame({"A": [True, False], "B": [True, False], "C": [False, True]}, index=index),
+    )
+
+    for plot, owners in (
+        (plot_marker_heatmap(markers, means, title="Markers", page="overview"), {"f1": "A", "f3": "C"}),
+        (plot_feature_landscape(landscape, index, title="Varying", page="overview"), {"R1": "A", "R7": "C"}),
+    ):
+        events = {model.args.get("event") for model in plot.references() if isinstance(model, CustomJS)}
+        assert set(marker_events("overview")) <= events
+        source = next(r.data_source for r in plot.renderers if "owner" in r.data_source.data)
+        assert dict(zip(source.data["feature"], source.data["owner"])) == owners
+        json_item(plot)

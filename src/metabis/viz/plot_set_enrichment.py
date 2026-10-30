@@ -227,6 +227,20 @@ def _hover_html(row: pd.Series, *, artifact: SetEnrichmentArtifact) -> str:
     )
 
 
+def set_enrichment_rows(artifact: SetEnrichmentArtifact) -> pd.DataFrame:
+    """One row per subsystem as the ORA ranking draws it, and its hover.
+
+    ``dominant_visual`` is where its dot sits, ``dominant_color`` its colour,
+    ``significant`` whether either direction is, and ``hover_html`` its hover,
+    both directions side by side; ``attrs["color_reference"]`` is the
+    distribution the colours come from. Step 3 reads one comparison's ORA from it,
+    so its rows say what step 4's do.
+    """
+    if not isinstance(artifact, SetEnrichmentArtifact):
+        raise TypeError("artifact must be a SetEnrichmentArtifact")
+    return _paired_frame(artifact)
+
+
 def plot_set_enrichment_category(
     artifact: SetEnrichmentArtifact,
     *,
@@ -329,4 +343,4 @@ def plot_set_enrichment_category(
     return layout
 
 
-__all__ = ["plot_set_enrichment_category"]
+__all__ = ["plot_set_enrichment_category", "set_enrichment_rows"]

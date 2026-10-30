@@ -24,12 +24,13 @@ from metabis.analysis.set_enrichment import (
     run_set_enrichment,
 )
 from metabis.analysis_workspace import RevisionKind, WorkspaceRevisions
-from metabis.viz.ranking_layout import RANKING_NAMES, RANKING_PLOT
 from metabis.managers.hover import panel as panel_module
 from metabis.viz.plot_set_enrichment import (
     NOT_SIGNIFICANT_COLOR,
     plot_set_enrichment_category,
+    set_enrichment_rows,
 )
+from metabis.viz.ranking_layout import RANKING_NAMES, RANKING_PLOT
 
 
 def _artifact(*, minimum_size=1) -> SetEnrichmentArtifact:
@@ -241,3 +242,17 @@ def test_empty_eligible_artifact_and_wrong_input_remain_structural():
         assert "SetEnrichmentArtifact" in str(exc)
     else:
         raise AssertionError("non-artifact input was accepted")
+
+
+def test_the_rows_step_3_reads_are_the_ones_the_ranking_draws():
+    """Step 3's ORA rows sit, colour and hover as step 4's ranking draws them."""
+    artifact = _artifact()
+    rows = set_enrichment_rows(artifact).set_index("subsystem_id")
+    layout = plot_set_enrichment_category(artifact)
+    drawn = layout.select_one({"name": "set_enrichment_subsystem_points"}).data_source.data
+
+    for sid, x, color, hover in zip(drawn["subsystem_id"], drawn["dominant_visual"], drawn["dominant_color"], drawn["hover_html"]):
+        assert (rows.at[sid, "dominant_visual"], rows.at[sid, "dominant_color"], rows.at[sid, "hover_html"]) == (x, color, hover)
+    # Both directions in each hover, whichever is drawn.
+    assert all("Target-higher" in hover and "Target-lower" in hover for hover in rows["hover_html"])
+    assert set_enrichment_rows(artifact).attrs["color_reference"] is not None

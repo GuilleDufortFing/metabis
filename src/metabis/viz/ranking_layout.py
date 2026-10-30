@@ -10,9 +10,11 @@ plot lists its studies:
   spreads the row's reactions or genes as dots. The page shows either or both
   (:func:`ranking_layout`), and the panels shown always fill the ranking's width.
 * **Categories as the network draws them.** Each category opens with its number
-  from the network and its name, flush left and bold, and its rows sit in a frame
-  with the border of the network's category circles, with a space before the next.
-  The heading is a kind of text of its own, never a row among the subsystems.
+  from the network and its name, flush left and bold, on the row above its frame,
+  which has the border of the network's category circles. The heading is the only
+  space between two categories, and a kind of text of its own, never a row among
+  the subsystems. Away from the network, without numbers, the names panel widens
+  so every heading keeps one line.
 * **Rows a reader can follow.** Every other row is shaded, as DataTables stripes a
   table (its ``stripe`` rows are about #f9f9f9, here the client's #f8f8f8).
 * **The network's order.** Categories follow the metabolic network's fixed order
@@ -39,7 +41,7 @@ import textwrap
 import zlib
 from dataclasses import dataclass, field
 from html import escape
-from typing import Dict, Iterable, List, Mapping, Optional, Tuple
+from typing import Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 from bokeh.core.properties import value
 from bokeh.models import (
@@ -67,6 +69,7 @@ from .subsystem_link import (
     CATEGORY_EVENT,
     FOCUS_EVENT,
     FOCUS_SOURCE,
+    LinkEvents,
     attach,
     focus_dispatch,
     focus_source,
@@ -108,6 +111,7 @@ HEADING_CHARACTER_WIDTH = 6.9
 HEADING_FONT_SIZE = "13px"
 NAME_FONT_SIZE = "11px"
 BADGE_WIDTH = 26  # from the panel's edge to a heading's first letter
+HEADING_INDENT = 2  # the same without the network's number
 HEXAGON_SIZE = 19  # pixels across a heading's hexagon, the network's category mark
 SCORE_WIDTH = 120  # the score panel beside the elements; alone it takes the width
 # The score axis reaches past the largest score by this share, so a diamond at
@@ -116,6 +120,8 @@ SCORE_REACH = 1.25
 DIAMOND_EDGE = "#000000"
 # The tint behind the name in focus: the gradient at this opacity, a pale shade.
 NAME_TINT_ALPHA = 0.22
+# A subsystem pointed at while another is kept: the step cards' secondary text.
+POINTED_GREY = theme.INK_MUTED
 NAMES_MIN_WIDTH = 240  # room for a heading of about 30 characters on one line
 
 
@@ -139,11 +145,10 @@ class Heading:
 
 @dataclass
 class RankingRows:
-    """Rows top to bottom: per category, its heading, its subsystems, then a gap."""
+    """Rows top to bottom: per category, its heading, then its subsystems."""
 
     factors: List[str] = field(default_factory=list)
     headings: List[Heading] = field(default_factory=list)
-    gaps: List[str] = field(default_factory=list)
     subsystems: List[str] = field(default_factory=list)  # their factors, in order
     members: Dict[str, List[str]] = field(default_factory=dict)  # category -> factors
     factor_of: Dict[str, str] = field(default_factory=dict)  # subsystem id -> factor
@@ -151,6 +156,8 @@ class RankingRows:
     name_of: Dict[str, str] = field(default_factory=dict)  # subsystem id -> full name
     text_of: Dict[str, str] = field(default_factory=dict)  # factor -> its name in lines
     names_width: int = 0  # pixels the longest name line takes
+    numbered: bool = True  # the headings carry the network's numbers
+    width: int = NAMES_MIN_WIDTH  # the names panel's
 
     @property
     def y_range_factors(self) -> List[str]:
@@ -180,21 +187,21 @@ def wrapped_name(name: str, length: int = NAME_LENGTH) -> str:
     return "\n".join([balanced[0], " ".join(balanced[1:])])
 
 
-def panel_width(names_width: int) -> int:
-    """The names panel's width: the longest name line, or room for a heading."""
-    return max(names_width, NAMES_MIN_WIDTH)
-
-
 def order_rows(
     entries: Iterable[RankedSubsystem],
     *,
     numbers: Optional[Mapping[str, int]] = None,
+    numbered: bool = True,
+    order: Optional[Sequence[str]] = None,
 ) -> RankingRows:
     """Categories in the network's order; within one, the strongest score first.
 
     ``numbers`` are the network's category numbers (:func:`category_numbers` over
     every category in use), so a ranking that lists only some categories keeps
-    their numbers; without them the categories listed are numbered.
+    their numbers; without them the categories listed are numbered. With
+    ``numbered`` False, away from the network, the headings show no number.
+    ``order`` gives the categories' order instead, for headings that are not the
+    network's, such as the groups features are highest in.
     """
     by_category: Dict[str, List[RankedSubsystem]] = {}
     for entry in entries:
@@ -202,7 +209,7 @@ def order_rows(
     if numbers is None or not set(by_category) <= set(numbers):
         numbers = category_numbers([*(numbers or {}), *by_category])
 
-    rows = RankingRows()
+    rows = RankingRows(numbered=numbered)
     used = set()
 
     def unique(text: str) -> str:
@@ -218,7 +225,12 @@ def order_rows(
         category: sorted(
             by_category[category], key=lambda entry: (-abs(entry.score), entry.name.lower())
         )
-        for category in sorted(by_category, key=category_sort_key)
+        for category in sorted(
+            by_category,
+            key=(lambda name: (order.index(name) if name in order else len(order), name))
+            if order is not None
+            else category_sort_key,
+        )
     }
     texts = {
         entry.subsystem_id: wrapped_name(entry.name)
@@ -232,15 +244,15 @@ def order_rows(
         )
         * NAME_CHARACTER_WIDTH
     ) + 20
-    heading_room = panel_width(rows.names_width) - BADGE_WIDTH - 8
-    heading_length = max(12, int(heading_room / HEADING_CHARACTER_WIDTH))
+    indent = (BADGE_WIDTH if numbered else HEADING_INDENT) + 8
+    # Beside the network, where the ranking has 450 px, a long heading takes two
+    # lines; away from it the panel widens so each keeps one.
+    longest = max((len(category) for category in ordered), default=0) * HEADING_CHARACTER_WIDTH + indent
+    rows.width = max(rows.names_width, NAMES_MIN_WIDTH, 0 if numbered else math.ceil(longest))
+    heading_length = max(12, int((rows.width - indent) / HEADING_CHARACTER_WIDTH))
 
-    for index, (category, members) in enumerate(ordered.items()):
-        if index:
-            gap = unique(f"gap:{numbers[category]}")
-            rows.factors.append(gap)
-            rows.gaps.append(gap)
-        text = wrapped_name(category, heading_length)
+    for category, members in ordered.items():
+        text = wrapped_name(category, heading_length) if numbered else category
         factors = tuple(
             unique(f"heading:{numbers[category]}:{line}")
             for line in range(len(text.split("\n")))
@@ -379,13 +391,17 @@ def names_panel(
     title: str = "",
     x_label: str = "",
     navigation_event: Optional[str] = None,
+    events: Optional[LinkEvents] = None,
 ):
     """The row names and category headings, sharing ``plot``'s rows.
 
     The names never pan with the data: they take a panel of their own. Its axes
     stay for the space they take, so the panels' rows line up, but draw nothing.
+    The headings carry the network's numbers unless the rows were ordered without
+    them (:func:`order_rows`).
     """
-    width = panel_width(rows.names_width)
+    numbered = rows.numbered
+    width = rows.width
     x_range = Range1d(0, width)
     panel = ranking_figure(
         rows,
@@ -409,7 +425,7 @@ def names_panel(
         axis.axis_line_color = None
         axis.axis_label_text_alpha = 0
     panel.xgrid.grid_line_color = None
-    _share_highlights(panel, plot, rows, navigation_event)
+    _share_highlights(panel, plot, rows, navigation_event, events)
 
     font = value(theme.FONT)
     panel.text(
@@ -447,7 +463,7 @@ def names_panel(
         y="y",
         text="text",
         source=headings,
-        x_offset=BADGE_WIDTH,
+        x_offset=BADGE_WIDTH if numbered else HEADING_INDENT,
         text_align="left",
         text_baseline="middle",
         text_font=font,
@@ -456,6 +472,11 @@ def names_panel(
         text_color=theme.INK,
         text_line_height=1.1,
     )
+    chosen = plot.select_one({"name": CHOSEN_CATEGORY})
+    if not numbered:
+        if chosen is not None:
+            select_on_heading(panel, rows, chosen, (events or LinkEvents()).category)
+        return panel
     # The category's number in the hexagon the network draws on the category's
     # rim, as the side menu numbers the steps; once selected, in the logo's.
     panel.scatter(
@@ -495,18 +516,18 @@ def names_panel(
         text_font_style="bold",
         text_color="#ffffff",
     )
-    chosen = plot.select_one({"name": CHOSEN_CATEGORY})
     if chosen is not None:
         follow_category(chosen, headings, badge)
-        select_on_heading(panel, rows, chosen)
+        select_on_heading(panel, rows, chosen, (events or LinkEvents()).category)
     return panel
 
 
-def select_on_heading(panel, rows: RankingRows, chosen: ColumnDataSource) -> None:
+def select_on_heading(panel, rows: RankingRows, chosen: ColumnDataSource, event: str = CATEGORY_EVENT) -> None:
     """A click on a category's heading, its number or its name, selects the category.
 
-    It dispatches :data:`CATEGORY_EVENT` as a click on the network's number does,
-    with ``null`` when the category is already selected, for the page to relay.
+    It dispatches ``event`` (:data:`CATEGORY_EVENT` by default) as a click on the
+    network's number does, with ``null`` when the category is already selected,
+    for the page to relay.
     """
     panel.js_on_event(
         "tap",
@@ -516,7 +537,7 @@ def select_on_heading(panel, rows: RankingRows, chosen: ColumnDataSource) -> Non
                 chosen=chosen,
                 factors=[list(heading.factors) for heading in rows.headings],
                 categories=[heading.category for heading in rows.headings],
-                event=CATEGORY_EVENT,
+                event=event,
             ),
             code="""
             const y = cb_obj.y
@@ -543,6 +564,8 @@ def score_panel(
     navigation_event: Optional[str] = None,
     x_range: Optional[Range1d] = None,
     hovers: Optional[Mapping[str, str]] = None,
+    events: Optional[LinkEvents] = None,
+    reference=None,
 ):
     """Each subsystem's own score as a diamond, on an axis of its own, sharing ``plot``'s rows.
 
@@ -552,7 +575,9 @@ def score_panel(
     ``colors`` (its node's colour in the network) where given. By default the axis
     is symmetric and reaches past the largest score, so a diamond at either end
     is drawn whole; ``x_range`` sets another, such as the members' own. A diamond's
-    hover is its node's in the network, from ``hovers``, or else its name and score.
+    hover is its node's in the network, from ``hovers``, or else its name and score;
+    ``reference`` (a :class:`.color_reference.GradientColorReference`) adds the
+    distribution its colour comes from, marked with its score.
     """
     largest = max([1.0, *(abs(float(v)) for v in scores.values())])
     reach = largest * SCORE_REACH
@@ -574,7 +599,7 @@ def score_panel(
             axis.ticker = FixedTicker(ticks=[-tick, 0.0, tick])
         # Zero is each frame's dashed line; a grid line there would cover it.
         panel.xgrid.ticker = FixedTicker(ticks=[-tick, tick])
-    _share_highlights(panel, plot, rows, navigation_event)
+    _share_highlights(panel, plot, rows, navigation_event, events)
     ids = [sid for sid in rows.factor_of if sid in scores]
     diamonds = panel.scatter(
         x="score",
@@ -599,18 +624,33 @@ def score_panel(
         line_color=DIAMOND_EDGE,
         line_width=1,
     )
-    panel.add_tools(HoverTool(renderers=[diamonds], tooltips=hover_panel.panel("@hover{safe}")))
+    tooltip = hover_panel.panel("@hover{safe}")
+    if reference is not None:
+        data = diamonds.data_source.data
+        data["color_reference_value"] = list(data["score"])
+        data["color_reference_marker_x"] = [reference.marker_x(value) for value in data["score"]]
+        tooltip = hover_panel.panel(
+            "@hover{safe}",
+            reference.hover_template(marker_x_field="color_reference_marker_x", value_field="color_reference_value"),
+        )
+    panel.add_tools(HoverTool(renderers=[diamonds], tooltips=tooltip))
     center_title_on_zero(panel)
     return panel
 
 
-def _share_highlights(panel, plot, rows: RankingRows, navigation_event: Optional[str]) -> None:
-    """A panel beside ``plot`` bands a search's matches as ``plot`` does, and takes its pointing."""
+def _share_highlights(
+    panel, plot, rows: RankingRows, navigation_event: Optional[str], events: Optional[LinkEvents] = None
+) -> None:
+    """A panel beside ``plot`` bands a search's matches as ``plot`` does, and takes its pointing.
+
+    Beside a plot with no focus link (:func:`add_focus_link`), nothing is pointed at.
+    """
     matched = plot.select_one({"name": MATCHED_ROWS})
-    if matched is not None:
-        highlight_rows(panel, matched)
+    if matched is None:
+        return
+    highlight_rows(panel, matched)
     if rows.factor_of:
-        _row_bands(panel, rows, navigation_event)
+        _row_bands(panel, rows, navigation_event, events)
 
 
 def center_title_on_zero(plot) -> None:
@@ -641,13 +681,14 @@ def center_title_on_zero(plot) -> None:
 
 
 def add_focus_link(
-    plot, rows: RankingRows, *, navigation_event: Optional[str] = None
+    plot, rows: RankingRows, *, navigation_event: Optional[str] = None, events: Optional[LinkEvents] = None
 ) -> ColumnDataSource:
     """Highlight the subsystem in focus, and the matches of a search, in this ranking.
 
-    Pointing at a row dispatches :data:`FOCUS_EVENT`, and tapping it dispatches
-    ``navigation_event`` when given; the page writes the shared selection into the
-    returned source, and the bands and outlines follow it.
+    Pointing at a row dispatches ``events.focus`` (:data:`FOCUS_EVENT` by
+    default), and tapping it dispatches ``navigation_event`` when given; the page
+    writes the shared selection into the returned source, and the bands and
+    outlines follow it.
     """
     ids = list(rows.factor_of)
     factors = [rows.factor_of[sid] for sid in ids]
@@ -661,7 +702,7 @@ def add_focus_link(
     )
     focus = focus_source()
     matched = ColumnDataSource({"y": []}, name=MATCHED_ROWS)
-    focused = ColumnDataSource({"y": []}, name=FOCUSED_ROWS)
+    focused = ColumnDataSource({"y": [], "kind": []}, name=FOCUSED_ROWS)
     chosen = ColumnDataSource({"category": []}, name=CHOSEN_CATEGORY)
     highlight_rows(plot, matched)
     focus.js_on_change(
@@ -674,13 +715,16 @@ def add_focus_link(
               .filter((id, i) => focus.data.kind[i] === kind && factor.has(id))
               .map((id) => factor.get(id))
             matched.data = {y: pick('match')}
-            focused.data = {y: pick('focus')}
+            // The row in focus, and one pointed at while another is kept.
+            const kept = pick('focus')
+            const pointed = pick('hover')
+            focused.data = {y: [...kept, ...pointed], kind: [...kept.map(() => 'focus'), ...pointed.map(() => 'hover')]}
             const category = focus.data.id.filter((id, i) => focus.data.kind[i] === 'category')
             if (String(category) !== String(chosen.data.category)) chosen.data = {category}
             """,
         ),
     )
-    _row_bands(plot, rows, navigation_event)
+    _row_bands(plot, rows, navigation_event, events)
     attach(plot, focus)
     attach(plot, lookup)
     attach(plot, headings)
@@ -711,7 +755,8 @@ def outline_selection(panels: List, rows: RankingRows, chosen: ColumnDataSource,
 
     Each shown panel draws its part of the outline, a box round the rows; the
     gradient runs from the first shown panel's left to the last one's right, as if
-    they were one.
+    they were one. A row pointed at while another is kept is outlined in grey: it
+    shows where the pointer is, and does nothing until it is clicked.
     """
     # Behind the name in focus, in the names panel only, where no data is drawn:
     # a light tint of the gradient, so the row is found at a glance.
@@ -745,7 +790,14 @@ def outline_selection(panels: List, rows: RankingRows, chosen: ColumnDataSource,
     edges = {category: list(rows.edges(category)) for category in rows.members}
     callback = CustomJS(
         args=dict(
-            panels=panels, sources=sources, tint=tint, chosen=chosen, focused=focused, edges=edges, edge=OUTLINE_WIDTH
+            panels=panels,
+            sources=sources,
+            tint=tint,
+            chosen=chosen,
+            focused=focused,
+            edges=edges,
+            edge=OUTLINE_WIDTH,
+            grey=POINTED_GREY,
         ),
         code=GRADIENT_JS
         + """
@@ -756,14 +808,15 @@ def outline_selection(panels: List, rows: RankingRows, chosen: ColumnDataSource,
         if (!(total > 0)) return
         const boxes = []
         const category = chosen.data.category[0]
-        if (category != null && edges[category]) boxes.push(edges[category])
+        if (category != null && edges[category]) boxes.push([...edges[category], false])
         const factors = panels[0].y_range.factors
         const rows = []
-        for (const factor of focused.data.y) {
+        const kinds = focused.data.kind ?? []
+        focused.data.y.forEach((factor, j) => {
           const i = factors.indexOf(factor)
-          if (i >= 0) rows.push([i, i + 1])
-        }
-        boxes.push(...rows)
+          if (i >= 0) boxes.push([i, i + 1, kinds[j] === 'hover'])
+          if (i >= 0 && kinds[j] !== 'hover') rows.push([i, i + 1])
+        })
         // The tint runs the gradient across the names, in slices.
         const names = panels[0].x_range
         const fill = {left: [], right: [], bottom: [], top: [], color: []}
@@ -789,9 +842,9 @@ def outline_selection(panels: List, rows: RankingRows, chosen: ColumnDataSource,
             const inset = edge / 2 * (end - start) / width
             const left = start + inset
             const right = end - inset
-            const at = (f) => metabisGradient((offset + f * width) / total)
             const pieces = 16
-            for (const [bottom, top] of boxes) {
+            for (const [bottom, top, pointed] of boxes) {
+              const at = (f) => pointed ? grey : metabisGradient((offset + f * width) / total)
               for (const y of [bottom, top]) {
                 for (let i = 0; i < pieces; i++) {
                   out.x0.push(left + (right - left) * i / pieces)
@@ -822,7 +875,9 @@ def outline_selection(panels: List, rows: RankingRows, chosen: ColumnDataSource,
             panel.x_range.js_on_change(attribute, callback)
 
 
-def _row_bands(plot, rows: RankingRows, navigation_event: Optional[str]) -> None:
+def _row_bands(
+    plot, rows: RankingRows, navigation_event: Optional[str], events: Optional[LinkEvents] = None
+) -> None:
     """An invisible band per row, for pointing at and tapping anywhere along it."""
     span = (plot.x_range.start - 1e6, plot.x_range.end + 1e6)
     ids = list(rows.factor_of)
@@ -842,7 +897,8 @@ def _row_bands(plot, rows: RankingRows, navigation_event: Optional[str]) -> None
         level="underlay",
         source=hits,
     )
-    plot.add_tools(HoverTool(renderers=[band], tooltips=None, callback=focus_dispatch(hits)))
+    focus_event = (events or LinkEvents()).focus
+    plot.add_tools(HoverTool(renderers=[band], tooltips=None, callback=focus_dispatch(hits, event=focus_event)))
     if navigation_event is not None:
         plot.add_tools(TapTool(renderers=[band]))
         hits.selected.js_on_change("indices", navigation_dispatch(hits, navigation_event))

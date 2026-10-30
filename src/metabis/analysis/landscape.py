@@ -19,22 +19,35 @@ from typing import Any, Literal, Mapping, Sequence
 import numpy as np
 import pandas as pd
 
+from ..managers.hover.sections.subsystem_info import subsystem_facts
 from .comparison_artifact import ComparisonThresholds, GroupComparisonArtifact
+from .reaction_direction import (
+    DEFAULT_REACTION_DIRECTION_CRITERION,
+    ReactionDirectionCriterion,
+    build_reaction_direction_map,
+)
 from .statistical_analysis import StatisticalAnalysis
 from .subsystem_analysis import SubsystemAnalysis
 
 __all__ = [
+    "ComparisonRule",
     "DEFAULT_LANDSCAPE_DELTA",
     "EnrichmentLandscape",
+    "FeatureLandscape",
     "Landscape",
     "LandscapeRule",
     "build_landscape",
     "enrichment_landscape",
+    "feature_landscape",
     "marker_reactions",
+    "select_comparison_subsystems",
     "select_enriched_subsystems",
     "select_landscape_subsystems",
     "select_shared_subsystems",
+    "select_varying_features",
     "subsystem_delta",
+    "subsystem_delta_ranking",
+    "subsystem_members",
     "with_thresholds",
 ]
 
@@ -48,6 +61,8 @@ DEFAULT_LANDSCAPE_DELTA: dict[str, Any] = {
 }
 
 LandscapeRule = Literal["spread", "category", "chosen"]
+# The rows of one comparison's ranking (:func:`select_comparison_subsystems`).
+ComparisonRule = Literal["strongest", "category", "chosen", "every", "ora"]
 
 
 def _decide(artifact, for_genes, thresholds, keep_reversed):
@@ -128,14 +143,16 @@ def subsystem_delta(
     """Delta, size and significant count of every subsystem for one comparison.
 
     Rows are subsystem IDs; columns ``name``, ``category``, ``reactions``,
-    ``significant`` and ``delta``. With ``for_genes`` the subsystem's genes are
-    read instead, as the overview's gene overlay reads them, from
-    ``expression_data``; ``reactions`` and ``significant`` then count genes.
-    Subsystems with no reaction in the data are left out.
+    ``significant``, ``delta`` and ``hover``, the facts its node's hover gives in
+    the network. With ``for_genes`` the subsystem's genes are read instead, as the
+    overview's gene overlay reads them, from ``expression_data``; ``reactions``
+    and ``significant`` then count genes. Subsystems with no reaction in the data
+    are left out.
     """
+    config = dict(delta_config or DEFAULT_LANDSCAPE_DELTA)
     analysis = SubsystemAnalysis(
         _DeltaInputs(metabolic_model, reaction_data, expression_data),
-        default_delta_config=dict(delta_config or DEFAULT_LANDSCAPE_DELTA),
+        default_delta_config=config,
     )
     analysis.set_group_comparison(artifact)
     rows = {}
@@ -143,16 +160,50 @@ def subsystem_delta(
         stats = analysis.get_subsystem_statistics(subsystem, for_genes=for_genes)
         if not stats.get("is_in_model"):
             continue
+        name = str(metabolic_model.get_subsystem_name(subsystem) or subsystem)
         rows[str(subsystem)] = {
-            "name": str(metabolic_model.get_subsystem_name(subsystem) or subsystem),
+            "name": name,
             "category": str(metabolic_model.get_subsystem_category(subsystem) or ""),
             "reactions": int(stats.get("total_elements", 0)),
             "significant": int(stats.get("significant_elements", 0)),
             "delta": float(stats.get("delta_subsystem_score") or 0.0),
+            "hover": subsystem_facts(
+                stats,
+                subsystem_name=str(subsystem),
+                display_name=name,
+                metric=str(config.get("metric", DEFAULT_LANDSCAPE_DELTA["metric"])),
+                for_genes=for_genes,
+            ),
         }
     return pd.DataFrame.from_dict(
-        rows, orient="index", columns=["name", "category", "reactions", "significant", "delta"]
+        rows, orient="index", columns=["name", "category", "reactions", "significant", "delta", "hover"]
     )
+
+
+def subsystem_delta_ranking(
+    metabolic_model,
+    reaction_data,
+    artifact: GroupComparisonArtifact,
+    *,
+    delta_config: Mapping[str, Any] | None = None,
+    for_genes: bool = False,
+    expression_data=None,
+) -> pd.DataFrame:
+    """One comparison's Delta score table, as step 4's overview ranks it.
+
+    The columns of :meth:`SubsystemAnalysis.rank_subsystems_by_delta_score`, the
+    strongest first: ``subsystem``, ``delta_score``, its absolute value,
+    ``n_significant``, ``n_total``, ``prop_significant``, ``net_direction_score``
+    and ``impact_score_metric``.
+    """
+    analysis = SubsystemAnalysis(
+        _DeltaInputs(metabolic_model, reaction_data, expression_data),
+        default_delta_config=dict(delta_config or DEFAULT_LANDSCAPE_DELTA),
+    )
+    analysis.set_group_comparison(artifact)
+    for subsystem in metabolic_model.get_subsystems() or []:
+        analysis.get_subsystem_statistics(subsystem, for_genes=for_genes)
+    return analysis.rank_subsystems_by_delta_score(for_genes=for_genes).reset_index(drop=True)
 
 
 @dataclass(frozen=True)
@@ -162,6 +213,8 @@ class Landscape:
     ``significant`` counts each subsystem's significant reactions per group;
     ``significant_reactions`` counts them over the whole model per group. In a
     gene landscape both count genes, and ``reactions`` the subsystem's genes.
+    ``hovers`` holds each subsystem's hover facts per group, as its node in that
+    group's network gives them.
     """
 
     delta: pd.DataFrame
@@ -170,6 +223,7 @@ class Landscape:
     categories: pd.Series
     reactions: pd.Series
     significant_reactions: pd.Series
+    hovers: pd.DataFrame | None = None
 
 
 def build_landscape(
@@ -206,9 +260,11 @@ def build_landscape(
     significant = pd.DataFrame(
         {label: table["significant"] for label, table in tables.items()}
     ).reindex(first.index).fillna(0).astype(int)
+    hovers = pd.DataFrame({label: table["hover"] for label, table in tables.items()}).reindex(first.index).fillna("")
     return Landscape(
         delta=delta,
         significant=significant,
+        hovers=hovers,
         names=first["name"],
         categories=first["category"],
         reactions=first["reactions"],
@@ -386,13 +442,206 @@ def enrichment_landscape(results: Mapping[str, pd.DataFrame]) -> EnrichmentLands
     )
 
 
-def select_enriched_subsystems(landscapes: Sequence[EnrichmentLandscape]) -> list[str]:
-    """Every subsystem significant in some group of some landscape, by category and name."""
+def select_enriched_subsystems(
+    landscapes: Sequence[EnrichmentLandscape], top: int | None = None
+) -> list[str]:
+    """The subsystems significant in some group of some landscape, by category and name.
+
+    With ``top``, only that many: those with the smallest adjusted p-value in any
+    group of any landscape.
+    """
+    if top is not None and top < 1:
+        raise ValueError("Show at least one subsystem")
     picked: dict[str, tuple[str, str]] = {}
+    smallest: dict[str, float] = {}
     for landscape in landscapes:
-        for item in landscape.enrichment.index[landscape.enrichment.notna().any(axis=1)]:
+        significant = landscape.enrichment.notna()
+        for item in landscape.enrichment.index[significant.any(axis=1)]:
             picked[item] = (landscape.categories[item], landscape.names[item])
-    return sorted(picked, key=lambda item: picked[item])
+            pvalue = float(landscape.adjusted_pval.loc[item][significant.loc[item]].min())
+            smallest[item] = min(smallest.get(item, 1.0), pvalue)
+    rows = list(picked)
+    if top is not None:
+        rows = sorted(rows, key=lambda item: (smallest[item], picked[item]))[:top]
+    return sorted(rows, key=lambda item: picked[item])
+
+
+def select_comparison_subsystems(
+    landscapes: Mapping[str, Landscape],
+    label: str,
+    *,
+    rule: ComparisonRule = "strongest",
+    top: int = 20,
+    min_reactions: int = 5,
+    category: str | None = None,
+    chosen: Sequence[str] = (),
+    enrichment: Mapping[str, EnrichmentLandscape] | None = None,
+) -> list[str]:
+    """The rows of one comparison's ranking, ``label``'s, read in one family or two.
+
+    ``strongest`` keeps the ``top`` subsystems whose Delta is largest either way
+    in any family, the strongest first; ``category`` every subsystem of one
+    category; ``every`` every subsystem; each with at least ``min_reactions``
+    features in some family. ``chosen`` keeps the given IDs. ``ora`` keeps the
+    ``top`` subsystems over-represented in some family (``enrichment``), the most
+    significant first.
+    """
+    if not landscapes:
+        raise ValueError("Choose at least one family")
+    if top < 1:
+        raise ValueError("Show at least one subsystem")
+    if min_reactions < 1:
+        raise ValueError("The minimum size is at least one feature")
+    universe = list(dict.fromkeys(item for landscape in landscapes.values() for item in landscape.delta.index))
+    names = {}
+    categories = {}
+    for landscape in landscapes.values():
+        for item in landscape.delta.index:
+            names.setdefault(item, landscape.names[item])
+            categories.setdefault(item, landscape.categories[item])
+
+    def size(item: str) -> int:
+        return max(int(landscape.reactions.get(item, 0)) for landscape in landscapes.values())
+
+    def strength(item: str) -> float:
+        values = [
+            abs(float(landscape.delta.at[item, label]))
+            for landscape in landscapes.values()
+            if item in landscape.delta.index and label in landscape.delta.columns
+        ]
+        return max(values, default=0.0)
+
+    large = [item for item in universe if size(item) >= min_reactions]
+    if rule == "strongest":
+        return sorted(large, key=lambda item: (-strength(item), -size(item), names[item]))[:top]
+    if rule == "category":
+        if not category:
+            raise ValueError("Choose a category")
+        return [item for item in large if categories[item] == category]
+    if rule == "every":
+        return large
+    if rule == "chosen":
+        unknown = [item for item in chosen if item not in names]
+        if unknown:
+            raise ValueError(f"No features in the data for {', '.join(unknown)}")
+        return list(dict.fromkeys(chosen))
+    if rule == "ora":
+        if not enrichment:
+            raise ValueError("Over-representation needs its results")
+        smallest: dict[str, float] = {}
+        for result in enrichment.values():
+            if label not in result.enrichment.columns:
+                continue
+            significant = result.enrichment[label].notna()
+            for item in result.enrichment.index[significant]:
+                smallest[item] = min(smallest.get(item, 1.0), float(result.adjusted_pval.at[item, label]))
+        return sorted(smallest, key=lambda item: (smallest[item], item))[:top]
+    raise ValueError(f"Unknown subsystem rule {rule!r}")
+
+
+def subsystem_members(
+    metabolic_model,
+    artifact: GroupComparisonArtifact,
+    *,
+    for_genes: bool = False,
+    criterion: ReactionDirectionCriterion = DEFAULT_REACTION_DIRECTION_CRITERION,
+) -> dict[str, tuple[str, ...]]:
+    """Each subsystem's reactions, or genes, among the comparison's results, as its Delta counts them.
+
+    A reversible reaction counts once, in the direction ``criterion`` chooses
+    (:func:`build_reaction_direction_map`); a gene counts in every subsystem whose
+    reactions it encodes. Subsystems with none are left out.
+    """
+    results = artifact.get_test_results(for_genes=for_genes)
+    if results is None:
+        return {}
+    tested = set(map(str, results.index))
+    direction = None if for_genes else build_reaction_direction_map(artifact, ReactionDirectionCriterion(criterion))
+    members: dict[str, tuple[str, ...]] = {}
+    for subsystem in metabolic_model.get_subsystems() or []:
+        if for_genes:
+            features = metabolic_model.get_genes_for_subsystem(subsystem) or []
+        else:
+            features = [direction.source_column_for(base) for base in metabolic_model.get_reactions_for_subsystem(subsystem) or []]
+        found = tuple(dict.fromkeys(str(item) for item in features if item is not None and str(item) in tested))
+        if found:
+            members[str(subsystem)] = found
+    return members
+
+
+@dataclass(frozen=True)
+class FeatureLandscape:
+    """Cohen's d of every feature (rows) in each group's comparison (columns).
+
+    ``significant`` says where that comparison judged the feature significant,
+    and ``adjusted_pval`` is its adjusted p-value there.
+    """
+
+    effect: pd.DataFrame
+    adjusted_pval: pd.DataFrame
+    significant: pd.DataFrame
+
+
+def feature_landscape(
+    artifacts: Mapping[str, GroupComparisonArtifact], *, for_genes: bool = False
+) -> FeatureLandscape:
+    """Each group's comparison, feature by feature, side by side.
+
+    ``artifacts`` map a group's label to its comparison against the rest, with
+    significance already decided, as :func:`build_landscape` takes them.
+    """
+    if not artifacts:
+        raise ValueError("The landscape needs at least one comparison")
+    results = {label: artifact.get_test_results(for_genes=for_genes) for label, artifact in artifacts.items()}
+    if any(frame is None for frame in results.values()):
+        raise ValueError("No gene results: load Expression Data")
+    effect = pd.DataFrame({label: frame["cohens_d"].astype(float) for label, frame in results.items()})
+    adjusted = pd.DataFrame({label: frame["adjusted_pval"].astype(float) for label, frame in results.items()}).reindex(
+        effect.index
+    )
+    significant = pd.DataFrame(
+        {
+            label: effect.index.isin(list(artifact.get_significant_elements(for_genes=for_genes)))
+            for label, artifact in artifacts.items()
+        },
+        index=effect.index,
+    )
+    return FeatureLandscape(effect=effect[list(artifacts)], adjusted_pval=adjusted[list(artifacts)], significant=significant)
+
+
+def select_varying_features(landscape: FeatureLandscape, top: int = 25) -> list[str]:
+    """The ``top`` features whose Cohen's d varies most across the groups.
+
+    Only features significant in some group are ranked: the variance of their d
+    across the groups ranks them, or, with one comparison, the size of d. A
+    reaction and its reverse (``_back``) take one row, the first ranked. Rows are
+    ordered by the group where d is largest, in the groups' order, and then by
+    that d, largest first, so each group's features read as a block.
+    """
+    if top < 1:
+        raise ValueError("Show at least one feature")
+    candidates = landscape.effect[landscape.significant.any(axis=1)].dropna(how="all")
+    if candidates.empty:
+        return []
+    if candidates.shape[1] > 1:
+        spread = candidates.var(axis=1, ddof=1, skipna=True).fillna(0.0)
+    else:
+        spread = candidates.iloc[:, 0].abs()
+    picked: list[str] = []
+    seen: set[str] = set()
+    for item in spread.sort_values(ascending=False, kind="mergesort").index:
+        base = str(item).removesuffix("_back")
+        if base in seen:
+            continue
+        seen.add(base)
+        picked.append(item)
+        if len(picked) == top:
+            break
+    block = candidates.loc[picked].fillna(-np.inf)
+    highest = block.to_numpy().argmax(axis=1)
+    largest = block.to_numpy().max(axis=1)
+    order = sorted(range(len(picked)), key=lambda row: (highest[row], -largest[row]))
+    return [picked[row] for row in order]
 
 
 def marker_reactions(artifacts: Mapping[str, GroupComparisonArtifact]) -> pd.DataFrame:

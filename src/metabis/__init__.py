@@ -36,6 +36,7 @@ _MODULE_EXPORTS: dict[str, tuple[str, ...]] = {
         "resolve_display_direction",
     ),
     ".analysis.adjustment": ("AdjustmentColumn", "ComparisonAdjustment"),
+    ".analysis.comparison_artifact": ("swapped_comparison",),
     ".analysis.agreement": (
         "AGREEMENT_CLASSES",
         "Agreement",
@@ -49,14 +50,20 @@ _MODULE_EXPORTS: dict[str, tuple[str, ...]] = {
     ".analysis.landscape": (
         "DEFAULT_LANDSCAPE_DELTA",
         "EnrichmentLandscape",
+        "FeatureLandscape",
         "Landscape",
         "build_landscape",
         "enrichment_landscape",
+        "feature_landscape",
         "marker_reactions",
+        "select_comparison_subsystems",
         "select_enriched_subsystems",
         "select_landscape_subsystems",
         "select_shared_subsystems",
+        "select_varying_features",
         "subsystem_delta",
+        "subsystem_delta_ranking",
+        "subsystem_members",
         "with_thresholds",
     ),
     ".analysis.markers": (
@@ -64,9 +71,12 @@ _MODULE_EXPORTS: dict[str, tuple[str, ...]] = {
         "pairwise_markers",
         "top_markers",
     ),
+    ".viz.plot_analysis_overview": ("OverviewCell", "plot_analysis_overview"),
+    ".viz.plot_comparison_ranking": ("RankingScore", "plot_comparison_ranking"),
+    ".viz.ranking_layout": ("RankedSubsystem",),
     ".viz.plot_landscape": (
-        "plot_delta_landscape",
-        "plot_enrichment_landscape",
+        "marker_events",
+        "plot_feature_landscape",
         "plot_marker_heatmap",
         "plot_sample_heatmap",
         "sample_heatmap_block",
@@ -144,7 +154,7 @@ _MODULE_EXPORTS: dict[str, tuple[str, ...]] = {
     ".viz.graph_marks": ("outline_elements",),
     ".viz.plot_metabolic_graph": ("plot_metabolic_graph",),
     ".viz.plot_reaction_set_enrichment": ("plot_reaction_set_enrichment",),
-    ".viz.plot_set_enrichment": ("plot_set_enrichment_category",),
+    ".viz.plot_set_enrichment": ("plot_set_enrichment_category", "set_enrichment_rows"),
     ".viz.plot_reduction_artifact": (
         "add_arrow_colouring",
         "add_group_picking",
@@ -179,6 +189,7 @@ _MODULE_EXPORTS: dict[str, tuple[str, ...]] = {
     ".viz.plot_subsystem_ranking": (
         "plot_subsystem_activity_ranking",
         "plot_subsystem_comparison",
+        "subsystem_delta_reference",
     ),
     ".viz.color_bars": (
         "add_category_key",
@@ -187,7 +198,7 @@ _MODULE_EXPORTS: dict[str, tuple[str, ...]] = {
         "registered_color_bar",
     ),
     ".viz.plot_utils": ("PLOT_THEME", "apply_academic_style"),
-    ".viz.subsystem_link": ("add_network_focus_link",),
+    ".viz.subsystem_link": ("add_network_focus_link", "link_events"),
     ".viz.transport_view": ("is_transport_subsystem", "plot_transport_view"),
     ".viz.compartment_maps": (
         "COMPARTMENT_MAPS",
@@ -249,6 +260,7 @@ if TYPE_CHECKING:
         resolve_display_direction,
     )
     from .analysis.adjustment import AdjustmentColumn, ComparisonAdjustment
+    from .analysis.comparison_artifact import swapped_comparison
     from .analysis.agreement import (
         AGREEMENT_CLASSES,
         Agreement,
@@ -262,20 +274,29 @@ if TYPE_CHECKING:
     from .analysis.landscape import (
         DEFAULT_LANDSCAPE_DELTA,
         EnrichmentLandscape,
+        FeatureLandscape,
         Landscape,
         build_landscape,
         enrichment_landscape,
+        feature_landscape,
         marker_reactions,
+        select_comparison_subsystems,
         select_enriched_subsystems,
         select_landscape_subsystems,
         select_shared_subsystems,
+        select_varying_features,
         subsystem_delta,
+        subsystem_delta_ranking,
+        subsystem_members,
         with_thresholds,
     )
     from .analysis.markers import group_means, pairwise_markers, top_markers
+    from .viz.plot_analysis_overview import OverviewCell, plot_analysis_overview
+    from .viz.plot_comparison_ranking import RankingScore, plot_comparison_ranking
+    from .viz.ranking_layout import RankedSubsystem
     from .viz.plot_landscape import (
-        plot_delta_landscape,
-        plot_enrichment_landscape,
+        marker_events,
+        plot_feature_landscape,
         plot_marker_heatmap,
         plot_sample_heatmap,
         sample_heatmap_block,
@@ -370,7 +391,7 @@ if TYPE_CHECKING:
         plot_reduction_artifact,
         reduction_colouring,
     )
-    from .viz.plot_set_enrichment import plot_set_enrichment_category
+    from .viz.plot_set_enrichment import plot_set_enrichment_category, set_enrichment_rows
     from .viz.plot_statistical_distributions import (
         create_statistical_results_table,
         plot_statistical_histograms,
@@ -386,6 +407,7 @@ if TYPE_CHECKING:
     from .viz.plot_subsystem_ranking import (
         plot_subsystem_activity_ranking,
         plot_subsystem_comparison,
+        subsystem_delta_reference,
     )
     from .visual_config import theme
     from .viz.color_bars import (
@@ -396,7 +418,7 @@ if TYPE_CHECKING:
     )
     from .viz.plot_utils import PLOT_THEME, apply_academic_style
     from .viz.plot_violins import plot_reaction_violins
-    from .viz.subsystem_link import add_network_focus_link
+    from .viz.subsystem_link import add_network_focus_link, link_events
     from .viz.transport_view import is_transport_subsystem, plot_transport_view
     from .viz.compartment_maps import (
         COMPARTMENT_MAPS,
@@ -466,6 +488,7 @@ __all__ = [
     "each_against_the_rest",
     "AdjustmentColumn",
     "ComparisonAdjustment",
+    "swapped_comparison",
     # Results across comparisons: landscape, agreement, reactions against genes
     "AGREEMENT_CLASSES",
     "Agreement",
@@ -475,24 +498,35 @@ __all__ = [
     "reaction_gene_concordance",
     "DEFAULT_LANDSCAPE_DELTA",
     "EnrichmentLandscape",
+    "FeatureLandscape",
     "Landscape",
     "build_landscape",
     "enrichment_landscape",
+    "feature_landscape",
     "marker_reactions",
     "select_enriched_subsystems",
     "select_landscape_subsystems",
     "select_shared_subsystems",
+    "select_varying_features",
+    "select_comparison_subsystems",
     "subsystem_delta",
+    "subsystem_delta_ranking",
+    "subsystem_members",
     "with_thresholds",
     "group_means",
     "group_palette",
     "pairwise_markers",
     "top_markers",
-    "plot_delta_landscape",
-    "plot_enrichment_landscape",
+    "plot_feature_landscape",
     "plot_marker_heatmap",
+    "marker_events",
     "plot_sample_heatmap",
     "sample_heatmap_block",
+    "OverviewCell",
+    "plot_analysis_overview",
+    "RankedSubsystem",
+    "RankingScore",
+    "plot_comparison_ranking",
     "plot_reaction_gene_concordance",
     "plot_result_agreement",
     # Typed analysis results
@@ -529,6 +563,7 @@ __all__ = [
     "add_map_links",
     "band_name",
     "add_network_focus_link",
+    "link_events",
     "add_pathway_key",
     "apply_academic_style",
     "category_numbers",
@@ -560,6 +595,7 @@ __all__ = [
     "biplot_arrow_features",
     "plot_reaction_set_enrichment",
     "plot_set_enrichment_category",
+    "set_enrichment_rows",
     "plot_reaction_violins",
     "plot_reduction_artifact",
     "plot_statistical_histograms",
@@ -568,6 +604,7 @@ __all__ = [
     "statistical_results_rows",
     "plot_subsystem_activity_ranking",
     "plot_subsystem_comparison",
+    "subsystem_delta_reference",
     "plot_subsystem_influence_summary",
     "plot_subsystem_ranking_artifact",
     "plot_subsystem_ranking_by_influence",

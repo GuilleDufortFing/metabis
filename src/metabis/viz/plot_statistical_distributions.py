@@ -1,10 +1,10 @@
-from html import escape
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 import numpy as np
 import pandas as pd
 from bokeh.layouts import column, row
 from bokeh.models import (
+    Axis,
     BooleanFilter,
     CDSView,
     ColumnDataSource,
@@ -25,10 +25,10 @@ from ..managers.workspace_mode import AnalysisWorkspaceMode
 from ..visual_config import theme
 from .click_behavior import add_click_behavior, get_external_reference_data
 from .color_bars import registered_color_bar
+from .feature_focus import FocusLayer, FocusNames, add_feature_focus
 from .table_formatting import (
     build_external_link_formatter,
     build_statistical_number_formatter,
-    format_statistical_value,
 )
 
 _STATISTICAL_METRIC_SPECS = [
@@ -153,6 +153,7 @@ def _build_statistical_table_rows(
         )
         rows.append(
             {
+                "feature_id": raw_id,
                 "display_id": reference_data["display_label"],
                 "name": "" if for_genes else reference_data["short_name"],
                 "ensembl_id": reference_data["raw_id"] if for_genes else "",
@@ -241,6 +242,8 @@ def statistical_results_rows(
 P_SIGNIFICANT = theme.SIGNIFICANT_PVAL
 P_OTHER_GREY = "#dddddd"  # the client's --card-grey
 STRONGEST_NAMED = 6
+# The source of a volcano plot's names (:func:`_name_points`).
+VOLCANO_NAMES = "metabis-volcano-names"
 STAT_PLOT_HEIGHT = 300
 SCATTER_PLOT_HEIGHT = 340
 # The effects a volcano plot can set against the adjusted p-value.
@@ -294,36 +297,38 @@ def _strongest(data: Dict[str, list], y_col: str, significant: List[bool], count
     return chosen
 
 
-def _name_points(plot, data, rows: List[int], x_col: str, y_col: str) -> None:
+def _name_points(plot, data, rows: List[int], x_col: str, y_col: str) -> ColumnDataSource:
     """Name a few points, nudged apart where their names would meet.
 
     Names right of the plot's middle read leftwards, so they stay inside it; a
-    name near one already placed moves down a line.
+    name near one already placed moves down a line. The names' source is
+    :data:`VOLCANO_NAMES`, which the subsystem in focus rewrites
+    (:mod:`.feature_focus`); it is returned.
     """
-    if not rows:
-        return
     x_values = np.asarray(data[x_col], dtype=float)
     y_values = np.asarray(data[y_col], dtype=float)
     # A reaction by its short name, a gene by its symbol.
     names = list(data.get("short_name") or data["display_label"])
+    labels = {"x": [], "y": [], "text": [], "align": [], "x_offset": [], "y_offset": []}
     xs = x_values[np.isfinite(x_values)]
     ys = y_values[np.isfinite(y_values)]
-    x_low, x_span = float(xs.min()), float(xs.max() - xs.min()) or 1.0
-    y_low, y_span = float(ys.min()), float(ys.max() - ys.min()) or 1.0
-    placed: List[tuple] = []
-    labels = {"x": [], "y": [], "text": [], "align": [], "x_offset": [], "y_offset": []}
-    for index in rows:
-        x, y = float(x_values[index]), float(y_values[index])
-        nx, ny = (x - x_low) / x_span, (y - y_low) / y_span
-        right = nx > 0.6
-        clashes = sum(1 for px, py, pright in placed if pright == right and abs(px - nx) < 0.35 and abs(py - ny) < 0.06)
-        placed.append((nx, ny, right))
-        labels["x"].append(x)
-        labels["y"].append(y)
-        labels["text"].append(str(names[index]))
-        labels["align"].append("right" if right else "left")
-        labels["x_offset"].append(-6 if right else 6)
-        labels["y_offset"].append(-13 * clashes)
+    if rows and len(xs) and len(ys):
+        x_low, x_span = float(xs.min()), float(xs.max() - xs.min()) or 1.0
+        y_low, y_span = float(ys.min()), float(ys.max() - ys.min()) or 1.0
+        placed: List[tuple] = []
+        for index in rows:
+            x, y = float(x_values[index]), float(y_values[index])
+            nx, ny = (x - x_low) / x_span, (y - y_low) / y_span
+            right = nx > 0.6
+            clashes = sum(1 for px, py, pright in placed if pright == right and abs(px - nx) < 0.35 and abs(py - ny) < 0.06)
+            placed.append((nx, ny, right))
+            labels["x"].append(x)
+            labels["y"].append(y)
+            labels["text"].append(str(names[index]))
+            labels["align"].append("right" if right else "left")
+            labels["x_offset"].append(-6 if right else 6)
+            labels["y_offset"].append(-13 * clashes)
+    source = ColumnDataSource(labels, name=VOLCANO_NAMES)
     plot.add_layout(
         LabelSet(
             x="x",
@@ -337,9 +342,12 @@ def _name_points(plot, data, rows: List[int], x_col: str, y_col: str) -> None:
             text_color=theme.INK,
             background_fill_color="#ffffff",
             background_fill_alpha=0.75,
-            source=ColumnDataSource(labels),
+            source=source,
+            # Over the veil that washes out what is not in focus (:mod:`.feature_focus`).
+            level="overlay",
         )
     )
+    return source
 
 
 def _create_scatter_figure(
@@ -361,13 +369,14 @@ def _create_scatter_figure(
     download_flag: Optional[str] = None,
     color_metric: Optional[str] = None,
     color_label: Optional[str] = None,
+    legend: bool = True,
 ):
     """Every element on two statistics: significant ones on the gradient, the rest grey.
 
     The non-significant points are drawn first and the significant ones over them,
-    each set listed in the legend below with its count; the strongest significant
-    elements are named on a volcano plot (``y_col`` an adjusted p), and a colour bar
-    keys the gradient.
+    each set listed with its count in a legend below unless ``legend`` is False;
+    the strongest significant elements are named on a volcano plot (``y_col`` a
+    -log10 p), and a colour bar keys the gradient.
     """
     scatter_fig = figure(
         sizing_mode="stretch_width",
@@ -424,20 +433,21 @@ def _create_scatter_figure(
             symmetric=thresholds.get("y_symmetric", False),
         )
 
-    n_marked = sum(1 for value in significant if value)
-    coloured = f", coloured by {color_label}" if color_label else ""
-    scatter_fig.add_layout(
-        Legend(
-            items=[
-                LegendItem(label=f"Significant ({n_marked:,}){coloured}", renderers=[marked]),
-                LegendItem(label=f"Not significant ({len(significant) - n_marked:,})", renderers=[others]),
-            ],
-            orientation="horizontal",
-            location="center",
-        ),
-        "below",
-    )
-    if "adjusted_pval" in y_col:
+    if legend:
+        n_marked = sum(1 for value in significant if value)
+        coloured = f", coloured by {color_label}" if color_label else ""
+        scatter_fig.add_layout(
+            Legend(
+                items=[
+                    LegendItem(label=f"Significant ({n_marked:,}){coloured}", renderers=[marked]),
+                    LegendItem(label=f"Not significant ({len(significant) - n_marked:,})", renderers=[others]),
+                ],
+                orientation="horizontal",
+                location="center",
+            ),
+            "below",
+        )
+    if y_col.startswith("neg_log"):
         _name_points(
             scatter_fig,
             source.data,
@@ -467,24 +477,33 @@ def _create_scatter_figure(
     return scatter_fig
 
 
-def _wrap_statistical_plot(plot):
+# A histogram keeps this many pixels, or moves to the next line.
+HISTOGRAM_MIN_WIDTH = 220
+
+
+def _wrap_statistical_plot(plot, min_width: int = 0):
     """Wrap a plot in a flex-friendly card container."""
     return column(
         plot,
         sizing_mode="stretch_width",
         styles={
-            "min-width": "0",
+            "min-width": f"{min_width}px" if min_width else "0",
+            "flex": "1 1 0",
         },
         css_classes=["stats-plot-card"],
     )
 
 
-def _build_responsive_plot_layout(plots: List[Any], plots_per_row: int = 2):
-    """Two by two, in rows that wrap on narrow screens; every plot keeps its toolbar."""
+def _build_responsive_plot_layout(plots: List[Any], plots_per_row: int = 2, min_width: int = 0):
+    """Two by two, or ``plots_per_row`` to a row, in rows that wrap on narrow screens.
+
+    A plot narrower than ``min_width`` pixels moves to the next line. Every plot
+    keeps its toolbar.
+    """
     rows = []
     for start_idx in range(0, len(plots), plots_per_row):
         row_plots = [
-            _wrap_statistical_plot(plot)
+            _wrap_statistical_plot(plot, min_width)
             for plot in plots[start_idx : start_idx + plots_per_row]
         ]
         rows.append(
@@ -724,7 +743,8 @@ def plot_statistical_histograms(
             )
         )
 
-    histogram_layout = _build_responsive_plot_layout(histograms)
+    # The four in one row, two by two when the page is narrow.
+    histogram_layout = _build_responsive_plot_layout(histograms, plots_per_row=4, min_width=HISTOGRAM_MIN_WIDTH)
 
     if return_plot:
         return histogram_layout
@@ -737,46 +757,11 @@ def _prepare_scatter_source(
     data_manager,
     test_results: pd.DataFrame,
     significant_elements: List[str],
-    parameters_to_plot: List[str] = None,
     for_genes: bool = False,
 ) -> ColumnDataSource:
     """Prepare the ColumnDataSource for scatter plots."""
     element_type = "gene" if for_genes else "reaction"
     color_manager = data_manager.color_manager
-
-    # Identify interesting elements for full tooltips
-    total_elements = len(test_results)
-    interesting_indices = set()
-
-    if total_elements < 100:
-        interesting_indices = set(test_results.index)
-    else:
-        # Calculate top 1% count (at least 5 elements)
-        top_n = max(5, int(total_elements * 0.01))
-
-        if parameters_to_plot:
-            if "pval" in parameters_to_plot and "adjusted_pval" in test_results.columns:
-                interesting_indices.update(
-                    test_results.nsmallest(top_n, "adjusted_pval").index
-                )
-
-            if "cohens_d" in parameters_to_plot and "cohens_d" in test_results.columns:
-                interesting_indices.update(
-                    test_results["cohens_d"].abs().nlargest(top_n).index
-                )
-
-            if "log2_fc" in parameters_to_plot and "log2_fc" in test_results.columns:
-                interesting_indices.update(
-                    test_results["log2_fc"].abs().nlargest(top_n).index
-                )
-
-            if (
-                "mean_difference" in parameters_to_plot
-                and "mean_difference" in test_results.columns
-            ):
-                interesting_indices.update(
-                    test_results["mean_difference"].abs().nlargest(top_n).index
-                )
 
     # Every element is drawn, the same on every render: the non-significant first,
     # so the significant ones sit on top of them.
@@ -834,39 +819,18 @@ def _prepare_scatter_source(
 
             data[f"color_{metric}"] = color_values
 
-    # Generate hover text for all elements
-    hover_texts = []
-    for position, idx in enumerate(test_results.index):
-        if idx in interesting_indices:
-            hover_text = data_manager.get_element_hover(
-                element_id=idx,
-                element_type=element_type,
-                show_stats=True,
-                show_plot=False,
-                show_color_reference=False,
-                show_influence=False,
-            )
-        else:
-            # A lighter panel for the rest, without the element's model details.
-            values = test_results.loc[idx]
-            hover_text = hover_panel.panel(
-                hover_panel.row("ID", escape(str(idx))),
-                hover_panel.row(element_type.capitalize(), escape(str(data["display_label"][position]))),
-                hover_panel.section(
-                    *(
-                        hover_panel.row(label, format_statistical_value(values.get(column, float("nan"))))
-                        for column, label in (
-                            ("adjusted_pval", "Adjusted p-value"),
-                            ("log2_fc", "Log2 FC"),
-                            ("cohens_d", "Cohen's d"),
-                            ("mean_difference", "Mean difference"),
-                        )
-                    ),
-                    title="Statistical Comparison",
-                ),
-            )
-
-        hover_texts.append(hover_text)
+    # Every element's hover is its own, as the graphs and step 4's ranking show it.
+    hover_texts = [
+        data_manager.get_element_hover(
+            element_id=idx,
+            element_type=element_type,
+            show_stats=True,
+            show_plot=False,
+            show_color_reference=False,
+            show_influence=False,
+        )
+        for idx in test_results.index
+    ]
     data["desc"] = hover_texts
 
     # Add extra columns if available
@@ -890,6 +854,10 @@ def plot_statistical_scatterplots(
     *,
     download_flag: Optional[str] = None,
     volcano: Optional[str] = None,
+    volcano_y: str = "adjusted",
+    sides: Optional[Tuple[str, str]] = None,
+    members: Optional[Mapping[str, Sequence[str]]] = None,
+    categories: Optional[Mapping[str, str]] = None,
     **kwargs,
 ) -> Optional[Any]:
     """Create a row of scatter plots for statistical parameters.
@@ -907,6 +875,13 @@ def plot_statistical_scatterplots(
             :func:`metabis.viz.click_behavior.add_click_behavior`.
         volcano: An effect ('cohens_d', 'log2_fc' or 'mean_difference') to draw
             only its volcano plot, the effect against -log10 adjusted p.
+        volcano_y: "adjusted" for -log10 adjusted p on the volcano plot's y
+            axis, or "raw" for -log10 p.
+        sides: The Baseline and Target names, written at the ends of the volcano
+            plot's x axis, where each side's higher features lie.
+        members: Each feature's subsystems, for the volcano plot to draw the
+            subsystem in focus over the rest (:mod:`.feature_focus`), with
+            ``categories`` naming each subsystem's category.
 
     Returns:
         Optional[gridplot]: The row of scatter plots if return_plot is True, otherwise None
@@ -914,6 +889,8 @@ def plot_statistical_scatterplots(
     if volcano is not None:
         if volcano not in VOLCANO_EFFECTS:
             raise ValueError(f"No volcano plot for {volcano}")
+        if volcano_y not in ("adjusted", "raw"):
+            raise ValueError(f"No volcano plot against {volcano_y} p-values")
         parameters_to_plot = ["pval", volcano]
     # Get necessary components from the data_manager
     group_comparison = data_manager.get_group_comparison_artifact()
@@ -956,7 +933,6 @@ def plot_statistical_scatterplots(
         data_manager,
         test_results,
         significant_elements,
-        parameters_to_plot=parameters_to_plot,
         for_genes=for_genes,
     )
 
@@ -1057,6 +1033,9 @@ def plot_statistical_scatterplots(
     for config in plot_configs:
         if config.get("volcano_only") and volcano is None:
             continue
+        if volcano is not None and volcano_y == "raw" and config["params"][0] == "pval":
+            # Against the p-value before correction, which no threshold is set on.
+            config = {**config, "y_col": "neg_log_pval", "y_label": "-log10 p", "y_thresh": None}
         if all(p in parameters_to_plot for p in config["params"]):
             # Calculate stats
             mask = config["mask_func"](test_results)
@@ -1087,10 +1066,33 @@ def plot_statistical_scatterplots(
                 download_flag=download_flag,
                 color_metric=config["color_metric"],
                 color_label=config["x_label"],
+                # A volcano plot's colours and grey say it, and its counts are the page's.
+                legend=volcano is None,
             )
+            if volcano is not None:
+                if sides is not None:
+                    # Each side's name at its own end of the axis, on a line of its
+                    # own under it, so a long name is never cut.
+                    low, high = sides
+                    ends = [
+                        Title(text=text, align=align, text_font_size="11px", text_font_style="normal", text_color=theme.INK)
+                        for text, align in ((f"\u2190 higher in {low}", "left"), (f"higher in {high} \u2192", "right"))
+                    ]
+                    axes = sum(1 for model in plot.below if isinstance(model, Axis))
+                    plot.below = [*plot.below[:axes], *ends, *plot.below[axes:]]
+                if members is not None:
+                    add_feature_focus(
+                        plot,
+                        [FocusLayer(source, config["x_col"], config["y_col"], config["color_col"])],
+                        members,
+                        categories or {},
+                        floor=0.0,
+                        names=FocusNames(plot.select_one({"name": VOLCANO_NAMES}), count=STRONGEST_NAMED),
+                    )
             scatter_plots.append(plot)
 
-    scatter_layout = _build_responsive_plot_layout(scatter_plots)
+    # A volcano plot is one figure, drawn as it is rather than in the grid of several.
+    scatter_layout = scatter_plots[0] if volcano is not None else _build_responsive_plot_layout(scatter_plots)
 
     if return_plot:
         return scatter_layout

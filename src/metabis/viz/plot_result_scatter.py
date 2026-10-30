@@ -8,7 +8,7 @@ features that change in neither are the light grey of non-significant marks.
 from __future__ import annotations
 
 from html import escape
-from typing import Mapping
+from typing import Mapping, Optional, Sequence
 
 import numpy as np
 import pandas as pd
@@ -19,6 +19,7 @@ from ..analysis.agreement import AGREEMENT_CLASSES, Agreement
 from ..analysis.concordance import CONCORDANCE_CLASSES
 from ..managers.hover.panel import panel, row, section
 from ..visual_config import theme
+from .feature_focus import FocusLayer, add_feature_focus
 from .plot_utils import apply_academic_style
 
 __all__ = ["plot_reaction_gene_concordance", "plot_result_agreement"]
@@ -85,8 +86,15 @@ def plot_reaction_gene_concordance(
     gene_labels: Mapping[str, str],
     title: str,
     width: int = 640,
+    members: Optional[Mapping[str, Sequence[str]]] = None,
+    categories: Optional[Mapping[str, str]] = None,
 ):
-    """Each reaction's Cohen's d against its strongest gene's, coloured by class."""
+    """Each reaction's Cohen's d against its strongest gene's, coloured by class.
+
+    With ``members``, each reaction's subsystems, the reactions of the subsystem
+    in focus are drawn over the rest (:mod:`.feature_focus`); ``categories`` name
+    each subsystem's category.
+    """
     if table.empty:
         raise ValueError("No reaction has a tested gene")
     frame = table.copy()
@@ -124,6 +132,16 @@ def plot_reaction_gene_concordance(
             ),
         )
     )
+    if members is not None:
+        add_feature_focus(
+            plot,
+            [
+                FocusLayer(renderer.data_source, "gene_effect", "reaction_effect", renderer.glyph.fill_color, "feature_id")
+                for renderer in renderers
+            ],
+            members,
+            categories or {},
+        )
     return plot
 
 
