@@ -1,6 +1,7 @@
 import os
 import re
-from typing import Any, Dict, List, Optional, Tuple
+from collections import defaultdict
+from typing import Any, Dict, List, Mapping, Optional, Tuple
 
 import pandas as pd
 
@@ -17,13 +18,28 @@ from .preprocessing import (
 # ``EX_glc[e]``.
 _PARENTHESIZED_COMPARTMENT = re.compile(r"\(([A-Za-z0-9]+)\)$")
 
+# An SBML ID carries a type prefix and escapes what an ID may not hold, and
+# Compass keeps them: Recon 2.2's EX_glc(e) reaches a file as
+# R_EX_glc_LPAREN_e_RPAREN_.
+_SBML_ESCAPES = {
+    "_LPAREN_": "(", "_RPAREN_": ")", "_LSQBKT_": "[", "_RSQBKT_": "]", "_DASH_": "-",
+    "_COMMA_": ",", "_SLASH_": "/", "_PERIOD_": ".", "_COLON_": ":", "_APOS_": "'",
+}
+
 
 def _identifier_spellings(source_id: str) -> List[str]:
-    """Return a source reaction ID, then the same ID as Recon3D spells it."""
-    match = _PARENTHESIZED_COMPARTMENT.search(source_id)
-    if not match:
-        return [source_id]
-    return [source_id, f"{source_id[: match.start()]}[{match.group(1)}]"]
+    """Return a source reaction ID, then the same ID unescaped and as Recon3D spells it."""
+    spellings = [source_id]
+    decoded = source_id.removeprefix("R_")
+    for escaped, character in _SBML_ESCAPES.items():
+        decoded = decoded.replace(escaped, character)
+    if decoded != source_id:
+        spellings.append(decoded)
+    for spelling in list(spellings):
+        match = _PARENTHESIZED_COMPARTMENT.search(spelling)
+        if match:
+            spellings.append(f"{spelling[: match.start()]}[{match.group(1)}]")
+    return spellings
 
 
 class ReactionData:
@@ -38,6 +54,7 @@ class ReactionData:
         samples_in: str = "rows",
         check_old_identifiers: bool = False,
         preprocessing: ReactionPreprocessingConfig | None = None,
+        source_reactions: Mapping[str, Tuple[str, int]] | None = None,
     ) -> tuple["ReactionData", Dict[str, Any]]:
         """Create ReactionData instance with validation results.
 
@@ -56,6 +73,7 @@ class ReactionData:
                 samples_in=samples_in,
                 check_old_identifiers=check_old_identifiers,
                 preprocessing=preprocessing,
+                source_reactions=source_reactions,
             )
 
             # Perform validation after successful creation
@@ -221,6 +239,7 @@ class ReactionData:
         reaction_name_format: str,
         data_mode: str,
         check_old_identifiers: bool = False,
+        source_reactions: Mapping[str, Tuple[str, int]] | None = None,
     ) -> Tuple[Dict[str, str], List[str], Dict[str, str], List[Dict[str, Any]]]:
         """Map base reaction IDs (without suffixes) to mar_id format.
 
@@ -233,21 +252,26 @@ class ReactionData:
         explicit policy rather than by whichever column happened to come last in the
         file. See :meth:`_resolve_reaction_id_collisions` for the policy.
 
-        Each source ID is looked up in three tiers, the first that matches deciding
-        its Human1 reaction: a Human1 reaction's whole annotation in the input
-        format; then one identifier of a listed annotation, or the ID with its
-        compartment respelled (see :func:`_identifier_spellings`); then, with
-        ``check_old_identifiers``, the legacy BiGG table. Only the last is a
-        high-effort match. The legacy table is read under the source's own
-        spelling alone: respelled, Recon2's exchanges land in a block of it copied
-        from misannotated Human1 reactions (``EX_Rtotal[e]`` names the exchange of
-        ribose there).
+        A source ID the declared source model's table lists maps where the table
+        says: the table was read from both models' chemistry, so it knows which
+        reaction that model means by an ID another release reuses, and it catches
+        the identifiers Human1 misannotates. Any other ID is looked up in three
+        tiers, the first that matches deciding its Human1 reaction: a Human1
+        reaction's whole annotation in the input format; then one identifier of a
+        listed annotation, or the ID unescaped or with its compartment respelled
+        (see :func:`_identifier_spellings`); then, with ``check_old_identifiers``,
+        the legacy BiGG table. Only the last is a high-effort match. The legacy
+        table is read under the source's own spelling alone: respelled, Recon2's
+        exchanges land in a block of it copied from misannotated Human1 reactions
+        (``EX_Rtotal[e]`` names the exchange of ribose there).
 
         Args:
             reaction_columns: Raw column names from CSV
             reaction_name_format: Format of input reaction IDs
             data_mode: 'dual' or 'single'
             check_old_identifiers: If True, attempt high-effort mapping via old identifiers
+            source_reactions: The declared source model's table, source reaction
+                ID -> (MAR ID, orientation), from ``MetabolicModel.get_source_reactions``
 
         Returns:
             Tuple of:
@@ -297,8 +321,12 @@ class ReactionData:
             # poor representative of any single one.
             claimed = set(old_identifier_claims.get(base_id, ()))
 
+            if source_reactions and base_id in source_reactions:
+                # The declared source model's own pairing, read from its chemistry
+                mar_id = source_reactions[base_id][0]
+                high_effort = False
             # Low effort: Check if base_id exists in model reactions (input format)
-            if base_id in model_reactions_in_input_format:
+            elif base_id in model_reactions_in_input_format:
                 mar_id = self.metabolic_model.translate_reaction(
                     base_id,
                     input_format=reaction_name_format,
@@ -344,6 +372,40 @@ class ReactionData:
         }
 
         return mapping, unmapped, high_effort_mappings, collisions
+
+    @staticmethod
+    def _read_orientations(
+        mapping: Mapping[str, str],
+        source_reactions: Mapping[str, Tuple[str, int]],
+    ) -> Tuple[frozenset, List[str]]:
+        """Which kept Human1 reactions to reverse, and the sources no table orients.
+
+        A source the table lists carries its own orientation. One it does not list,
+        mapped by identifier instead, takes its Human1 reaction's orientation when
+        every source the table pairs with that reaction agrees on it; otherwise it
+        stays as Human1 writes it and is counted as unread.
+
+        Returns:
+            The MAR IDs to reverse, and the source IDs left unread.
+        """
+        agreed = defaultdict(set)
+        for mar_id, orientation in source_reactions.values():
+            if orientation:
+                agreed[mar_id].add(orientation)
+        reversed_ids, unread = set(), []
+        for source_id, mar_id in mapping.items():
+            row = source_reactions.get(source_id)
+            if row is not None and row[0] == mar_id:
+                orientation = row[1]
+            elif len(agreed.get(mar_id, ())) == 1:
+                orientation = next(iter(agreed[mar_id]))
+            else:
+                orientation = 0
+            if orientation == -1:
+                reversed_ids.add(mar_id)
+            elif orientation == 0:
+                unread.append(source_id)
+        return frozenset(reversed_ids), sorted(unread)
 
     @staticmethod
     def _resolve_reaction_id_collisions(
@@ -403,6 +465,7 @@ class ReactionData:
         samples_in: str = "rows",
         check_old_identifiers: bool = False,
         preprocessing: ReactionPreprocessingConfig | None = None,
+        source_reactions: Mapping[str, Tuple[str, int]] | None = None,
     ) -> None:
         """Load reaction data from a CSV file specified by the path.
 
@@ -419,6 +482,10 @@ class ReactionData:
             preprocessing: Typed preprocessing configuration. When omitted, dual
                 inputs use Compass negative-log preprocessing and single inputs use
                 the signed cube-root transform, preserving the mode defaults.
+            source_reactions: The declared source model's table, from
+                ``MetabolicModel.get_source_reactions``. It maps the IDs it lists,
+                and ``reversed_reactions`` names the Human1 reactions whose kept
+                source it writes the other way; the caller reverses them.
 
         Returns:
             None
@@ -440,6 +507,10 @@ class ReactionData:
         self.df_reaction_data = None  # Initialize
         self.applied_normalizations = []  # Track which normalizations were applied
         self.preprocessing_report = None
+        # Source base ID -> the Human1 reaction it backs, and the Human1 reactions
+        # whose backing source the declared model writes the other way.
+        self.reaction_mapping: Dict[str, str] = {}
+        self.reversed_reactions: frozenset = frozenset()
 
         if preprocessing is None:
             preprocessing = (
@@ -484,6 +555,11 @@ class ReactionData:
                 reaction_name_format,
                 data_mode,
                 check_old_identifiers,
+                source_reactions=source_reactions,
+            )
+            self.reaction_mapping = dict(base_reaction_mapping)
+            self.reversed_reactions, unread_orientations = self._read_orientations(
+                base_reaction_mapping, source_reactions or {}
             )
 
             # Store mapping statistics for alignment report
@@ -507,6 +583,10 @@ class ReactionData:
                     1 + len(record["discarded"]) for record in id_collisions
                 ),
                 "id_collisions": id_collisions,
+                "reversed_count": len(self.reversed_reactions),
+                "unread_orientation_count": (
+                    len(unread_orientations) if source_reactions else 0
+                ),
             }
 
             # --- Step 2: Mode-specific processing ---
@@ -580,11 +660,13 @@ class ReactionData:
                     neg_vals = (-original_df[col].clip(upper=0)).abs()
 
                     processed_data[mar_id] = pos_vals
-                    # Check if reaction is reversible using the already-known mar_id or if neg_vals has any non-zero entries
+                    # Check if reaction is reversible using the already-known mar_id or if neg_vals has any non-zero entries.
+                    # A reaction to be reversed is made reversible when it is.
                     is_reversible = (
                         self.metabolic_model.is_reaction_reversible(
                             mar_id, input_format="mar_id"
                         )
+                        or mar_id in self.reversed_reactions
                         or (neg_vals > 0).any()
                     )
 
@@ -687,6 +769,7 @@ class ReactionData:
             "total_subsystems": 0,
             "contested_reaction_count": 0,
             "contesting_source_count": 0,
+            "unread_orientation_count": 0,
         }
 
         # Get mapping stats if available
@@ -698,6 +781,9 @@ class ReactionData:
             )
             report["contesting_source_count"] = self.mapping_stats.get(
                 "contesting_source_count", 0
+            )
+            report["unread_orientation_count"] = self.mapping_stats.get(
+                "unread_orientation_count", 0
             )
 
         if self.df_reaction_data is None or self.df_reaction_data.empty:

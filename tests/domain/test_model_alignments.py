@@ -145,3 +145,56 @@ def test_a_transport_is_never_compared_by_metabolite_alone(regen):
     human1 = {("glc", "c"): -1, ("glc", "m"): 1}
 
     assert read(regen, source, human1, compartments=({"c"}, {"m"}))[0] is None
+
+
+# --- The source-model reaction tables -------------------------------------------------
+
+
+@pytest.mark.resource
+@pytest.mark.parametrize("name", sorted(MetabolicModel.SOURCE_REACTION_FILES))
+def test_each_reaction_table_pairs_ids_with_human1_reactions(model, name):
+    table = model.get_source_reactions(name)
+    human1 = set(model.get_reactions(format="mar_id"))
+
+    assert table
+    assert {mar_id for mar_id, _ in table.values()} <= human1 | {""}
+    assert {orientation for _, orientation in table.values()} <= {-1, 0, 1}
+    # An ID paired with no Human1 reaction carries no orientation.
+    assert all(orientation == 0 for mar_id, orientation in table.values() if not mar_id)
+
+
+def test_human1_itself_has_no_table(model):
+    assert model.get_source_reactions("Human1") == {}
+    assert model.get_source_reactions("HMR1.0") == {}
+
+
+def test_the_tables_pair_by_chemistry_where_identifiers_mislead(model):
+    recon1, recon2 = model.get_source_reactions("RECON1"), model.get_source_reactions("RECON2")
+    recon22 = model.get_source_reactions("RECON2.2")
+
+    assert recon2["G3PD1"] == ("MAR00479", -1)
+    # Human1 and the legacy aliases file glucose exchange's ID under GD1beta's.
+    assert recon2["EX_glc(e)"] == ("MAR09034", 1)
+    # CITL is citrate lyase; its aliases name chitobiose hydrolysis.
+    assert recon2["CITL"] == ("", 0)
+    # Recon1 means a dolichyl-phosphate transport by DOLP_Lter, Recon2 a glucosyl
+    # transfer, and Human1 has both.
+    assert recon1["DOLP_Lter"][0] == "MAR07257"
+    assert recon2["DOLP_Lter"][0] == "MAR07279"
+    # Compass writes Recon 2.2's SBML IDs; both spellings are listed.
+    assert recon22["R_EX_glc_LPAREN_e_RPAREN_"] == recon22["EX_glc(e)"] == ("MAR09034", 1)
+
+
+def test_reversing_a_reaction_swaps_its_sides_and_makes_it_reversible():
+    model = MetabolicModel()
+    before = model.reactions.get("MAR00479")
+    reactants, products = list(before.reactants), list(before.products)
+
+    results = model.reverse_reactions(["MAR00479", "NOT_A_REACTION"])
+
+    after = model.reactions.get("MAR00479")
+    assert (after.reactants, after.products) == (products, reactants)
+    assert after.is_reversible
+    assert results["corrected_reactions"] == ["MAR00479"]
+    assert results["made_reversible"] == ["MAR00479"]
+    assert results["reactions_not_found"] == ["NOT_A_REACTION"]

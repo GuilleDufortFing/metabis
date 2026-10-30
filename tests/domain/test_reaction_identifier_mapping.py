@@ -283,3 +283,93 @@ def test_the_legacy_table_is_not_read_under_another_spelling(tmp_path, model):
 
     assert loaded.get_reaction_df().empty
     assert loaded.mapping_stats["unmapped_count"] == 1
+
+
+def test_an_sbml_identifier_is_also_read_unescaped():
+    # Compass keeps Recon 2.2's SBML IDs: EX_glc(e) reaches a file escaped.
+    assert _identifier_spellings("R_EX_glc_LPAREN_e_RPAREN_") == [
+        "R_EX_glc_LPAREN_e_RPAREN_",
+        "EX_glc(e)",
+        "EX_glc[e]",
+    ]
+
+
+# --- The declared source model's table --------------------------------------
+
+
+def declared(tmp_path, model, columns, table, name="declared.tsv", **overrides):
+    return load(
+        write_dual(tmp_path, columns, name=name),
+        model,
+        **{
+            "reaction_name_format": "rxnRecon3DID",
+            "check_old_identifiers": True,
+            "source_reactions": table,
+            **overrides,
+        },
+    )
+
+
+def test_the_table_maps_the_ids_it_lists_and_names_their_reversals(tmp_path, model):
+    loaded = declared(
+        tmp_path, model, {"G3PD1_pos": [1.0, 2.0, 3.0]}, {"G3PD1": ("MAR00479", -1)}
+    )
+
+    assert list(loaded.get_reaction_df().columns) == ["MAR00479"]
+    assert loaded.reaction_mapping == {"G3PD1": "MAR00479"}
+    assert loaded.reversed_reactions == {"MAR00479"}
+    assert loaded.mapping_stats["reversed_count"] == 1
+
+
+def test_each_source_reaction_carries_its_own_orientation(tmp_path, model):
+    # MAR03146's thiolase step is r0634 written backwards in Recon2, and part of the
+    # lumped FAOXC101C8m written forwards: whichever backs it decides.
+    table = {"r0634": ("MAR03146", -1), "FAOXC101C8m": ("MAR03146", 1)}
+
+    specific = declared(tmp_path, model, {"r0634_pos": [1.0, 2.0, 3.0]}, table, name="a.tsv")
+    lumped = declared(tmp_path, model, {"FAOXC101C8m_pos": [1.0, 2.0, 3.0]}, table, name="b.tsv")
+
+    assert specific.reversed_reactions == {"MAR03146"}
+    assert lumped.reversed_reactions == frozenset()
+
+
+def test_a_table_row_with_no_human1_reaction_leaves_the_id_unmapped(tmp_path, model):
+    # The legacy aliases file CITL, citrate lyase, under chitobiose hydrolysis.
+    loaded = declared(tmp_path, model, {"CITL_pos": [1.0, 2.0, 3.0]}, {"CITL": ("", 0)})
+
+    assert loaded.get_reaction_df().empty
+    assert loaded.mapping_stats["unmapped_count"] == 1
+
+
+def test_an_id_the_table_does_not_list_takes_its_reactions_agreed_orientation(tmp_path, model):
+    agreed = declared(
+        tmp_path, model, {"G3PD1_pos": [1.0, 2.0, 3.0]}, {"OTHER": ("MAR00479", -1)}, name="a.tsv"
+    )
+    disputed = declared(
+        tmp_path,
+        model,
+        {"G3PD1_pos": [1.0, 2.0, 3.0]},
+        {"OTHER": ("MAR00479", -1), "ANOTHER": ("MAR00479", 1)},
+        name="b.tsv",
+    )
+
+    assert agreed.reversed_reactions == {"MAR00479"}
+    assert agreed.mapping_stats["unread_orientation_count"] == 0
+    assert disputed.reversed_reactions == frozenset()
+    assert disputed.mapping_stats["unread_orientation_count"] == 1
+
+
+def test_a_single_column_reaction_to_be_reversed_keeps_its_backward_direction(tmp_path, model):
+    # MAR00479 is irreversible in Human1; reversed, it is made reversible, so a
+    # single-column file keeps a backward column for it as it did before.
+    path = str(tmp_path / "single.tsv")
+    pd.DataFrame({"G3PD1": [1.0, 2.0, 3.0]}, index=["s1", "s2", "s3"]).to_csv(
+        path, sep="\t", index_label="sample_id"
+    )
+    options = dict(data_mode="single", reaction_name_format="rxnRecon3DID")
+
+    reversed_ = load(path, model, **options, source_reactions={"G3PD1": ("MAR00479", -1)})
+    plain = load(path, model, **options)
+
+    assert "MAR00479_back" in reversed_.get_reaction_df().columns
+    assert "MAR00479_back" not in plain.get_reaction_df().columns

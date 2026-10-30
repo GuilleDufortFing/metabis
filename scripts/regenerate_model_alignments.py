@@ -1,41 +1,46 @@
-"""Regenerate the packaged reaction-orientation files from the source models.
+"""Regenerate the packaged source-model reaction tables and orientation files.
 
-Each file under ``resources/model_interoperability/model_alignments/`` says, for
-every Human1 reaction, how one source model writes the reaction that a data file
-of that model maps to it: ``1`` the same way, ``-1`` reversed, ``0`` no source
-reaction maps to it. Loading reverses each ``-1`` reaction in the session's copy
-of Human1 (``MetabolicModel.apply_alignment_corrections``), so that a source's
-forward score is drawn and tested as the forward direction.
+For each source model, ``resources/model_interoperability/model_alignments/``
+holds two files written here:
 
-The files had no committed producer, and they did not agree with the models they
-name. Compared reaction by reaction with Compass's own Recon2, the RECON2 file
-called 723 of the 881 reversed reactions aligned and 75 of its 233 reversals were
-not reversed. This script reads every value from the two models' stoichiometry,
-so a file can be reproduced and audited.
+``reactions_<MODEL>.tsv``
+    Every reaction of the model, under the ID its data files carry, with the
+    Human1 reaction it maps to and how the two are written: ``1`` alike, ``-1``
+    reversed, ``0`` not read. Loading a file declared to come from that model
+    maps the IDs it lists through it first, and reverses, in the session's copy
+    of Human1, each reaction whose kept source is ``-1``, so that a source's
+    forward score is drawn and tested as the forward direction.
+``alignment_<MODEL>.txt``
+    One value per Human1 reaction: that of the source reaction loading keeps when
+    a file holds the whole model. ``MetabolicModel.apply_alignment_corrections``
+    reads it.
 
-How a value is read:
+The orientation files had no committed producer, and they did not agree with the
+models they name: against Compass's own Recon2, the RECON2 file called 723 of the
+881 reversed reactions aligned. Both files are now read from the two models'
+stoichiometry, so they can be reproduced and audited.
 
-1. Pairing. The source model's reaction IDs, as a data file of that model
-   carries them, go through the loader's own lookup
-   (``ReactionData._map_base_reactions_to_model``). The orientation recorded for
-   a Human1 reaction is that of the source reaction the loader keeps for it when
-   the file holds the whole model, never that of a crosswalk entry the loader
-   would not choose.
+How a row is read:
+
+1. Pairing. A source reaction pairs with the Human1 reaction the loader's
+   identifier lookup gives it (``ReactionData._map_base_reactions_to_model``)
+   when that reaction holds the same metabolites in the same compartments. When
+   instead exactly one other Human1 reaction does, the chemistry wins: that is
+   how a Recon1 ID that Recon2 reuses for another reaction, or an identifier
+   Human1 files under the wrong exchange, still lands on its reaction, and how a
+   reaction no identifier names finds one. Failing both, the identifier pairing
+   stands.
 2. Orientation. The two reactions' metabolites are compared side by side, in
    their compartments. Protons and water are left out: models balance them on
    either side. A reaction is aligned when every shared metabolite is on the
-   same side, reversed when every one is on the other side. Failing a match in
+   same side, reversed when every one is on the other side. A transported
+   metabolite counts only between the same two compartments. Failing a match in
    the same compartment, a reaction that is not a transport is compared by
-   metabolite alone. A reaction with a single metabolite in each model - an
-   exchange, demand or sink - is compared by that metabolite's side.
-3. Ties. When the source reactions claiming one Human1 reaction disagree, the
-   one the loader keeps decides; when it cannot be read, the others decide if
-   they agree. What is left is either read by hand (``READ_BY_HAND``) or ``0``,
-   and is reported.
-
-One value per Human1 reaction cannot serve two source reactions written in
-opposite directions, so a file can be right only for the source the loader keeps
-from the whole model. ``--check`` lists those reactions.
+   metabolite alone; a transport its two models name differently, by its
+   compartments; a reaction with a single metabolite in each model - an
+   exchange, demand or sink - by that metabolite's side.
+3. What that leaves open is read by hand (``READ_BY_HAND``) or written ``0``,
+   and reported.
 
 Usage::
 
@@ -45,8 +50,8 @@ Usage::
 ``--check`` reports how each regenerated file compares with the packaged one and
 changes nothing; ``--write`` replaces the packaged files. The source models are
 downloaded once into ``--cache`` and verified against the SHA-256 recorded here.
-No public copy of HMR 1.0 was found, so ``alignment_HMR1.0.txt`` is not
-regenerated; it holds no reversal, so it changes no load.
+No public copy of HMR 1.0 was found, so it has no table and
+``alignment_HMR1.0.txt`` is not regenerated; it holds no reversal.
 """
 
 from __future__ import annotations
@@ -139,42 +144,69 @@ SOURCES = {
     ),
 }
 
-# Reactions whose orientation the stoichiometry leaves open, read from both
-# equations by hand. Each names the source reaction it was read against.
-# The models give the cofactors of r0400 opposite sides, both name glycogenin's
-# two forms each other's way in GGNG, and Recon2 writes the acyl-CoAs of r1450 as
-# HC01409 (hexanoyl-CoA) and HC01410 ((2E)-hexenoyl-CoA).
-_NEUGC = (1, "r0400")  # both oxidise N-acetylneuraminate to N-glycolylneuraminate
-_GLYCOGENIN = (1, "GGNG")  # both move eight glucoses from UDP-glucose to glycogenin
-# Phytanoyl-CoA enters the peroxisome from the cytosol in both; Human1 also
-# hydrolyses its CoA on the way, so the two share only the cytosolic species.
-_PHYTANOYL = (1, "SCP21x")
-# Human1's exchange takes the lysophosphatidylcholine out of the extracellular
-# space, as the source's uptake into the cytosol does.
-_LYSO_PC = (1, "AK2LGCHOLt")
-READ_BY_HAND: dict[str, dict[str, tuple[int, str]]] = {
-    "RECON1": {
-        "MAR03481": _PHYTANOYL,
-        "MAR05395": _GLYCOGENIN,
-        # Recon1's 2-oxoisovalerate dehydrogenase is the lumped forward reaction;
-        # Human1's first step runs forward too.
-        "MAR06416": (1, "OIVD2m"),
-    },
-    "RECON2": {
-        "MAR03156": (1, "r1450"),  # hexanoyl-CoA -> (2E)-hexenoyl-CoA in both
-        "MAR03481": _PHYTANOYL,
-        "MAR04531": _NEUGC,
-        "MAR05395": _GLYCOGENIN,
-        "MAR09172": _LYSO_PC,
-    },
-    "RECON2.2": {
-        "MAR03481": _PHYTANOYL,
-        "MAR04531": _NEUGC,
-        "MAR05395": _GLYCOGENIN,
-        "MAR09172": _LYSO_PC,
-    },
-    "RECON3D": {"MAR03481": _PHYTANOYL, "MAR05395": _GLYCOGENIN},
-    "HMR2.0": {"MAR03481": (1, "HMR_3481")},
+# Rows the stoichiometry leaves open, read from both equations by hand: each source
+# reaction keeps the Human1 reaction its identifier names, in the orientation given.
+# They share their main metabolites but not their cofactors or names: the models
+# give r0400's cofactors opposite sides; name glycogenin's two forms each other's
+# way in GGNG; write r1450's acyl-CoAs as HC01409 (hexanoyl-CoA) and HC01410
+# ((2E)-hexenoyl-CoA); lump OIVD2m's 2-oxoisovalerate dehydrogenase where Human1
+# has its first step, which also runs forward; hydrolyse SCP21x's CoA in Human1
+# only, as phytanoyl-CoA enters the peroxisome; move HMR_1630's THCA-CoA and
+# HMR_1666's cholate through the mitochondrion where Human1 has the peroxisome;
+# and reduce r1135's and HMR_1748's sterols with one cofactor and Human1's with
+# another. AK2LGCHOLt takes lysophosphatidylcholine out of the extracellular
+# space, as Human1's exchange does, and biomass_reaction makes biomass from its
+# parts, as Human1's does.
+_ALIGNED = {
+    "GGNG": "MAR05395",
+    "OIVD2m": "MAR06416",
+    "SCP21x": "MAR03481",
+    "r0400": "MAR04531",
+    "r1450": "MAR03156",
+    "AK2LGCHOLt": "MAR09172",
+    "HMR_1630": "MAR01629",
+    "HMR_1666": "MAR01665",
+    "HMR_1748": "MAR01748",
+    "HMR_3748": "MAR06416",
+    "HMR_3481": "MAR03481",
+    "biomass_reaction": "MAR04413",
+    "r1135": "MAR02301",
+}
+
+
+def _aligned(*sources: str, sbml: bool = False) -> dict[str, tuple[str, int]]:
+    return {("R_" if sbml else "") + s: (_ALIGNED[s], 1) for s in sources}
+
+
+READ_BY_HAND: dict[str, dict[str, tuple[str, int]]] = {
+    "RECON1": _aligned("GGNG", "OIVD2m", "SCP21x"),
+    "RECON2": _aligned("GGNG", "OIVD2m", "SCP21x", "r0400", "r1450", "AK2LGCHOLt"),
+    "RECON2.2": _aligned("GGNG", "OIVD2m", "SCP21x", "r0400", "biomass_reaction", "r1135", sbml=True),
+    "RECON3D": _aligned("GGNG", "OIVD2m", "SCP21x", "HMR_1630", "HMR_1666", "HMR_1748"),
+    "HMR2.0": _aligned("HMR_1630", "HMR_1666", "HMR_3481", "HMR_3748"),
+}
+
+# Source reactions whose identifier names a Human1 reaction that shares none of
+# their chemistry, and no Human1 reaction has it: the table pairs them with none,
+# so loading leaves them unmapped instead of putting their scores on another
+# reaction. CITL (citrate lyase) is filed under chitobiose hydrolysis, DHAPAx
+# under 3-dehydro-L-gulonate decarboxylation, DSAT under deoxyribose transport,
+# FTCD under fructose symport, r1446 (butyryl-CoA dehydrogenation) under
+# dodecenoyl-CoA hydration, Recon1's C110CPT2m (a carnitine transferase) under
+# an acylcarnitine antiport and GDCHOLAtx (glycodeoxycholate transport) under a
+# ganglioside's. Recon1 and Recon 2.2 also use the dolichol pathway's IDs for
+# other steps than Recon2 and Recon3D, whose meaning Human1 follows.
+_UNRELATED = ("CITL", "DHAPAx", "DSAT", "FTCD", "r1446")
+_DOLICHOL = (
+    "DOLPGT3_Ler", "DOLPGT3_Uer", "DOLPH_Uer", "DOLPMT3_Uer", "DOLPMT4_Uer", "DOLPMT_U", "DOLP_Uter",
+)
+NO_COUNTERPART: dict[str, frozenset[str]] = {
+    "RECON1": frozenset(
+        (*_UNRELATED[:4], "C110CPT2m", "GDCHOLAtx", "DOLPGT1_Ler", "DOLPMT4_Ler", *_DOLICHOL[1:])
+    ),
+    "RECON2": frozenset(_UNRELATED),
+    "RECON2.2": frozenset("R_" + s for s in (*_DOLICHOL, "r1446")),
+    "RECON3D": frozenset(("CITL", "DSAT", "r1446")),
 }
 
 # SBML and BiGG identifiers escape what an ID may not hold.
@@ -278,8 +310,15 @@ def read_sbml(paths: dict[str, Path]) -> dict[str, dict]:
                 for reference in listed.iter(namespace + "speciesReference"):
                     if reference.get("species") in species and float(reference.get("stoichiometry", "1")):
                         side[species[reference.get("species")]] = sign
-        sides[unescape(reaction.get("id")).removeprefix("R_")] = side
+        # Keyed as Compass writes it, R_EX_glc_LPAREN_e_RPAREN_; the table also
+        # lists the conventional EX_glc(e) (see ``conventional``).
+        sides[reaction.get("id")] = side
     return sides
+
+
+def conventional(identifier: str) -> str:
+    """An SBML reaction ID as the model's own literature writes it."""
+    return unescape(identifier).removeprefix("R_")
 
 
 READERS = {"compass": read_compass, "cobra": read_cobra, "raven": read_raven, "sbml": read_sbml}
@@ -456,55 +495,139 @@ def fetch(name: str, source: Source, cache: Path) -> dict[str, Path]:
     return paths
 
 
-def build(name: str, source: Source, cache: Path, human1: Human1) -> tuple[dict[str, int], dict]:
+class Chemistry:
+    """Human1's reactions as sets of species, to find the one a source reaction is."""
+
+    def __init__(self, human1: Human1) -> None:
+        self.human1 = human1
+        self.species: dict[tuple, set] = collections.defaultdict(set)
+        for metabolite in human1.model.metabolites.get_all():
+            for found in human1.keys(metabolite.id):
+                self.species[found].add(metabolite.id)
+        self.reactions: dict[str, dict] = {}
+        self.containing: dict[str, set] = collections.defaultdict(set)
+        for reaction in human1.model.reactions.get_all():
+            side = {}
+            for metabolites, sign in ((reaction.reactants, -1), (reaction.products, 1)):
+                for metabolite in metabolites:
+                    if not any(name in human1.ignored for name, _ in human1.keys(metabolite)):
+                        side[metabolite] = sign
+            self.reactions[reaction.id] = side
+            for metabolite in side:
+                self.containing[metabolite].add(reaction.id)
+
+    def same(self, source: dict) -> dict[str, int]:
+        """The Human1 reactions holding exactly the source's metabolites, with their orientation.
+
+        Protons and water aside, every source species must name one Human1
+        species, and the Human1 reaction must hold those species and no other, all
+        on the source's sides (1) or all on the other sides (-1).
+        """
+        mapped = {}
+        for found, sign in source.items():
+            if found[0] in self.human1.ignored:
+                continue
+            candidates = self.species.get(found, set())
+            if len(candidates) != 1:
+                return {}
+            metabolite = next(iter(candidates))
+            if metabolite in mapped:
+                return {}
+            mapped[metabolite] = sign
+        if not mapped:
+            return {}
+        matches = {}
+        for reaction_id in set.intersection(*(self.containing[m] for m in mapped)):
+            side = self.reactions[reaction_id]
+            if set(side) != set(mapped):
+                continue
+            agree = sum(side[m] == sign for m, sign in mapped.items())
+            if agree == len(mapped):
+                matches[reaction_id] = 1
+            elif agree == 0:
+                matches[reaction_id] = -1
+        return matches
+
+
+def build(
+    name: str, source: Source, cache: Path, human1: Human1, chemistry: Chemistry
+) -> tuple[dict[str, tuple[str, int, str]], dict[str, int], dict]:
+    """The model's table rows, its per-Human1-reaction values, and what to report."""
     sides = READERS[source.reader](fetch(name, source, cache))
     reader = ReactionData.__new__(ReactionData)
     reader.metabolic_model = human1.model
     mapping, _unmapped, _high, collisions = reader._map_base_reactions_to_model(
         sorted(sides), source.reaction_format, "single", check_old_identifiers=True
     )
-    claimants = collections.defaultdict(set)
-    for source_id, mar_id in mapping.items():
-        claimants[mar_id].add(source_id)
+    # Each source's identifier pairing, whether or not it wins its Human1 reaction.
+    claims = dict(mapping)
     for record in collisions:
-        claimants[record["mar_id"]].update(discarded for discarded, _ in record["discarded"])
-    kept = {mar_id: source_id for source_id, mar_id in mapping.items()}
-
+        for discarded, _ in record["discarded"]:
+            claims[discarded] = record["mar_id"]
     letters = dict(source.compartments)
-
-    def read(source_id: str, mar_id: str) -> tuple[int | None, str]:
-        return orientation(
-            sides[source_id],
-            human1.side(mar_id),
-            human1.ignored,
-            human1_count=human1.metabolite_count(mar_id),
-            human1_compartments=human1.compartments(mar_id, letters),
-            human1_where=human1.where(mar_id, letters),
-        )
-
-    values, report, bases = {}, collections.defaultdict(list), collections.Counter()
     by_hand = READ_BY_HAND.get(name, {})
-    for mar_id in sorted(claimants):
-        readings = {source_id: read(source_id, mar_id) for source_id in sorted(claimants[mar_id])}
-        value, basis = readings[kept[mar_id]]
-        signs = {source_id: sign for source_id, (sign, _) in readings.items()}
-        if len({sign for sign in signs.values() if sign is not None}) > 1:
-            report["claimants disagree"].append((mar_id, signs, kept[mar_id]))
-        if value is None:
-            others = {sign for sign in signs.values() if sign is not None}
-            if len(others) == 1:
-                value, basis = others.pop(), "the other claimants"
-            elif mar_id in by_hand:
-                value, read_against = by_hand[mar_id]
-                assert read_against == kept[mar_id], (name, mar_id, read_against, kept[mar_id])
+    unrelated = NO_COUNTERPART.get(name, frozenset())
+    used_by_hand, used_unrelated = set(), set()
+
+    rows: dict[str, tuple[str, int, str]] = {}
+    report, bases = collections.defaultdict(list), collections.Counter()
+    for source_id in sorted(sides):
+        side = sides[source_id]
+        claimed = claims.get(source_id)
+        same = chemistry.same(side)
+        if claimed is not None and claimed in same:
+            mar_id, value, basis = claimed, same[claimed], "identifier and chemistry"
+        elif len(same) == 1:
+            ((mar_id, value),) = same.items()
+            basis = "chemistry"
+            heading = "paired by chemistry, not identifier" if claimed else "paired by chemistry alone"
+            report[heading].append((source_id, claimed, mar_id))
+        elif claimed is not None:
+            mar_id = claimed
+            value, basis = orientation(
+                side,
+                human1.side(mar_id),
+                human1.ignored,
+                human1_count=human1.metabolite_count(mar_id),
+                human1_compartments=human1.compartments(mar_id, letters),
+                human1_where=human1.where(mar_id, letters),
+            )
+            if value is None and source_id in by_hand:
+                read_against, value = by_hand[source_id]
+                assert read_against == mar_id, (name, source_id, read_against, mar_id)
                 basis = "read by hand"
-            else:
-                report["left open"].append((mar_id, kept[mar_id], basis))
+                used_by_hand.add(source_id)
+            elif value is None and source_id in unrelated:
+                mar_id, value, basis = "", 0, "unrelated chemistry"
+                used_unrelated.add(source_id)
+            elif value is None:
+                report["left open"].append((source_id, mar_id, basis))
                 value = 0
+        else:
+            continue
+        rows[source_id] = (mar_id, value, basis)
         bases[basis] += 1
-        values[mar_id] = value
     report["read from"] = sorted(bases.items(), key=lambda item: -item[1])
-    return values, report
+    report["read by hand, no longer needed"] = sorted(set(by_hand) - used_by_hand)
+    report["unrelated, no longer needed"] = sorted(unrelated - used_unrelated)
+
+    # One value per Human1 reaction, for apply_alignment_corrections: that of the
+    # source loading keeps from the whole model through the table.
+    table = {source_id: (mar_id, value) for source_id, (mar_id, value, _) in rows.items()}
+    kept, *_ = reader._map_base_reactions_to_model(
+        sorted(sides),
+        source.reaction_format,
+        "single",
+        check_old_identifiers=True,
+        source_reactions=table,
+    )
+    values = {mar_id: table[source_id][1] for source_id, mar_id in kept.items() if mar_id}
+
+    if source.reader == "sbml":
+        # Compass writes Recon 2.2's SBML IDs; other tools write them conventionally.
+        for source_id, row in list(rows.items()):
+            rows.setdefault(conventional(source_id), row)
+    return rows, values, report
 
 
 def packaged(name: str) -> tuple[list[str], dict[str, int]]:
@@ -517,6 +640,17 @@ def packaged(name: str) -> tuple[list[str], dict[str, int]]:
     return order, values
 
 
+def table_text(name: str, source: Source, rows: dict[str, tuple[str, int, str]]) -> str:
+    header = [
+        f"# The reactions of {name} ({source.origin}), each under the ID its data files",
+        "# carry, with the Human1 reaction it maps to and how the two are written: 1 alike,",
+        "# -1 reversed, 0 not read. Written by scripts/regenerate_model_alignments.py.",
+        "source_id\thuman1_id\torientation\tbasis",
+    ]
+    lines = [f"{s}\t{m}\t{v}\t{b}" for s, (m, v, b) in sorted(rows.items())]
+    return "\n".join(header + lines) + "\n"
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     mode = parser.add_mutually_exclusive_group(required=True)
@@ -527,27 +661,36 @@ def main() -> None:
     arguments = parser.parse_args()
 
     human1 = Human1(MetabolicModel(use_cache=False))
+    chemistry = Chemistry(human1)
     for name in arguments.model or sorted(SOURCES):
         source = SOURCES[name]
-        values, report = build(name, source, arguments.cache, human1)
+        rows, values, report = build(name, source, arguments.cache, human1, chemistry)
         order, current = packaged(name)
         if set(order) != set(human1.model.get_reactions(format="mar_id")):
             raise SystemExit(f"alignment_{name}.txt does not list every Human1 reaction once")
         regenerated = {mar_id: values.get(mar_id, 0) for mar_id in order}
         counts = collections.Counter(regenerated.values())
         changes = collections.Counter((current[m], regenerated[m]) for m in order if current[m] != regenerated[m])
+        table_path = ALIGNMENTS / f"reactions_{name}.tsv"
+        text = table_text(name, source, rows)
         print(f"\n{name}: {source.origin}")
+        print(f"  table: {len(rows):,} source reactions" + (
+            "" if not table_path.exists() else
+            (", unchanged" if table_path.read_text() == text else ", changed")
+        ))
         print(f"  {counts[1]:,} aligned, {counts[-1]:,} reversed, {counts[0]:,} without a source reaction")
         print("  changes from the packaged file: " + (
             ", ".join(f"{before:+d} -> {after:+d}: {n:,}" for (before, after), n in sorted(changes.items())) or "none"
         ))
-        for heading, rows in sorted(report.items()):
-            print(f"  {heading}: {len(rows)}")
-            for row in rows[:8]:
-                print(f"    {row}")
+        for heading, items in sorted(report.items()):
+            print(f"  {heading}: {len(items)}")
+            for item in items[:8]:
+                print(f"    {item}")
         if arguments.write:
-            text = "".join(f"{mar_id} : {regenerated[mar_id]}\n" for mar_id in order)
-            (ALIGNMENTS / f"alignment_{name}.txt").write_text(text)
+            table_path.write_text(text)
+            (ALIGNMENTS / f"alignment_{name}.txt").write_text(
+                "".join(f"{mar_id} : {regenerated[mar_id]}\n" for mar_id in order)
+            )
     sys.stdout.flush()
 
 

@@ -21,7 +21,7 @@ import pickle
 import time
 from abc import ABC, abstractmethod
 from contextlib import redirect_stdout
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Iterable, List, Optional, Tuple
 from urllib.parse import quote
 
 from metabis.resource_registry import DEFAULT_RESOURCES_ROOT, ResourceRegistry
@@ -37,6 +37,11 @@ from .entities import (
     SubsystemNeighborRelationship,
 )
 from .loaders import (
+    TRANSPORT_BETWEEN,
+    TRANSPORT_PARTS,
+    TRANSPORT_SUBSYSTEM,
+    TRANSPORT_WITHIN,
+    _clean_subsystem_name,
     build_gene_reaction_associations,
     build_metabolite_reaction_relationships,
     build_subsystem_content_relationships,
@@ -48,11 +53,6 @@ from .loaders import (
     load_reactions_from_files,
     load_subsystem_metabolite_classification,
     split_transport_by_compartment,
-    TRANSPORT_BETWEEN,
-    TRANSPORT_PARTS,
-    TRANSPORT_SUBSYSTEM,
-    TRANSPORT_WITHIN,
-    _clean_subsystem_name,
 )
 from .reaction_names import short_reaction_name
 
@@ -2163,6 +2163,62 @@ class MetabolicModel(MetabolicModelInterface):
         "RECON3D": "alignment_RECON3D.txt",
     }
 
+    # Each source model's own reactions, under the IDs its data files carry, with
+    # the Human1 reaction each one maps to and how the two are written: 1 alike, -1
+    # reversed, 0 not read. Built from both models by
+    # scripts/regenerate_model_alignments.py. HMR 1.0 has no public copy to read.
+    SOURCE_REACTION_FILES = {
+        "HMR2.0": "reactions_HMR2.0.tsv",
+        "RECON1": "reactions_RECON1.tsv",
+        "RECON2": "reactions_RECON2.tsv",
+        "RECON2.2": "reactions_RECON2.2.tsv",
+        "RECON3D": "reactions_RECON3D.tsv",
+    }
+
+    def get_source_reactions(self, model_name: str) -> Dict[str, Tuple[str, int]]:
+        """Get a source model's reactions, each with its Human1 reaction and orientation.
+
+        Args:
+            model_name: One of the available alignment model names.
+
+        Returns:
+            Dictionary mapping source reaction ID -> (MAR ID, orientation), where
+            orientation is 1 when both models write the reaction alike, -1 when
+            reversed and 0 when it could not be read. Empty for Human1 itself and
+            for a model with no table.
+
+        Raises:
+            ValueError: If model_name is not recognized.
+        """
+        if model_name not in self.ALIGNMENT_MODEL_FILES:
+            available = ", ".join(self.ALIGNMENT_MODEL_FILES.keys())
+            raise ValueError(
+                f"Unknown alignment model: '{model_name}'. "
+                f"Available models: {available}"
+            )
+        filename = self.SOURCE_REACTION_FILES.get(model_name)
+        if filename is None:
+            return {}
+
+        table: Dict[str, Tuple[str, int]] = {}
+        with open(self.resource_registry.get_alignment_file(filename)) as handle:
+            for line in handle:
+                if line.startswith("#") or not line.strip():
+                    continue
+                source_id, mar_id, orientation = line.rstrip("\n").split("\t")[:3]
+                if source_id != "source_id":
+                    table[source_id] = (mar_id, int(orientation))
+        return table
+
+    def get_alignment_values(self, model_name: str) -> Dict[str, int]:
+        """Get a source model's orientation of each Human1 reaction (1, -1 or 0).
+
+        One value per Human1 reaction: that of the source reaction loading keeps
+        when a file holds the whole model. Empty for Human1 itself.
+        """
+        path = self.get_alignment_file_path(model_name)
+        return self._load_alignment_file(path) if path else {}
+
     @classmethod
     def get_available_alignment_models(cls) -> List[str]:
         """Get list of available alignment model names.
@@ -2318,18 +2374,34 @@ class MetabolicModel(MetabolicModelInterface):
         # Load alignment file
         alignment_mapping = self._load_alignment_file(alignment_file_path)
 
+        # Only -1 asks for a change; 0 and 1 leave the reaction as it is.
+        return self.reverse_reactions(
+            reaction_id
+            for reaction_id, alignment_value in alignment_mapping.items()
+            if alignment_value == -1
+        )
+
+    def reverse_reactions(self, reaction_ids: Iterable[str]) -> Dict[str, any]:
+        """Reverse each named reaction in place, making it reversible first.
+
+        Swaps each reaction's reactants and products, its equation and formula
+        sides, and negates its stoichiometry. Loading uses it on the reactions whose
+        source reaction the declared model writes the other way, so that a source's
+        forward score stays forward.
+
+        Args:
+            reaction_ids: MAR IDs of the reactions to reverse.
+
+        Returns:
+            Dict with the same statistics as :meth:`apply_alignment_corrections`.
+        """
         # Track statistics
         corrections_applied = 0
         reactions_not_found = []
         made_reversible = []
         corrected_reactions = []
 
-        for reaction_id, alignment_value in alignment_mapping.items():
-            # Skip if alignment is 0 or 1 (no correction needed)
-            if alignment_value in [0, 1]:
-                continue
-
-            # alignment_value is -1, need to reverse the reaction
+        for reaction_id in reaction_ids:
             reaction = self.reactions.get(reaction_id)
 
             if reaction is None:
@@ -2404,8 +2476,8 @@ class MetabolicModel(MetabolicModelInterface):
 
         if reactions_not_found:
             print(
-                f"Warning: {len(reactions_not_found)} reactions in the alignment "
-                f"file were not found in the model."
+                f"Warning: {len(reactions_not_found)} reactions to reverse "
+                f"were not found in the model."
             )
 
         return {

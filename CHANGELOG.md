@@ -33,6 +33,17 @@ and releases follow [Semantic Versioning](https://semver.org/).
   columns and rows of the on-screen statistical results table, smallest adjusted
   p-value first, for callers that draw their own table instead of the Bokeh
   `DataTable` from `create_statistical_results_table`.
+- Source-model reaction tables, `model_alignments/reactions_<MODEL>.tsv` for
+  RECON1, RECON2, RECON2.2, RECON3D and HMR2.0: every reaction of the model,
+  under the ID its data files carry, with the Human1 reaction it maps to and
+  whether the two are written alike or reversed, read from both models'
+  chemistry by `scripts/regenerate_model_alignments.py`.
+  `MetabolicModel.get_source_reactions(name)` reads one, and
+  `ReactionData(..., source_reactions=...)` maps the IDs it lists first and
+  names, in `reversed_reactions`, the Human1 reactions whose backing source it
+  writes the other way; `MetabolicModel.reverse_reactions(ids)` reverses them.
+  `ReactionData.reaction_mapping` gives each kept source's Human1 reaction, and
+  `MetabolicModel.get_alignment_values(name)` a model's per-reaction file.
 
 ### Changed
 
@@ -63,6 +74,26 @@ and releases follow [Semantic Versioning](https://semver.org/).
   by `scripts/regenerate_model_alignments.py`, which pins every source by
   SHA-256 and can be rerun with `--check`. HMR1.0, with no public source, is
   unchanged and holds no reversal.
+- A Human1 reaction is oriented by the source reaction that backs it in the
+  loaded file, from the declared model's table, rather than by one value per
+  Human1 reaction: two source reactions written opposite ways, as Recon2's
+  r0634 and FAOXC101C8m are for MAR03146, are each read right. Four reactions
+  of the bundled Smillie example were drawn reversed.
+- With a source model declared, a reaction pairs with the Human1 reaction
+  holding its exact chemistry when its identifier names another: Recon2's
+  `EX_glc(e)` reaches glucose exchange, not the GD1beta exchange Human1's BiGG
+  annotation files it under, and Recon1's `DOLP_Lter` a dolichyl-phosphate
+  transport, as Recon1 means it, not the glucosyl transfer Recon2 reuses the ID
+  for. An identifier naming a chemically unrelated reaction (Recon2's `CITL`,
+  citrate lyase, filed under chitobiose hydrolysis) is left unmapped, and a
+  reaction no identifier names maps by its chemistry. The Th17 example leaves
+  208 reactions unmapped instead of 247.
+- An SBML reaction ID is also read unescaped and without its prefix, so Compass
+  output on Recon 2.2 (`R_EX_glc_LPAREN_e_RPAREN_`) maps.
+- `DistributionBinner.bin_for_value` bins a value as an element of the
+  distribution with that value is binned. An older definition later in the class
+  shadowed it and ignored the spread method, so a transport family's Delta
+  score could be coloured a bin away from a subsystem with the same score.
 
 ## [1.0.0] - 2026-07-27
 
