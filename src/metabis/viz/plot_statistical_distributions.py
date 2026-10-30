@@ -664,7 +664,6 @@ def plot_statistical_histograms(
     """
     # Get necessary components from the data_manager
     group_comparison = data_manager.get_group_comparison_artifact()
-    color_manager = data_manager.color_manager
 
     if not group_comparison:
         raise ValueError("No group comparison set in the data_manager")

@@ -28,7 +28,6 @@ from .metabolic_visualization.generation.graph_building.spaced_network import (
 from .ranking_layout import (
     RANKING_DOTS,
     RankedSubsystem,
-    RankingRows,
     add_focus_link,
     names_panel,
     order_rows,

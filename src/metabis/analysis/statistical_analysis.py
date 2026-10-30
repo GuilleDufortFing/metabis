@@ -11,7 +11,8 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 import numpy as np
 import pandas as pd
 from scipy import special
-from scipy.stats import mannwhitneyu, t as t_distribution, ttest_ind
+from scipy.stats import mannwhitneyu, ttest_ind
+from scipy.stats import t as t_distribution
 from statsmodels.stats.multitest import multipletests
 
 __all__ = [

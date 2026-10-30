@@ -6,7 +6,6 @@ from dataclasses import replace
 import pandas as pd
 from bokeh.models import HoverTool
 
-from metabis.managers.hover.panel import PANEL_STYLE
 from metabis.analysis.artifacts import (
     AnalysisArtifactMetadata,
     ArtifactDimension,
@@ -29,6 +28,7 @@ from metabis.analysis.reaction_set_enrichment import (
     run_reaction_set_enrichment,
 )
 from metabis.analysis_workspace import RevisionKind, WorkspaceRevisions
+from metabis.managers.hover.panel import PANEL_STYLE
 from metabis.viz.plot_reaction_set_enrichment import plot_reaction_set_enrichment
 
 

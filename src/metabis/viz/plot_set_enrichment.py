@@ -32,7 +32,11 @@ from .ranking_layout import (
     ranking_figure,
     ranking_layout,
 )
-from .set_enrichment_overview import ora_family_label, ora_hover_facts, signed_log2_gradient_scale
+from .set_enrichment_overview import (
+    ora_family_label,
+    ora_hover_facts,
+    signed_log2_gradient_scale,
+)
 
 # One dot per subsystem takes the shared signed-log2 gradient (red for
 # over-representation among Target-higher features, blue for Target-lower); a

@@ -18,6 +18,7 @@ from metabis.analysis.comparison_membership import (
 )
 from metabis.analysis.landscape import (
     FeatureLandscape,
+    Landscape,
     build_landscape,
     feature_landscape,
     marker_reactions,
@@ -258,9 +259,7 @@ def test_markers_are_significant_higher_and_highest_in_their_group():
     assert first.margin == pytest.approx(0.5)
 
 
-def _landscape(delta: dict, sizes: dict) -> "Landscape":
-    from metabis.analysis.landscape import Landscape
-
+def _landscape(delta: dict, sizes: dict) -> Landscape:
     frame = pd.DataFrame(delta)
     names = {item: SUBSYSTEMS[item][0] if item in SUBSYSTEMS else item for item in frame.index}
     categories = {item: SUBSYSTEMS[item][1] if item in SUBSYSTEMS else "Other" for item in frame.index}

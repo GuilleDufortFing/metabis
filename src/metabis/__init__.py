@@ -260,16 +260,32 @@ if TYPE_CHECKING:
         resolve_display_direction,
     )
     from .analysis.adjustment import AdjustmentColumn, ComparisonAdjustment
-    from .analysis.comparison_artifact import swapped_comparison
     from .analysis.agreement import (
         AGREEMENT_CLASSES,
         Agreement,
         ResultEffects,
         compare_results,
     )
+    from .analysis.comparison_artifact import swapped_comparison
+    from .analysis.comparison_membership import (
+        ComparisonMembership,
+        ComparisonMode,
+        ComparisonSideSpec,
+        GroupComparisonSpec,
+        each_against_the_rest,
+    )
     from .analysis.concordance import (
         CONCORDANCE_CLASSES,
         reaction_gene_concordance,
+    )
+    from .analysis.dimensionality_reduction import ReductionKey, ReductionResult
+    from .analysis.experiment_analysis import ExperimentAnalysis
+    from .analysis.group_comparison import GroupComparison
+    from .analysis.h5ad_embeddings import (
+        DetectedEmbedding,
+        EmbeddingAlignmentError,
+        build_h5ad_reduction_artifact,
+        discover_h5ad_embeddings,
     )
     from .analysis.landscape import (
         DEFAULT_LANDSCAPE_DELTA,
@@ -291,36 +307,6 @@ if TYPE_CHECKING:
         with_thresholds,
     )
     from .analysis.markers import group_means, pairwise_markers, top_markers
-    from .viz.plot_analysis_overview import OverviewCell, plot_analysis_overview
-    from .viz.plot_comparison_ranking import RankingScore, plot_comparison_ranking
-    from .viz.ranking_layout import RankedSubsystem
-    from .viz.plot_landscape import (
-        marker_events,
-        plot_feature_landscape,
-        plot_marker_heatmap,
-        plot_sample_heatmap,
-        sample_heatmap_block,
-    )
-    from .viz.plot_result_scatter import (
-        plot_reaction_gene_concordance,
-        plot_result_agreement,
-    )
-    from .analysis.comparison_membership import (
-        ComparisonMembership,
-        ComparisonMode,
-        ComparisonSideSpec,
-        GroupComparisonSpec,
-        each_against_the_rest,
-    )
-    from .analysis.dimensionality_reduction import ReductionKey, ReductionResult
-    from .analysis.experiment_analysis import ExperimentAnalysis
-    from .analysis.group_comparison import GroupComparison
-    from .analysis.h5ad_embeddings import (
-        DetectedEmbedding,
-        EmbeddingAlignmentError,
-        build_h5ad_reduction_artifact,
-        discover_h5ad_embeddings,
-    )
     from .domain.expression_data import ExpressionData
     from .domain.format_detection import (
         detect_expression_csv_params,
@@ -355,34 +341,66 @@ if TYPE_CHECKING:
     )
     from .managers.group_palettes import group_palette
     from .managers.workspace import AnalysisWorkspace, AnalysisWorkspaceMode
+    from .visual_config import theme
+    from .viz.color_bars import (
+        add_category_key,
+        add_pathway_key,
+        overview_color_bar,
+        registered_color_bar,
+    )
+    from .viz.compartment_maps import (
+        COMPARTMENT_MAPS,
+        add_map_bands,
+        add_map_find,
+        add_map_links,
+        band_name,
+        highlight_reactions,
+        map_bands,
+        map_ids_for_reactions,
+        map_reaction_ids,
+        map_subsystems,
+        maps_for_reactions,
+    )
+    from .viz.graph_marks import outline_elements
+    from .viz.metabolic_visualization.generation.graph_building.spaced_network import (
+        category_numbers,
+    )
     from .viz.metabolic_visualization.pipeline import (
         GraphPipelineError,
         GraphRunMetadata,
         PipelinePhaseMetric,
     )
+    from .viz.plot_analysis_overview import OverviewCell, plot_analysis_overview
     from .viz.plot_comparison_artifact import (
         plot_comparison_histogram,
         plot_comparison_scatter,
     )
+    from .viz.plot_comparison_ranking import RankingScore, plot_comparison_ranking
     from .viz.plot_gene_reaction_influence import (
         plot_gene_reaction_influence_heatmap,
         plot_subsystem_influence_summary,
         plot_subsystem_ranking_by_influence,
     )
-    from .viz.graph_marks import outline_elements
+    from .viz.plot_landscape import (
+        marker_events,
+        plot_feature_landscape,
+        plot_marker_heatmap,
+        plot_sample_heatmap,
+        sample_heatmap_block,
+    )
     from .viz.plot_metabolic_graph import plot_metabolic_graph
     from .viz.plot_reaction_set_enrichment import plot_reaction_set_enrichment
     from .viz.plot_reduction_artifact import (
         FEATURE_CHOICE,
-        add_arrow_colouring,
-        add_group_picking,
-        biplot_arrow_features,
         FEATURE_ROWS,
         ReductionColouring,
         ReductionFeaturePresentation,
         ReductionGroupPresentation,
         ReductionPlotPresentation,
         ReductionSamplePresentation,
+        add_arrow_colouring,
+        add_group_picking,
+        biplot_arrow_features,
         build_reduction_presentation,
         plot_pca_biplot_artifact,
         plot_pca_components_artifact,
@@ -391,7 +409,14 @@ if TYPE_CHECKING:
         plot_reduction_artifact,
         reduction_colouring,
     )
-    from .viz.plot_set_enrichment import plot_set_enrichment_category, set_enrichment_rows
+    from .viz.plot_result_scatter import (
+        plot_reaction_gene_concordance,
+        plot_result_agreement,
+    )
+    from .viz.plot_set_enrichment import (
+        plot_set_enrichment_category,
+        set_enrichment_rows,
+    )
     from .viz.plot_statistical_distributions import (
         create_statistical_results_table,
         plot_statistical_histograms,
@@ -409,37 +434,15 @@ if TYPE_CHECKING:
         plot_subsystem_comparison,
         subsystem_delta_reference,
     )
-    from .visual_config import theme
-    from .viz.color_bars import (
-        add_category_key,
-        add_pathway_key,
-        overview_color_bar,
-        registered_color_bar,
-    )
     from .viz.plot_utils import PLOT_THEME, apply_academic_style
     from .viz.plot_violins import plot_reaction_violins
+    from .viz.ranking_layout import RankedSubsystem
     from .viz.subsystem_link import add_network_focus_link, link_events
-    from .viz.transport_view import is_transport_subsystem, plot_transport_view
-    from .viz.compartment_maps import (
-        COMPARTMENT_MAPS,
-        add_map_bands,
-        add_map_find,
-        add_map_links,
-        band_name,
-        highlight_reactions,
-        map_bands,
-        map_ids_for_reactions,
-        map_reaction_ids,
-        map_subsystems,
-        maps_for_reactions,
-    )
-    from .viz.metabolic_visualization.generation.graph_building.spaced_network import (
-        category_numbers,
-    )
     from .viz.table_formatting import (
         build_external_link_formatter,
         build_statistical_number_formatter,
     )
+    from .viz.transport_view import is_transport_subsystem, plot_transport_view
 
 # The supported flat public surface. `from metabis import *` yields exactly
 # these names. Seams a coordinator installs and reads (the Analysis Workspace,

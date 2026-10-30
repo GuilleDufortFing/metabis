@@ -37,22 +37,22 @@ from bokeh.models import (
     Title,
     VeeHead,
 )
-from bokeh.transform import transform
 from bokeh.palettes import BrBG, Category10
 from bokeh.plotting import figure
+from bokeh.transform import transform
 
 from ..analysis.dimensionality_reduction import ReductionArtifact
-from ..managers.group_palettes import OKABE_ITO
 from ..managers.color_distributions import gradient_palette
+from ..managers.group_palettes import OKABE_ITO
 from ..managers.hover.panel import extend, panel, row, section
 from ..managers.hover.panel import inner as hover_panel_inner
 from ..visual_config import theme
+from .brand import GRADIENT_JS, OUTLINE_WIDTH, gradient_segments
 from .click_behavior import get_external_reference_data
 from .plot_reduced_dimension import (
     calculate_cluster_metrics,
     get_metric_interpretation,
 )
-from .brand import GRADIENT_JS, OUTLINE_WIDTH, gradient_segments
 from .plot_utils import apply_academic_style, short_row_label
 
 DEFAULT_CATEGORICAL_PALETTE = OKABE_ITO
@@ -1423,7 +1423,7 @@ def plot_pca_components_artifact(
 
     # Rows run top to bottom from the strongest; row i is centred at n - i - 0.5,
     # so the arrays below are kept bottom to top, as the y axis counts.
-    names, labels, ticks, hovers, ids = [], [], [], [], []
+    names, ticks, hovers, ids = [], [], [], []
     arrowed = set(arrow_features)
     for members in groups:
         first = artifact.feature_names[members[0]]

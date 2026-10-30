@@ -15,14 +15,12 @@ from __future__ import annotations
 
 import pandas as pd
 import pytest
-from bokeh.models import GlyphRenderer, HoverTool
+from bokeh.models import GlyphRenderer, HoverTool, Text
 
 from metabis.managers.color_manager import ColorManager
 from metabis.managers.hover import panel as hover_panel
 from metabis.managers.workspace_mode import AnalysisWorkspaceMode
 from metabis.viz.plot_subsystem_ranking import plot_subsystem_comparison
-from bokeh.models import Text
-
 from metabis.viz.ranking_layout import RANKING_DOTS, RANKING_SCORE
 
 METRIC = "cohens_d"

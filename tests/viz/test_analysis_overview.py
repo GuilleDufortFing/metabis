@@ -5,7 +5,15 @@ from __future__ import annotations
 import math
 
 import pytest
-from bokeh.models import BoxAnnotation, CustomJS, GlyphRenderer, HoverTool, Quad, Rect, TapTool
+from bokeh.models import (
+    BoxAnnotation,
+    CustomJS,
+    GlyphRenderer,
+    HoverTool,
+    Quad,
+    Rect,
+    TapTool,
+)
 
 from metabis.viz.plot_analysis_overview import (
     OVERVIEW_COLUMNS,

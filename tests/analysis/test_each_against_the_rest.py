@@ -2,7 +2,10 @@
 
 import pytest
 
-from metabis.analysis.comparison_membership import ComparisonMembership, each_against_the_rest
+from metabis.analysis.comparison_membership import (
+    ComparisonMembership,
+    each_against_the_rest,
+)
 
 GROUPS = {"H": ("h1", "h2"), "N": ("n1", "n2"), "I": ("i1", "i2"), "X": ("x1", "x2")}
 UNIVERSE = [s for samples in GROUPS.values() for s in samples]

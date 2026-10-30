@@ -108,12 +108,12 @@ def overview_color_bar(
         )
     if set_enrichment_artifact is not None:
         # Imported on use: the worker imports set_enrichment_overview without Bokeh.
+        from ..managers.color_distributions import ColorDistributionRegistry
+        from ..visual_config import theme
         from .set_enrichment_overview import (
             SET_ENRICHMENT_SUBSYSTEM_METRIC,
             build_set_enrichment_overview_colors,
         )
-        from ..managers.color_distributions import ColorDistributionRegistry
-        from ..visual_config import theme
 
         scale = ColorDistributionRegistry(
             configurations={

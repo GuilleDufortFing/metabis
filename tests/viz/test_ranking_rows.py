@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
-from metabis.viz.ranking_layout import HEADING_CHARACTER_WIDTH, NAMES_MIN_WIDTH, RankedSubsystem, order_rows
+from metabis.viz.ranking_layout import (
+    HEADING_CHARACTER_WIDTH,
+    NAMES_MIN_WIDTH,
+    RankedSubsystem,
+    order_rows,
+)
 
 LONG = "Sulfur Amino Acids & One-Carbon Metabolism"
 ENTRIES = [

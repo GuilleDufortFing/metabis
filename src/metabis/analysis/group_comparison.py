@@ -6,6 +6,7 @@ import pandas as pd
 
 from ..analysis_workspace import WorkspaceProvenance
 from ..managers.workspace_mode import AnalysisWorkspaceMode
+from .adjustment import ComparisonAdjustment
 from .artifacts import (
     AnalysisArtifactMetadata,
     ArtifactDimension,
@@ -17,7 +18,6 @@ from .comparison_artifact import (
     GroupComparisonArtifact,
     MetricSummary,
 )
-from .adjustment import ComparisonAdjustment
 from .comparison_membership import ComparisonMembership, GroupComparisonSpec
 from .importance_analysis import (
     ImportanceAnalysis,

@@ -2,7 +2,10 @@
 
 import pytest
 
-from metabis.domain.metabolic_model.reaction_names import SHORT_NAME_LENGTH, short_reaction_name
+from metabis.domain.metabolic_model.reaction_names import (
+    SHORT_NAME_LENGTH,
+    short_reaction_name,
+)
 
 
 @pytest.mark.parametrize(
