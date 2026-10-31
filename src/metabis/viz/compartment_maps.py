@@ -13,14 +13,15 @@ graph and the maps of its compartments:
 * **Into a map.** :func:`highlight_reactions` frames a subsystem's reactions,
   and :func:`add_map_bands` lays its band under them.
 * **Out of a map.** :func:`add_map_links` names each reaction's subsystem, and a
-  tap on a reaction dispatches :data:`MAP_REACTION_EVENT` on ``window`` with it,
-  for the page to offer that subsystem's graph.
+  tap on a reaction opens no page: it dispatches :data:`MAP_REACTION_EVENT` on
+  ``window`` with it, for the page to outline that subsystem's band and offer
+  its graph.
 * **Find.** :func:`add_map_find` rings the reactions, genes and metabolites whose
   name holds the query the page writes into its source, and centres the view on
   the first, dispatching :data:`MAP_FIND_EVENT` with what it found.
 * **Subsystems.** :func:`add_map_bands` outlines Metabolic Atlas's band under one
   subsystem's links at a time, in the logo's gradient: the subsystem the map was
-  opened from, one the page names, or that of the reaction under the pointer.
+  opened from, or one the page names: one chosen, or a tapped reaction's.
 
 A map draws its links along Metabolic Atlas's own paths (:mod:`.atlas_paths`).
 """
@@ -34,11 +35,12 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Dict, Iterable, List, Mapping, Optional, Tuple
 
-from bokeh.models import ColumnDataSource, CustomJS, HoverTool, TapTool
+from bokeh.models import ColumnDataSource, CustomJS, TapTool
 
 from ..visual_config import theme
 from .atlas_paths import atlas_paths
 from .brand import OUTLINE_WIDTH, gradient_segments
+from .click_behavior import OWN_TAP_TAG
 from .subsystem_link import attach
 
 MAPS_DIRECTORY = Path(__file__).resolve().parent.parent / "resources/graphs/compartment/human1"
@@ -154,6 +156,14 @@ def map_subsystems(model, map_id: str) -> Dict[str, Tuple[str, str]]:
     return named
 
 
+def map_reaction_names(model, map_id: str) -> Dict[str, str]:
+    """Each reaction a map draws, to its short name (reaction_names), as figures label it."""
+    return {
+        drawn: model.get_reaction_reference_data(own).get("short_name") or drawn
+        for drawn, own in resolve_map_reactions(model, map_id).items()
+    }
+
+
 def maps_for_reactions(model, reactions: Iterable[str]) -> List[Tuple[CompartmentMap, int]]:
     """The maps that draw any of ``reactions``, with how many, the most first."""
     wanted = {str(reaction).removesuffix("_back") for reaction in reactions}
@@ -219,12 +229,18 @@ def highlight_reactions(plot, drawn_ids: Iterable[str], *, padding: float = 600.
     return len(xs)
 
 
-def add_map_links(plot, subsystem_of: Mapping[str, Tuple[str, str]]) -> None:
+def add_map_links(
+    plot, subsystem_of: Mapping[str, Tuple[str, str]], names: Optional[Mapping[str, str]] = None
+) -> None:
     """Name each reaction's subsystem in a map, and offer it on a tap.
 
     ``subsystem_of`` gives, for each drawn reaction identifier, its subsystem's
-    identifier and name. A tap on a reaction dispatches :data:`MAP_REACTION_EVENT`
-    with ``{element_id, label, subsystem_id, subsystem}``.
+    identifier and name, and ``names`` its short name (:func:`map_reaction_names`).
+    A tap on a reaction dispatches :data:`MAP_REACTION_EVENT` with
+    ``{element_id, label, name, subsystem_id, subsystem}``, for the page to outline
+    the subsystem and offer its graph; ``name`` is the identifier without ``names``. It opens no page: the reactions' sources
+    carry :data:`~metabis.viz.click_behavior.OWN_TAP_TAG`, which the click
+    behaviour leaves to this callback. Genes and metabolites keep their links.
     """
     for renderer, source in _sources(plot):
         data = source.data
@@ -236,6 +252,12 @@ def add_map_links(plot, subsystem_of: Mapping[str, Tuple[str, str]]) -> None:
         ]
         data["subsystem_id"] = [pair[0] for pair in pairs]
         data["subsystem"] = [pair[1] for pair in pairs]
+        if names is not None:
+            data["short_name"] = [
+                names.get(str(element).removesuffix("_back")) or str(element) for element in data["element_id"]
+            ]
+        if OWN_TAP_TAG not in source.tags:
+            source.tags = [*source.tags, OWN_TAP_TAG]
         plot.add_tools(TapTool(renderers=[renderer]))
         source.selected.js_on_change(
             "indices",
@@ -248,9 +270,12 @@ def add_map_links(plot, subsystem_of: Mapping[str, Tuple[str, str]]) -> None:
                 window.dispatchEvent(new CustomEvent(event, {detail: {
                   element_id: data.element_id[index],
                   label: data.display_label[index],
+                  name: (data.short_name ?? data.display_label)[index],
                   subsystem_id: data.subsystem_id[index],
                   subsystem: data.subsystem[index],
                 }}))
+                // Nothing stays selected, so no other reaction is drawn as unselected.
+                setTimeout(() => { source.selected.indices = [] }, 0)
                 """,
             ),
         )
@@ -347,8 +372,8 @@ def add_map_bands(plot, map_id: str, shown: Optional[str] = None) -> Optional[Co
 
     ``shown`` is the band shown first, by its name in :func:`map_bands`. The page
     writes another name, or none, into the returned source (:data:`MAP_BAND_SOURCE`,
-    ``{"name": [...]}``); pointing at a reaction shows its subsystem's band until
-    the pointer leaves it. A band keeps Metabolic Atlas's width in map units at
+    ``{"name": [...]}``), for a band chosen or a reaction clicked; pointing changes
+    nothing. A band keeps Metabolic Atlas's width in map units at
     every zoom. It is outlined, never filled, so it is not read as a score: a
     stroke in the gradient, and over it a white stroke narrower by the outline on
     each side, both opaque, so where a band crosses itself the outlines merge
@@ -384,12 +409,12 @@ def add_map_bands(plot, map_id: str, shown: Optional[str] = None) -> Optional[Co
     plot.renderers = renderers[:after] + [outline, core] + renderers[after:]
 
     chosen = ColumnDataSource({"name": [shown] if shown in bands else []}, name=MAP_BAND_SOURCE)
+    # Only the page changes the band: one that followed the pointer would repaint
+    # the whole map at every reaction the pointer crossed.
     show = CustomJS(
         args=dict(every=every, drawn=drawn, chosen=chosen),
         code="""
-        // A reaction under the pointer names its own subsystem's band for a moment.
-        const pointed = (window.__metabisPointedBand ?? {})[chosen.id] ?? null
-        const name = (pointed ?? chosen.data.name[0] ?? '').toLowerCase()
+        const name = (chosen.data.name[0] ?? '').toLowerCase()
         const rows = every.data.name.map((band, i) => band.toLowerCase() === name ? i : -1).filter((i) => i >= 0)
         const pick = (key) => rows.map((i) => every.data[key][i])
         drawn.data = {x0: pick('x0'), y0: pick('y0'), x1: pick('x1'), y1: pick('y1'), color: pick('color')}
@@ -413,27 +438,6 @@ def add_map_bands(plot, map_id: str, shown: Optional[str] = None) -> Optional[Co
     for attribute in ("start", "end"):
         plot.x_range.js_on_change(attribute, width)
     plot.js_on_change("inner_width", width)
-    for renderer, source in _sources(plot):
-        if not (_is_reactions(source.data) and "subsystem" in source.data):
-            continue
-        plot.add_tools(
-            HoverTool(
-                renderers=[renderer],
-                tooltips=None,
-                callback=CustomJS(
-                    args=dict(source=source, chosen=chosen),
-                    code="""
-                    const index = cb_data.index.indices[0]
-                    const pointed = index === undefined ? null : String(source.data.subsystem[index] || '') || null
-                    const state = (window.__metabisPointedBand ??= {})
-                    if ((state[chosen.id] ?? null) === pointed) return
-                    state[chosen.id] = pointed
-                    // The same choice again, which redraws the band.
-                    chosen.data = {name: [...chosen.data.name]}
-                    """,
-                ),
-            )
-        )
     # The band shown first.
     rows = [i for i, name in enumerate(every.data["name"]) if name == shown]
     drawn.data = {key: [every.data[key][i] for i in rows] for key in ("x0", "y0", "x1", "y1", "color")}
@@ -459,6 +463,7 @@ __all__ = [
     "highlight_reactions",
     "map_ids_for_reactions",
     "map_reaction_ids",
+    "map_reaction_names",
     "map_subsystems",
     "maps_for_reactions",
     "reaction_subsystems",

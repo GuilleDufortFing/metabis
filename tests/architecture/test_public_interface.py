@@ -139,6 +139,7 @@ EXPECTED_ROOT_ALL = frozenset(
         "map_bands",
         "map_ids_for_reactions",
         "map_reaction_ids",
+        "map_reaction_names",
         "map_subsystems",
         "maps_for_reactions",
         "plot_transport_view",

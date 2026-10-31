@@ -1,11 +1,16 @@
 """The compartment maps: their names, their reactions, and the links into and out of them."""
 
+import json
+import shutil
+import subprocess
+
 import pytest
-from bokeh.models import ColumnDataSource, TapTool
+from bokeh.models import ColumnDataSource, HoverTool, TapTool
 from bokeh.plotting import figure
 
 from metabis import MetabolicModel
 from metabis.viz.atlas_paths import ATLAS_SUFFIX, atlas_paths
+from metabis.viz.click_behavior import OWN_TAP_TAG, add_click_behavior
 from metabis.viz.compartment_maps import (
     COMPARTMENT_MAPS,
     MAP_BAND_SOURCE,
@@ -20,6 +25,7 @@ from metabis.viz.compartment_maps import (
     map_bands,
     map_ids_for_reactions,
     map_reaction_ids,
+    map_reaction_names,
     map_subsystems,
     maps_for_reactions,
     resolve_map_reactions,
@@ -60,9 +66,12 @@ def test_a_subsystem_leads_to_the_maps_of_its_compartments(model):
     assert [count for _, count in maps] == sorted((count for _, count in maps), reverse=True)
     drawn = map_ids_for_reactions(model, "mitochondria", reactions)
     assert len(drawn) >= maps[0][1]
-    # And back: each reaction a map draws names its subsystem.
+    # And back: each reaction a map draws names its subsystem, and has a short name.
     named = map_subsystems(model, "mitochondria")
     assert {named[identifier][0] for identifier in drawn} == {TCA}
+    short = map_reaction_names(model, "mitochondria")
+    assert set(short) == set(resolve_map_reactions(model, "mitochondria"))
+    assert sum(short[identifier] != identifier for identifier in drawn) > len(drawn) / 2
 
 
 def _map_plot():
@@ -101,7 +110,7 @@ def test_a_subsystems_reactions_are_framed_and_nothing_fades():
 
 
 def test_a_tapped_reaction_offers_its_subsystem():
-    plot, reactions, _ = _map_plot()
+    plot, reactions, metabolites = _map_plot()
     add_map_links(plot, {"MAR2": ("glycolysis", "Glycolysis")})
 
     assert reactions.data["subsystem_id"] == ["", "glycolysis", ""]
@@ -109,6 +118,63 @@ def test_a_tapped_reaction_offers_its_subsystem():
     assert plot.select({"type": TapTool})
     (callback,) = reactions.selected.js_property_callbacks["change:indices"]
     assert callback.args["event"] == MAP_REACTION_EVENT
+    # The map answers its reactions' taps; metabolites keep the click behaviour's.
+    assert OWN_TAP_TAG in reactions.tags and OWN_TAP_TAG not in metabolites.tags
+
+
+def _tap(source, index) -> dict:
+    """Run a source's tap callbacks in Node, in order, as BokehJS does on a tap at ``index``."""
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("Node.js runs the tap")
+    callbacks = [
+        [callback.code, {name: None if name == "source" else value for name, value in callback.args.items()}]
+        for callback in source.selected.js_property_callbacks["change:indices"]
+    ]
+    script = """
+    const [callbacks, data, tags, index] = JSON.parse(process.argv[1]);
+    const opened = [], events = [];
+    globalThis.window = {dispatchEvent: (event) => events.push(event.detail)};
+    globalThis.CustomEvent = class { constructor(type, init) { this.detail = init.detail } };
+    globalThis.document = {createElement: () => ({click() { opened.push(this.href) }}), body: {appendChild() {}, removeChild() {}}};
+    const source = {tags, data, selected: {indices: [index]}};
+    for (const [code, args] of callbacks) {
+      const names = Object.keys(args);
+      new Function('cb_obj', ...names, code)(source.selected, ...names.map((name) => name === 'source' ? source : args[name]));
+    }
+    setTimeout(() => console.log(JSON.stringify({opened, events, selected: source.selected.indices})), 10);
+    """
+    arguments = json.dumps([callbacks, dict(source.data), list(source.tags), index])
+    result = subprocess.run([node, "-e", script, arguments], capture_output=True, text=True, check=True)
+    return json.loads(result.stdout)
+
+
+def test_a_reaction_tap_in_a_map_opens_no_page_but_a_metabolite_tap_does():
+    plot, reactions, metabolites = _map_plot()
+    reactions.data["external_url"] = [f"https://metabolicatlas.org/reaction/MAR{i}" for i in (1, 2, 3)]
+    metabolites.data["external_url"] = ["https://metabolicatlas.org/metabolite/m1"]
+    # As the API draws a map: the click behaviour first, then the map's links.
+    add_click_behavior(plot, download_flag="metabisDownloadHoverOnClick")
+    add_map_links(plot, {"MAR2": ("glycolysis", "Glycolysis")}, {"MAR2": "glucose → G6P"})
+
+    tapped = _tap(reactions, 1)
+    assert tapped["opened"] == []
+    assert tapped["events"] == [
+        {
+            "element_id": "MAR2_back",
+            "label": "two",
+            "name": "glucose → G6P",
+            "subsystem_id": "glycolysis",
+            "subsystem": "Glycolysis",
+        }
+    ]
+    # Nothing is left selected, so no other reaction is drawn as unselected.
+    assert tapped["selected"] == []
+    assert _tap(metabolites, 0) == {
+        "opened": ["https://metabolicatlas.org/metabolite/m1"],
+        "events": [],
+        "selected": [],
+    }
 
 
 def test_a_find_rings_reactions_genes_and_metabolites_by_name():
@@ -146,8 +212,9 @@ def test_one_subsystems_band_at_a_time():
     bands = map_bands("mitochondria")
     shown = band_name(bands, "tricarboxylic acid cycle and glyoxylate/dicarboxylate metabolism")
     assert shown == "Tricarboxylic acid cycle and glyoxylate/dicarboxylate metabolism"
-    plot, reactions, _ = _map_plot()
+    plot = _map_plot()[0]
     add_map_links(plot, {"MAR2": ("tca", shown)})
+    hovers = list(plot.select(type=HoverTool))
 
     chosen = add_map_bands(plot, "mitochondria", shown)
 
@@ -164,13 +231,9 @@ def test_one_subsystems_band_at_a_time():
     band = outline.data_source.data
     assert band["x0"] and len(set(band["color"])) > 3
     assert all(color.startswith("#") for color in band["color"])
-    # Pointing at a reaction names its own subsystem's band.
-    from bokeh.models import HoverTool
-
-    pointing = [
-        tool
-        for tool in plot.select(type=HoverTool)
-        if reactions in [renderer.data_source for renderer in tool.renderers]
-    ]
-    assert pointing and pointing[0].callback.args["chosen"] is chosen
+    # Only the page changes the band: nothing redraws it under the pointer, which
+    # would repaint the whole map at every reaction the pointer crossed.
+    (show,) = chosen.js_property_callbacks["change:data"]
+    assert show.args["chosen"] is chosen
+    assert list(plot.select(type=HoverTool)) == hovers
     assert add_map_bands(_map_plot()[0], "nowhere") is None

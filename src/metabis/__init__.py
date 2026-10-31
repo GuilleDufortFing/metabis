@@ -210,6 +210,7 @@ _MODULE_EXPORTS: dict[str, tuple[str, ...]] = {
         "map_bands",
         "map_ids_for_reactions",
         "map_reaction_ids",
+        "map_reaction_names",
         "map_subsystems",
         "maps_for_reactions",
     ),
@@ -358,6 +359,7 @@ if TYPE_CHECKING:
         map_bands,
         map_ids_for_reactions,
         map_reaction_ids,
+        map_reaction_names,
         map_subsystems,
         maps_for_reactions,
     )
@@ -575,6 +577,7 @@ __all__ = [
     "map_bands",
     "map_ids_for_reactions",
     "map_reaction_ids",
+    "map_reaction_names",
     "map_subsystems",
     "maps_for_reactions",
     "overview_color_bar",

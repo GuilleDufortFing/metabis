@@ -13,9 +13,14 @@ __all__ = [
     "add_click_behavior",
     "get_external_reference_data",
     "CLICK_BEHAVIOR_TAG",
+    "OWN_TAP_TAG",
 ]
 
 CLICK_BEHAVIOR_TAG = "metabis_click_behavior_attached"
+# A source whose taps another callback answers, as a compartment map's reactions
+# are (compartment_maps.add_map_links): a tap on it opens no link and navigates
+# nowhere, though it still downloads the hover panel when downloading is on.
+OWN_TAP_TAG = "metabis_own_tap"
 
 
 CLICK_BEHAVIOR_CODE = r"""
@@ -281,12 +286,17 @@ try {
         return;
     }
 
-    if (navigateToSubsystem()) {
+    // A source whose taps another callback answers (OWN_TAP_TAG), such as a
+    // compartment map's reactions, neither navigates nor opens its link. Its tags
+    // are read now, so they hold whichever of the two callbacks came first.
+    const ownTap = typeof own_tap_tag !== "undefined" && (source.tags || []).includes(own_tap_tag);
+
+    if (!ownTap && navigateToSubsystem()) {
         clearSelection();
         return;
     }
 
-    if (openExternalLink()) {
+    if (!ownTap && openExternalLink()) {
         clearSelection();
         return;
     }
@@ -350,7 +360,8 @@ def add_click_behavior(
 
     A tap downloads the element's hover panel when downloading is enabled,
     otherwise navigates to a tapped subsystem, otherwise opens the element's
-    external link.
+    external link. A source tagged :data:`OWN_TAP_TAG` does neither of the last
+    two: another callback answers its taps.
 
     ``enabled_toggle`` (a Bokeh ``Toggle``) and ``subsystem_select`` (a Bokeh
     ``Select``) suit a Bokeh server document, where both widgets live beside the
@@ -424,7 +435,7 @@ def add_click_behavior(
 
             source.tags = existing_tags + [CLICK_BEHAVIOR_TAG]
 
-            callback_args = {"source": source, "prefix": filename_prefix}
+            callback_args = {"source": source, "prefix": filename_prefix, "own_tap_tag": OWN_TAP_TAG}
             if enabled_toggle is not None:
                 callback_args["enabled_toggle"] = enabled_toggle
             if subsystem_select is not None:
