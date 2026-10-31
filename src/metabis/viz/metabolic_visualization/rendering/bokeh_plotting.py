@@ -492,6 +492,7 @@ def _draw_enriched_main_metabolites(plot, metabolite_glyphs):
         alpha_max=VisualizationConstants.METABOLITE_LABEL_ALPHA_MAX,
         zoom_min=VisualizationConstants.METABOLITE_LABEL_ZOOM_THRESHOLD_MIN,
         zoom_max=VisualizationConstants.METABOLITE_LABEL_ZOOM_THRESHOLD_MAX,
+        labels=labels,
     )
 
     return renderer
@@ -558,6 +559,7 @@ def _draw_enriched_intermediate_metabolites(plot, metabolite_glyphs):
         alpha_max=VisualizationConstants.METABOLITE_LABEL_ALPHA_MAX,
         zoom_min=VisualizationConstants.METABOLITE_LABEL_ZOOM_THRESHOLD_MIN,
         zoom_max=VisualizationConstants.METABOLITE_LABEL_ZOOM_THRESHOLD_MAX,
+        labels=labels,
     )
 
     return renderer
@@ -625,6 +627,7 @@ def _draw_enriched_genes(plot, gene_glyphs):
         alpha_max=VisualizationConstants.GENE_LABEL_ALPHA_MAX,
         zoom_min=VisualizationConstants.GENE_LABEL_ZOOM_THRESHOLD_MIN,
         zoom_max=VisualizationConstants.GENE_LABEL_ZOOM_THRESHOLD_MAX,
+        labels=labels,
     )
 
     return renderer
@@ -700,6 +703,7 @@ def _draw_enriched_reactions(plot, reaction_glyphs):
         alpha_max=VisualizationConstants.REACTION_LABEL_ALPHA_MAX,
         zoom_min=VisualizationConstants.REACTION_LABEL_ZOOM_THRESHOLD_MIN,
         zoom_max=VisualizationConstants.REACTION_LABEL_ZOOM_THRESHOLD_MAX,
+        labels=labels,
     )
 
     return renderer
@@ -772,6 +776,7 @@ def _draw_enriched_compartments(plot, compartment_glyphs):
         alpha_max=VisualizationConstants.COMPARTMENT_LABEL_ALPHA_MAX,
         zoom_min=VisualizationConstants.COMPARTMENT_LABEL_ZOOM_THRESHOLD_MIN,
         zoom_max=VisualizationConstants.COMPARTMENT_LABEL_ZOOM_THRESHOLD_MAX,
+        labels=labels,
     )
 
     return renderer

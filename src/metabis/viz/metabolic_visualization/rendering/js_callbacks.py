@@ -55,6 +55,7 @@ def _apply_initial_zoom_alpha(
     alpha_max,
     zoom_min,
     zoom_max,
+    labels=None,
 ):
     """Seed label alpha from the initial plot ranges before JS callbacks run."""
     data = dict(label_source.data)
@@ -75,6 +76,8 @@ def _apply_initial_zoom_alpha(
         for index in range(point_count)
     ]
     label_source.data = data
+    if labels is not None:
+        labels.visible = alpha > 0
 
 
 def add_zoom_based_alpha_callback(
@@ -85,6 +88,7 @@ def add_zoom_based_alpha_callback(
     alpha_max=None,
     zoom_min=None,
     zoom_max=None,
+    labels=None,
 ):
     """Add JavaScript callback to dynamically adjust label alpha based on zoom level.
 
@@ -96,6 +100,8 @@ def add_zoom_based_alpha_callback(
         alpha_max: Maximum alpha value (defaults to subsystem settings)
         zoom_min: Zoom level for minimum alpha (defaults to subsystem settings)
         zoom_max: Zoom level for maximum alpha (defaults to subsystem settings)
+        labels: The LabelSet drawing ``label_source``, hidden while its labels are
+            fully transparent: BokehJS draws every label of a set, seen or not.
     """
     alpha_min, alpha_max, zoom_min, zoom_max = _resolve_zoom_alpha_parameters(
         alpha_min,
@@ -111,11 +117,13 @@ def add_zoom_based_alpha_callback(
         alpha_max=alpha_max,
         zoom_min=zoom_min,
         zoom_max=zoom_max,
+        labels=labels,
     )
 
     callback = CustomJS(
         args=dict(
             source=label_source,
+            labels=labels,
             plot=plot,
             glyph_type=glyph_type,
             alpha_min=alpha_min,
@@ -149,6 +157,11 @@ def add_zoom_based_alpha_callback(
             alpha = alpha_min + t * (alpha_max - alpha_min);
         }
 
+        // A view that only moved, or zoomed past the thresholds, keeps its alpha:
+        // nothing to redraw.
+        if (source.__metabis_alpha === alpha) return;
+        source.__metabis_alpha = alpha;
+
         // Update all label alphas, factoring in base_alpha if provided
         const data = source.data;
         const n = data.x.length;
@@ -158,6 +171,7 @@ def add_zoom_based_alpha_callback(
             const base_alpha = base[i] != null ? base[i] : 1.0;
             data.text_alpha[i] = alpha * base_alpha;
         }
+        if (labels !== null) labels.visible = alpha > 0;
 
         // Trigger data source change to update the plot
         source.change.emit();
