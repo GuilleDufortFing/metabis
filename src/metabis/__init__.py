@@ -135,6 +135,7 @@ _MODULE_EXPORTS: dict[str, tuple[str, ...]] = {
     ),
     ".managers.group_palettes": ("group_palette",),
     ".managers.workspace": ("AnalysisWorkspace", "AnalysisWorkspaceMode"),
+    ".managers.element_details": ("element_details",),
     # Graph metadata only. The artifact seam itself is the public module
     # metabis.viz.metabolic_visualization (ADR-0008).
     ".viz.metabolic_visualization.pipeline": (
@@ -207,12 +208,14 @@ _MODULE_EXPORTS: dict[str, tuple[str, ...]] = {
         "add_map_links",
         "band_name",
         "highlight_reactions",
+        "keep_map_scale",
         "map_bands",
         "map_ids_for_reactions",
         "map_reaction_ids",
         "map_reaction_names",
         "map_subsystems",
         "maps_for_reactions",
+        "resolve_map_reactions",
     ),
     ".viz.metabolic_visualization.generation.graph_building.spaced_network": (
         "category_numbers",
@@ -334,6 +337,7 @@ if TYPE_CHECKING:
     )
     from .domain.reaction_data import ReactionData
     from .domain.sample_metadata import MetadataAlignmentReport, SampleMetadata
+    from .managers.element_details import element_details
     from .managers.group_manager import (
         GroupDefinition,
         GroupLoadResult,
@@ -356,12 +360,14 @@ if TYPE_CHECKING:
         add_map_links,
         band_name,
         highlight_reactions,
+        keep_map_scale,
         map_bands,
         map_ids_for_reactions,
         map_reaction_ids,
         map_reaction_names,
         map_subsystems,
         maps_for_reactions,
+        resolve_map_reactions,
     )
     from .viz.graph_marks import outline_elements
     from .viz.metabolic_visualization.generation.graph_building.spaced_network import (
@@ -480,6 +486,7 @@ __all__ = [
     "AnalysisWorkspace",
     "AnalysisWorkspaceMode",
     "ExperimentAnalysis",
+    "element_details",
     # Group and comparison identity
     "SampleGroup",
     "GroupDefinition",
@@ -574,12 +581,14 @@ __all__ = [
     "category_numbers",
     "highlight_reactions",
     "is_transport_subsystem",
+    "keep_map_scale",
     "map_bands",
     "map_ids_for_reactions",
     "map_reaction_ids",
     "map_reaction_names",
     "map_subsystems",
     "maps_for_reactions",
+    "resolve_map_reactions",
     "overview_color_bar",
     "plot_transport_view",
     "registered_color_bar",

@@ -14,6 +14,7 @@ from metabis.viz.click_behavior import OWN_TAP_TAG, add_click_behavior
 from metabis.viz.compartment_maps import (
     COMPARTMENT_MAPS,
     MAP_BAND_SOURCE,
+    MAP_ELEMENT_EVENT,
     MAP_FIND_SOURCE,
     MAP_REACTION_EVENT,
     MAPS_DIRECTORY,
@@ -22,6 +23,7 @@ from metabis.viz.compartment_maps import (
     add_map_links,
     band_name,
     highlight_reactions,
+    keep_map_scale,
     map_bands,
     map_ids_for_reactions,
     map_reaction_ids,
@@ -87,10 +89,34 @@ def _map_plot():
         }
     )
     metabolites = ColumnDataSource(
-        {"x": [300.0], "y": [300.0], "element_id": ["m1"], "display_label": ["glucose"], "alpha": [1.0]}
+        {
+            "x": [300.0],
+            "y": [300.0],
+            "element_id": ["m1"],
+            "model_id": ["MAM01965m"],
+            "display_label": ["glucose"],
+            "alpha": [1.0],
+            "size": [20],
+            "hover": ["glucose"],
+        }
+    )
+    # A map draws a gene beside each reaction it catalyses, labelled with its symbol.
+    genes = ColumnDataSource(
+        {
+            "x": [110.0, 510.0, 890.0],
+            "y": [110.0, 510.0, 890.0],
+            "element_id": ["g1", "g2", "g3"],
+            "model_id": ["ENSG00000138796", "ENSG00000084754", "ENSG00000138796"],
+            "display_label": ["HADH", "HADHA", "HADH"],
+            "alpha": [1.0] * 3,
+            "width": [60] * 3,
+            "height": [30] * 3,
+            "hover": ["HADH", "HADHA", "HADH"],
+        }
     )
     plot.scatter(x="x", y="y", source=reactions)
     plot.scatter(x="x", y="y", source=metabolites)
+    plot.rect(x="x", y="y", width="width", height="height", source=genes)
     return plot, reactions, metabolites
 
 
@@ -118,8 +144,10 @@ def test_a_tapped_reaction_offers_its_subsystem():
     assert plot.select({"type": TapTool})
     (callback,) = reactions.selected.js_property_callbacks["change:indices"]
     assert callback.args["event"] == MAP_REACTION_EVENT
-    # The map answers its reactions' taps; metabolites keep the click behaviour's.
-    assert OWN_TAP_TAG in reactions.tags and OWN_TAP_TAG not in metabolites.tags
+    # The map answers every tap itself: its genes' and metabolites' show their details.
+    (callback,) = metabolites.selected.js_property_callbacks["change:indices"]
+    assert (callback.args["event"], callback.args["kind"]) == (MAP_ELEMENT_EVENT, "metabolite")
+    assert OWN_TAP_TAG in reactions.tags and OWN_TAP_TAG in metabolites.tags
 
 
 def _tap(source, index) -> dict:
@@ -149,7 +177,7 @@ def _tap(source, index) -> dict:
     return json.loads(result.stdout)
 
 
-def test_a_reaction_tap_in_a_map_opens_no_page_but_a_metabolite_tap_does():
+def test_no_tap_in_a_map_opens_a_page_each_names_what_was_tapped():
     plot, reactions, metabolites = _map_plot()
     reactions.data["external_url"] = [f"https://metabolicatlas.org/reaction/MAR{i}" for i in (1, 2, 3)]
     metabolites.data["external_url"] = ["https://metabolicatlas.org/metabolite/m1"]
@@ -162,6 +190,7 @@ def test_a_reaction_tap_in_a_map_opens_no_page_but_a_metabolite_tap_does():
     assert tapped["events"] == [
         {
             "element_id": "MAR2_back",
+            "model_id": "MAR2_back",
             "label": "two",
             "name": "glucose → G6P",
             "subsystem_id": "glycolysis",
@@ -170,9 +199,10 @@ def test_a_reaction_tap_in_a_map_opens_no_page_but_a_metabolite_tap_does():
     ]
     # Nothing is left selected, so no other reaction is drawn as unselected.
     assert tapped["selected"] == []
+    # A metabolite's tap names it for its details, as a gene's does, and opens no page.
     assert _tap(metabolites, 0) == {
-        "opened": ["https://metabolicatlas.org/metabolite/m1"],
-        "events": [],
+        "opened": [],
+        "events": [{"kind": "metabolite", "element_id": "m1", "model_id": "MAM01965m", "label": "glucose"}],
         "selected": [],
     }
 
@@ -185,6 +215,53 @@ def test_a_find_rings_reactions_genes_and_metabolites_by_name():
     (callback,) = find.js_property_callbacks["change:data"]
     assert reactions in callback.args["sources"] and metabolites in callback.args["sources"]
     assert callback.args["full_width"] == 800.0
+
+
+def _find(plot, query: str, *, exact: bool = False, index: int = 0) -> dict:
+    """Run a map's find callback in Node on ``query``: what it reports and where it centres."""
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("Node.js runs the find")
+    find = next(source for source in plot.tags if getattr(source, "name", None) == MAP_FIND_SOURCE)
+    (callback,) = find.js_property_callbacks["change:data"]
+    sources = [dict(source.data) for source in callback.args["sources"]]
+    script = """
+    const [code, sources, fullWidth, event, query, exact, index] = JSON.parse(process.argv[1]);
+    const events = [];
+    globalThis.window = {dispatchEvent: (dispatched) => events.push(dispatched.detail)};
+    globalThis.CustomEvent = class { constructor(type, init) { this.detail = init.detail } };
+    const range = (start, end) => ({start, end, setv(values) { Object.assign(this, values) }});
+    const plot = {x_range: range(0, 1000), y_range: range(1000, 0)};
+    const ring = {data: null};
+    const find = {data: {query: [query], exact: [exact], index: [index]}};
+    new Function('find', 'sources', 'ring', 'plot', 'full_width', 'event', code)(
+      find, sources.map((data) => ({data})), ring, plot, fullWidth, event);
+    console.log(JSON.stringify({found: events[0], ringed: ring.data.x.length,
+      centre: (plot.x_range.start + plot.x_range.end) / 2}));
+    """
+    arguments = json.dumps(
+        [callback.code, sources, callback.args["full_width"], callback.args["event"], query, exact, index]
+    )
+    result = subprocess.run([node, "-e", script, arguments], capture_output=True, text=True, check=True)
+    return json.loads(result.stdout)
+
+
+def test_a_find_matches_exactly_when_asked_and_steps_through_its_matches():
+    plot = _map_plot()[0]
+    add_map_find(plot)
+
+    # Any name that holds the query, or only the one that is it, as a gene's link asks.
+    assert _find(plot, "hadh")["found"]["count"] == 3
+    exact = _find(plot, "HADH", exact=True)
+    assert (exact["found"]["count"], exact["ringed"]) == (2, 2)
+    # Each match in turn, counting round, as Metabolic Atlas's map search steps.
+    assert _find(plot, "HADH", exact=True, index=1)["centre"] == 890.0
+    stepped_back = _find(plot, "HADH", exact=True, index=-1)
+    assert (stepped_back["found"]["index"], stepped_back["centre"]) == (1, 890.0)
+    assert _find(plot, "HADH", exact=True, index=2)["centre"] == 110.0
+    # A gene or a metabolite by the model's identifier, which its label does not show.
+    assert _find(plot, "ENSG00000138796", exact=True)["found"]["count"] == 2
+    assert _find(plot, "MAM01965m", exact=True)["found"] == {"query": "mam01965m", "count": 1, "index": 0, "label": "glucose"}
 
 
 def test_every_human1_map_carries_metabolic_atlas_paths():
@@ -237,3 +314,37 @@ def test_one_subsystems_band_at_a_time():
     assert show.args["chosen"] is chosen
     assert list(plot.select(type=HoverTool)) == hovers
     assert add_map_bands(_map_plot()[0], "nowhere") is None
+
+
+def _resized(plot, frames, x=(0.0, 2000.0), y=(1000.0, 0.0)) -> list:
+    """Run a map's scale keeper in Node as its frame takes each (width, height): its x-range after each."""
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("Node.js runs the resize")
+    (callback,) = plot.js_property_callbacks["change:inner_width"]
+    script = """
+    const [code, frames, x, y] = JSON.parse(process.argv[1]);
+    const plot = {x_range: {start: x[0], end: x[1]}, y_range: {start: y[0], end: y[1]}};
+    const seen = [];
+    for (const [width, height] of frames) {
+      plot.inner_width = width; plot.inner_height = height;
+      new Function('plot', code)(plot);
+      seen.push([plot.x_range.start, plot.x_range.end]);
+    }
+    console.log(JSON.stringify(seen));
+    """
+    arguments = json.dumps([callback.code, frames, x, y])
+    result = subprocess.run([node, "-e", script, arguments], capture_output=True, text=True, check=True)
+    return json.loads(result.stdout)
+
+
+def test_a_narrowed_map_is_cut_from_the_left_never_squeezed():
+    plot = _map_plot()[0]
+    keep_map_scale(plot)
+
+    assert set(plot.js_property_callbacks) == {"change:inner_width", "change:inner_height"}
+    # Two map units a pixel across and down; narrowed to 600 px at the same height by a
+    # sidebar, it shows 1,200 units, its right edge kept; widened again, all of it.
+    assert _resized(plot, [(1000, 500), (600, 500), (1000, 500)]) == [[0, 2000], [800, 2000], [0, 2000]]
+    # A data range without its span yet is left to fit itself.
+    assert _resized(plot, [(600, 500)], x=(None, None)) == [[None, None]]

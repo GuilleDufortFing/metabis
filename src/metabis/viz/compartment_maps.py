@@ -13,12 +13,15 @@ graph and the maps of its compartments:
 * **Into a map.** :func:`highlight_reactions` frames a subsystem's reactions,
   and :func:`add_map_bands` lays its band under them.
 * **Out of a map.** :func:`add_map_links` names each reaction's subsystem, and a
-  tap on a reaction opens no page: it dispatches :data:`MAP_REACTION_EVENT` on
-  ``window`` with it, for the page to outline that subsystem's band and offer
-  its graph.
+  tap opens no page: on a reaction it dispatches :data:`MAP_REACTION_EVENT` on
+  ``window``, for the page to outline that subsystem's band, offer its graph and
+  show the reaction's details; on a gene or a metabolite, :data:`MAP_ELEMENT_EVENT`,
+  for its details.
 * **Find.** :func:`add_map_find` rings the reactions, genes and metabolites whose
-  name holds the query the page writes into its source, and centres the view on
-  the first, dispatching :data:`MAP_FIND_EVENT` with what it found.
+  name holds the query the page writes into its source, or is it, and centres the
+  view on one, dispatching :data:`MAP_FIND_EVENT` with what it found.
+* **Scale.** :func:`keep_map_scale` keeps a map at one scale across and down
+  whatever its plot's size: a narrower map shows less of itself, never squeezed.
 * **Subsystems.** :func:`add_map_bands` outlines Metabolic Atlas's band under one
   subsystem's links at a time, in the logo's gradient: the subsystem the map was
   opened from, or one the page names: one chosen, or a tapped reaction's.
@@ -45,6 +48,8 @@ from .subsystem_link import attach
 
 MAPS_DIRECTORY = Path(__file__).resolve().parent.parent / "resources/graphs/compartment/human1"
 MAP_REACTION_EVENT = "metabis:map-reaction"
+# A tapped gene or metabolite, whose details the page shows.
+MAP_ELEMENT_EVENT = "metabis:map-element"
 MAP_FIND_EVENT = "metabis:map-find"
 MAP_FIND_SOURCE = "metabis-map-find"
 # The subsystem whose band a map shows, which the page writes.
@@ -192,6 +197,45 @@ def _is_reactions(data: Mapping) -> bool:
     return "angle" in data and "element_id" in data
 
 
+def _element_kind(data: Mapping) -> Optional[str]:
+    """What a map source draws, read from its columns: reactions, genes or metabolites."""
+    if _is_reactions(data):
+        return "reaction"
+    if "model_id" not in data or "hover" not in data:
+        return None
+    if "width" in data and "height" in data:
+        return "gene"
+    if "size" in data:
+        return "metabolite"
+    return None
+
+
+def _tap_dispatches(plot, renderer, source, kind: str) -> None:
+    """A tap on one of ``source``'s elements dispatches :data:`MAP_ELEMENT_EVENT`, and opens no page."""
+    if OWN_TAP_TAG not in source.tags:
+        source.tags = [*source.tags, OWN_TAP_TAG]
+    plot.add_tools(TapTool(renderers=[renderer]))
+    source.selected.js_on_change(
+        "indices",
+        CustomJS(
+            args=dict(source=source, event=MAP_ELEMENT_EVENT, kind=kind),
+            code="""
+            const index = source.selected.indices[0]
+            if (index === undefined) return
+            const data = source.data
+            window.dispatchEvent(new CustomEvent(event, {detail: {
+              kind,
+              element_id: data.element_id[index],
+              model_id: data.model_id[index],
+              label: data.display_label[index],
+            }}))
+            // Nothing stays selected, so no other element is drawn as unselected.
+            setTimeout(() => { source.selected.indices = [] }, 0)
+            """,
+        ),
+    )
+
+
 def highlight_reactions(plot, drawn_ids: Iterable[str], *, padding: float = 600.0) -> int:
     """Frame ``drawn_ids``' reactions in a map, leaving every glyph as drawn.
 
@@ -237,13 +281,19 @@ def add_map_links(
     ``subsystem_of`` gives, for each drawn reaction identifier, its subsystem's
     identifier and name, and ``names`` its short name (:func:`map_reaction_names`).
     A tap on a reaction dispatches :data:`MAP_REACTION_EVENT` with
-    ``{element_id, label, name, subsystem_id, subsystem}``, for the page to outline
-    the subsystem and offer its graph; ``name`` is the identifier without ``names``. It opens no page: the reactions' sources
-    carry :data:`~metabis.viz.click_behavior.OWN_TAP_TAG`, which the click
-    behaviour leaves to this callback. Genes and metabolites keep their links.
+    ``{element_id, model_id, label, name, subsystem_id, subsystem}``, for the page to
+    outline the subsystem, offer its graph and show its details; ``name`` is the
+    identifier without ``names``. A tap on a gene or a metabolite dispatches
+    :data:`MAP_ELEMENT_EVENT` with ``{kind, element_id, model_id, label}``, for the
+    page to show its details. No tap opens a page: the sources carry
+    :data:`~metabis.viz.click_behavior.OWN_TAP_TAG`, which the click behaviour
+    leaves to these callbacks.
     """
     for renderer, source in _sources(plot):
         data = source.data
+        kind = _element_kind(data)
+        if kind in ("gene", "metabolite"):
+            _tap_dispatches(plot, renderer, source, kind)
         if not _is_reactions(data):
             continue
         pairs = [
@@ -269,6 +319,7 @@ def add_map_links(
                 const data = source.data
                 window.dispatchEvent(new CustomEvent(event, {detail: {
                   element_id: data.element_id[index],
+                  model_id: (data.model_id ?? data.element_id)[index],
                   label: data.display_label[index],
                   name: (data.short_name ?? data.display_label)[index],
                   subsystem_id: data.subsystem_id[index],
@@ -281,12 +332,47 @@ def add_map_links(
         )
 
 
-def add_map_find(plot) -> Optional[ColumnDataSource]:
-    """A find for a map: the page writes a query; the map rings what matches and centres on it.
+def keep_map_scale(plot) -> None:
+    """A map shows less of itself as it narrows, never squeezed: across as down, one scale.
 
-    Reactions, genes and metabolites are found by their name or identifier,
-    ignoring case. The view moves to the first match, zoomed in at least to a
-    fifth of the map's width, and :data:`MAP_FIND_EVENT` reports how many matched.
+    A map is drawn at its own proportions. When its frame changes size, as when the
+    page sets a sidebar beside it at the same height, its horizontal span follows its
+    vertical one, so a map unit takes as many pixels across as down. The right edge
+    stays where it was, so nothing on screen moves: what the sidebar takes is cut from
+    the map's left.
+    """
+    keep = CustomJS(
+        args=dict(plot=plot),
+        code="""
+        let width, height
+        try { width = plot.inner_width; height = plot.inner_height } catch { return }
+        const xr = plot.x_range
+        const yr = plot.y_range
+        const along = xr.end - xr.start
+        const down = Math.abs(yr.end - yr.start)
+        // Before the first layout, or before a data range has its span, nothing to keep.
+        if (!(width > 0 && height > 0 && down > 0 && Number.isFinite(along) && along !== 0)) return
+        const span = down * width / height
+        if (Math.abs(Math.abs(along) - span) <= 1e-9 * span) return
+        // As a zoom tool does, so a data range keeps the view rather than fitting it again.
+        xr.have_updated_interactively = true
+        xr.start = xr.end - Math.sign(along) * span
+        """,
+    )
+    plot.js_on_change("inner_width", keep)
+    plot.js_on_change("inner_height", keep)
+
+
+def add_map_find(plot) -> Optional[ColumnDataSource]:
+    """A find for a map: the page writes a query; the map rings what matches and centres on one.
+
+    Reactions, genes and metabolites are found by their name or identifiers,
+    ignoring case: any that holds the query, or, when the page writes ``exact``,
+    only those named exactly so (a gene "HADH" without "HADHA"). The view moves to
+    the match the page's ``index`` names, the first by default and counting round,
+    zoomed in at least to a fifth of the map's width, as Metabolic Atlas's map
+    search steps through its matches. :data:`MAP_FIND_EVENT` reports how many
+    matched, which is shown and its label.
     """
     searched = [source for _renderer, source in _sources(plot) if "display_label" in source.data and "x" in source.data]
     if not searched:
@@ -312,24 +398,28 @@ def add_map_find(plot) -> Optional[ColumnDataSource]:
             args=dict(find=find, sources=searched, ring=ring, plot=plot, full_width=full_width, event=MAP_FIND_EVENT),
             code="""
             const query = String(find.data.query[0] ?? '').trim().toLowerCase()
-            const found = {x: [], y: []}
-            let first = null
+            const exact = Boolean(find.data.exact?.[0])
+            const matches = (text) => exact ? text === query : text.includes(query)
+            const found = {x: [], y: [], label: []}
             if (query) {
               for (const source of sources) {
                 const data = source.data
                 const names = data.display_label
                 const ids = data.element_id ?? data.id ?? names
+                const models = data.model_id ?? ids
                 for (let i = 0; i < names.length; i++) {
-                  const name = String(names[i] ?? '').toLowerCase()
-                  const id = String(ids[i] ?? '').toLowerCase()
-                  if (!name.includes(query) && !id.includes(query)) continue
+                  const texts = [names[i], ids[i], models[i]].map((text) => String(text ?? '').toLowerCase())
+                  if (!texts.some(matches)) continue
                   found.x.push(data.x[i])
                   found.y.push(data.y[i])
-                  if (first === null) first = {x: data.x[i], y: data.y[i], label: String(names[i])}
+                  found.label.push(String(names[i]))
                 }
               }
             }
-            ring.data = found
+            const count = found.x.length
+            const index = count ? ((Number(find.data.index?.[0] ?? 0) % count) + count) % count : 0
+            const first = count ? {x: found.x[index], y: found.y[index], label: found.label[index]} : null
+            ring.data = {x: found.x, y: found.y}
             if (first !== null) {
               const xr = plot.x_range
               const yr = plot.y_range
@@ -344,7 +434,7 @@ def add_map_find(plot) -> Optional[ColumnDataSource]:
               yr.setv({start: first.y + height / 2, end: first.y - height / 2})
             }
             window.dispatchEvent(new CustomEvent(event, {detail: {
-              query, count: found.x.length, label: first === null ? null : first.label,
+              query, count, index, label: first === null ? null : first.label,
             }}))
             """,
         ),
@@ -451,6 +541,7 @@ __all__ = [
     "COMPARTMENT_MAPS",
     "CompartmentMap",
     "MAP_BAND_SOURCE",
+    "MAP_ELEMENT_EVENT",
     "MAP_FIND_EVENT",
     "MAP_FIND_SOURCE",
     "MAP_REACTION_EVENT",
@@ -461,6 +552,7 @@ __all__ = [
     "map_bands",
     "add_map_links",
     "highlight_reactions",
+    "keep_map_scale",
     "map_ids_for_reactions",
     "map_reaction_ids",
     "map_reaction_names",

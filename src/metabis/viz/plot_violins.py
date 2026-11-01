@@ -1,5 +1,6 @@
 import base64
 import io
+from html import escape
 from typing import Optional, Tuple
 
 import numpy as np
@@ -611,13 +612,13 @@ def create_html_violin_for_hover(
     }" text-anchor="middle"
                   font-size="12" fill="#333" transform="rotate(-30 {scale_x(1.0)} {
         margin_top + plot_area_height + 25
-    })">{group1_name}</text>
+    })">{escape(str(group1_name))}</text>
             <text x="{scale_x(2.0)}" y="{
         margin_top + plot_area_height + 25
     }" text-anchor="middle"
                   font-size="12" fill="#333" transform="rotate(-30 {scale_x(2.0)} {
         margin_top + plot_area_height + 25
-    })">{group2_name}</text>
+    })">{escape(str(group2_name))}</text>
 
             <!-- Y-axis labels (simplified) -->
             <text x="{margin_left - 5}" y="{

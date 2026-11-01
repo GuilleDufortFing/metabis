@@ -1665,6 +1665,13 @@ def _convert_glyphs_to_bokeh_data(glyphs):
     sample_glyph = glyphs[0]
     glyph_class = sample_glyph["glyph_class"]
 
+    # The model's own identifier of what a glyph draws (a gene's Ensembl identifier, a
+    # metabolite's, under a map's own glyph IDs and display labels): what a click asks
+    # the element's details by, and finds it on a map by
+    # (metabis.managers.element_details).
+    if glyph_class in ("metabolite", "gene", "reaction"):
+        data["model_id"] = [str(g.get("label") or g["id"]) for g in glyphs]
+
     if glyph_class == "metabolite":
         data["size"] = [g.get("size", 20) for g in glyphs]
         # data["hover"] = [g.get("hover", f"Metabolite: {g['id']}") for g in glyphs]

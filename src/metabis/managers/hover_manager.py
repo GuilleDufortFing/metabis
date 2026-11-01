@@ -202,6 +202,14 @@ class HoverManager:
         """
         self.group_comparison_artifact = artifact
 
+    def main_direction(self, reaction_id: str) -> Optional[str]:
+        """The direction a reversible reaction is shown in, as its hover names it; None when unresolved."""
+        return self._resolve_main_direction(reaction_id)
+
+    def context(self, **options) -> HoverContext:
+        """The context a hover section is built in, as :meth:`_create_context` makes it."""
+        return self._create_context(**options)
+
     def _resolve_main_direction(self, reaction_id: str) -> Optional[str]:
         """Direction shown for a reversible reaction under the current mode.
 
