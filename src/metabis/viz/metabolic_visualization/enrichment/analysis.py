@@ -249,14 +249,26 @@ def should_metabolite_be_missing(metabolite_id, metabolite_reactions, active_rea
 # ============================================================================
 
 
+def _has_data(element_data):
+    """Whether a reaction's or a gene's data provider entry holds data in the workspace's mode."""
+    return bool(
+        element_data.get("comparison_stats", {}).get("has_comparison_data")
+        or element_data.get("experiment_stats", {}).get("has_experiment_data")
+    )
+
+
 def identify_missing_data_subgraph(glyphs, connections, data_manager):
     """Identify nodes that should have missing data styling.
 
     This function uses sophisticated logic to determine which elements should be
     styled as missing data:
     - Missing reactions: always marked as missing
-    - Genes: marked as missing if connected to missing reactions
-    - Enzyme groups: marked as missing if associated with missing reactions
+    - Genes: marked as missing if connected to missing reactions, unless they
+      have data of their own: a gene is coloured by its own test, so one beside
+      a reaction Compass found blocked (SAT1 beside MAR08603 in the Th17 data)
+      keeps its colour rather than reading as no data
+    - Enzyme groups: marked as missing if associated with missing reactions and
+      none of their genes has data
     - Metabolites: marked as missing only if ALL connected reactions are missing
 
     Args:
@@ -273,6 +285,8 @@ def identify_missing_data_subgraph(glyphs, connections, data_manager):
     missing_data_elements = {}
     missing_reaction_ids = set()
     missing_reaction_labels = set()
+    # Genes with data of their own in the workspace's mode, which stay coloured.
+    scored_genes = set()
 
     # Phase 1: Identify missing reactions
     for glyph in glyphs:
@@ -284,7 +298,7 @@ def identify_missing_data_subgraph(glyphs, connections, data_manager):
                     missing_data_elements[glyph["id"]] = "no_metadata"
                     missing_reaction_ids.add(glyph["id"])
                     missing_reaction_labels.add(reaction_id)
-                elif not (reaction_data.get("comparison_stats", {}).get("has_comparison_data") or reaction_data.get("experiment_stats", {}).get("has_experiment_data")):
+                elif not _has_data(reaction_data):
                     missing_data_elements[glyph["id"]] = "no_experimental_data"
                     missing_reaction_ids.add(glyph["id"])
                     missing_reaction_labels.add(reaction_id)
@@ -309,6 +323,8 @@ def identify_missing_data_subgraph(glyphs, connections, data_manager):
                 gene_data = data_manager.data_provider.get_gene_data(glyph["label"])
                 if not gene_data["is_in_model"]:
                     missing_data_elements[glyph["id"]] = "no_metadata"
+                elif _has_data(gene_data):
+                    scored_genes.add(glyph["id"])
             except Exception:
                 missing_data_elements[glyph["id"]] = "no_metadata"
 
@@ -346,20 +362,20 @@ def identify_missing_data_subgraph(glyphs, connections, data_manager):
             connected_glyph = next((g for g in glyphs if g["id"] == connected_id), None)
             if connected_glyph and connected_glyph["glyph_class"] == GlyphClass.GENE:
                 # If the gene is not already marked, mark as no_experimental_data (since it's due to missing reaction data)
-                if connected_id not in missing_data_elements:
+                if connected_id not in missing_data_elements and connected_id not in scored_genes:
                     missing_data_elements[connected_id] = "no_experimental_data"
 
     # Phase 6: Add enzyme groups associated with missing reactions
     for glyph in glyphs:
         if glyph["glyph_class"] == GlyphClass.ENZYME_GROUP and "reaction_id" in glyph:
             if glyph["reaction_id"] in missing_reaction_labels:
-                if glyph["id"] not in missing_data_elements:
+                members = glyph.get("glyph_ids") or ()
+                if glyph["id"] not in missing_data_elements and not scored_genes.intersection(members):
                     missing_data_elements[glyph["id"]] = "no_experimental_data"
-                # Also add all enzyme nodes in this group
-                if "glyph_ids" in glyph:
-                    for enzyme_id in glyph["glyph_ids"]:
-                        if enzyme_id not in missing_data_elements:
-                            missing_data_elements[enzyme_id] = "no_experimental_data"
+                # Also add the group's enzyme nodes without data of their own
+                for enzyme_id in members:
+                    if enzyme_id not in missing_data_elements and enzyme_id not in scored_genes:
+                        missing_data_elements[enzyme_id] = "no_experimental_data"
 
     # Phase 7: Analyze metabolites with smart connectivity logic
     for glyph in glyphs:
