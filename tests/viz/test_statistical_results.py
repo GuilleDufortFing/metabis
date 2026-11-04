@@ -268,30 +268,38 @@ def test_the_names_of_a_volcano_plot_follow_the_subsystem_in_focus():
     assert callback.args["naming"] == {"count": STRONGEST_NAMED, "name": "short_name", "significant": "significant"}
     place = callback.args["place"]
     assert place.args["names"] is names and place.args["unfocused"]["text"] == names.data["text"]
-    assert place in plot.x_range.js_property_callbacks["change:end"]
-    assert place in plot.y_range.js_property_callbacks["change:end"]
+    # Placed again whenever the view or the plot's size changes, either end of either axis.
+    for model, attribute in ((plot.x_range, "start"), (plot.x_range, "end"), (plot.y_range, "start"), (plot.y_range, "end"), (plot, "inner_width")):
+        assert place in model.js_property_callbacks[f"change:{attribute}"]
     assert "names.data = labels" in place.code
 
 
-def _place_names(place, *, size, x_range, y_range, unfocused=None) -> dict:
-    """Run a volcano plot's name placement in Node, on a plot of ``size`` (None: not laid out yet)."""
+def _place_names(place, *, size, x_range, y_range, unfocused=None, focus=None, dots=None) -> dict:
+    """Run a volcano plot's name placement in Node, on a plot of ``size`` (None: not laid out yet).
+
+    ``focus`` are the names the subsystem in focus chose, and ``dots`` its points.
+    """
     node = shutil.which("node")
     if node is None:
         pytest.skip("Node.js runs the placement")
     script = """
-    const [code, size, xRange, yRange, unfocused] = JSON.parse(process.argv[1]);
-    globalThis.window = {};
-    globalThis.requestAnimationFrame = (frame) => { globalThis.waiting = frame };
+    const [code, size, xRange, yRange, unfocused, focus, dots] = JSON.parse(process.argv[1]);
+    globalThis.window = {__metabisFocusNames: focus ? {names: focus} : {}};
+    const frames = [];
+    globalThis.requestAnimationFrame = (frame) => { frames.push(frame) };
     globalThis.document = {createElement: () => ({getContext: () => ({font: '', measureText: (text) => ({width: text.length * 6})})})};
     const plot = {x_range: {start: xRange[0], end: xRange[1]}, y_range: {start: yRange[0], end: yRange[1]}};
     for (const [name, index] of [['inner_width', 0], ['inner_height', 1]]) {
       Object.defineProperty(plot, name, {get() { if (size === null) throw new Error(`Figure.${name} is unset`); return size[index] }});
     }
     const names = {id: 'names', data: null};
-    new Function('plot', 'names', 'unfocused', code)(plot, names, unfocused);
-    console.log(JSON.stringify({data: names.data, waiting: typeof globalThis.waiting === 'function'}));
+    const leaders = {data: null};
+    new Function('plot', 'names', 'unfocused', 'dots', 'leaders', code)(plot, names, unfocused, {data: dots ?? {x: [], y: []}}, leaders);
+    // The placement runs at the next frame, once however often the view moved.
+    frames.shift()();
+    console.log(JSON.stringify({data: names.data, leaders: leaders.data, waiting: frames.length > 0}));
     """
-    arguments = json.dumps([place.code, size, x_range, y_range, unfocused or place.args["unfocused"]])
+    arguments = json.dumps([place.code, size, x_range, y_range, unfocused or place.args["unfocused"], focus, dots])
     result = subprocess.run([node, "-e", script, arguments], capture_output=True, text=True, check=True)
     return json.loads(result.stdout)
 
@@ -310,11 +318,38 @@ def test_volcano_names_wait_for_the_plot_and_never_overlap():
     early = _place_names(place, size=None, x_range=[-1, 2], y_range=[0, 3])
     assert early["data"]["text"] == names.data["text"] and early["waiting"]
 
-    # Two names on almost the same point go to either side, or one above the other.
-    crowded = {"x": [1.0, 1.01], "y": [2.0, 2.0], "text": ["CD36", "SLC14A1"]}
+    # Two names on nearby points go to either side, or one above the other.
+    crowded = {"x": [1.0, 1.05], "y": [2.0, 2.0], "text": ["CD36", "SLC14A1"]}
     placed = _place_names(place, size=[400, 300], x_range=[-1, 2], y_range=[0, 3], unfocused=crowded)["data"]
     assert placed["text"] == ["CD36", "SLC14A1"]
     assert placed["align"][0] != placed["align"][1] or placed["y_offset"][0] != placed["y_offset"][1]
+
+    # Features at one point, as two reactions of the same statistics, share one name.
+    same = {"x": [1.0, 1.0, 1.0], "y": [2.0, 2.0, 2.0], "text": ["Guanine aminohydrolase", "xanthosine", "guanosine"]}
+    shared = _place_names(place, size=[400, 300], x_range=[-1, 2], y_range=[0, 3], unfocused=same)["data"]
+    assert shared["text"] == ["Guanine aminohydrolase +2"]
+
+
+def test_volcano_names_never_hide_a_point_in_focus_and_a_lifted_one_is_joined_to_its_own():
+    from metabis.viz.plot_statistical_distributions import VOLCANO_NAMES
+
+    plot = plot_statistical_scatterplots(
+        _workspace(), return_plot=True, volcano="cohens_d", members={"R1": ["glyc"]}, categories={"glyc": "Carbohydrate"}
+    )
+    place = plot.x_range.js_property_callbacks["change:end"][0]
+    assert place.args["names"] is plot.select_one({"name": VOLCANO_NAMES})
+
+    # 100 px a unit. A point in focus where the name would go, beside its own
+    # point, to the right of it: the name moves up and a line joins it to its point.
+    focus = [{"x": 0.0, "y": 1.5, "text": "ATP:AMP phosphotransferase"}]
+    dots = {"x": [0.0, 0.5], "y": [1.5, 1.5]}
+    result = _place_names(place, size=[300, 300], x_range=[-1, 2], y_range=[0, 3], focus=focus, dots=dots)
+    placed, lines = result["data"], result["leaders"]
+    assert placed["text"] == ["ATP:AMP phosphotransferase"] and placed["y_offset"][0] != 0
+    assert len(lines["x0"]) == 1
+    # The line starts by the named point, not on it, and ends where the name begins.
+    assert abs(lines["x0"][0]) < 0.05 and abs(lines["y0"][0] - 1.5) < 0.05 and (lines["x0"][0], lines["y0"][0]) != (0.0, 1.5)
+    assert abs(lines["y1"][0] - (1.5 + placed["y_offset"][0] / 100)) < 1e-9
 
 
 def test_the_four_distributions_share_one_row_that_wraps_when_narrow():

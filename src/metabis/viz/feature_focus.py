@@ -101,10 +101,17 @@ def add_feature_focus(
     place = None
     if names is not None:
         # Each name beside its point, on whichever side and at whichever of a few
-        # heights keeps it inside the frame and off the names placed before it; a
-        # name with no such place is left out. Placed again as the view moves.
+        # heights keeps it inside the frame, off the names placed before it and off
+        # every point named or in focus, so no name hides a point and passes for
+        # another's; a name with no such place is left out. Features at one point
+        # share a name, the first's with how many more; a name lifted off its
+        # point is joined to it by a line. Placed again as the view moves.
+        leaders = ColumnDataSource({"x0": [], "y0": [], "x1": [], "y1": []})
+        plot.segment(
+            x0="x0", y0="y0", x1="x1", y1="y1", source=leaders, line_color=theme.INK, line_alpha=0.6, line_width=1, level="overlay"
+        )
         place = CustomJS(
-            args=dict(plot=plot, names=names.labels, unfocused=dict(names.labels.data)),
+            args=dict(plot=plot, names=names.labels, unfocused=dict(names.labels.data), dots=chosen, leaders=leaders),
             code="""
             // The names' own font (the LabelSet's 11px Helvetica), measured.
             const context = (window.__metabisNameCanvas ??= document.createElement('canvas').getContext('2d'))
@@ -127,16 +134,34 @@ def add_feature_focus(
               }
               const px = (x) => ((x - xr.start) / (xr.end - xr.start)) * width
               const py = (y) => ((yr.end - y) / (yr.end - yr.start)) * height
-              const boxes = []
-              const labels = {x: [], y: [], text: [], align: [], x_offset: [], y_offset: []}
+              const dataX = (x) => xr.start + (x / width) * (xr.end - xr.start)
+              const dataY = (y) => yr.end - (y / height) * (yr.end - yr.start)
+              // The points no name may cover: those named, and those in focus.
+              const points = candidates.map((name) => [px(name.x), py(name.y)])
+              if (chosen) dots.data.x.forEach((x, i) => points.push([px(x), py(dots.data.y[i])]))
+              const covers = (box) => points.some(([x, y]) => x > box.l - 4 && x < box.r + 4 && y > box.t - 4 && y < box.b + 4)
+              // Features at one point, as two reactions of the same statistics, share one name.
+              const groups = []
               for (const name of candidates) {
                 const x = px(name.x)
                 const y = py(name.y)
+                const same = groups.find((group) => Math.abs(group.px - x) < 3 && Math.abs(group.py - y) < 3)
+                if (same) same.more += 1
+                else groups.push({x: name.x, y: name.y, text: name.text, px: x, py: y, more: 0})
+              }
+              const boxes = []
+              const labels = {x: [], y: [], text: [], align: [], x_offset: [], y_offset: []}
+              const lines = {x0: [], y0: [], x1: [], y1: []}
+              for (const group of groups) {
+                const x = group.px
+                const y = group.py
                 if (x < 0 || x > width || y < 0 || y > height) continue
                 // A name longer than the room on its wider side ends in an ellipsis.
+                const more = group.more ? ` +${group.more}` : ''
                 const room = Math.max(width - x, x) - 18
-                let text = name.text
-                while (text.length > 10 && measure(text) > room) text = text.slice(0, -2) + '\u2026'
+                let text = group.text
+                while (text.length > 10 && measure(text + more) > room) text = text.slice(0, -2) + '\u2026'
+                text += more
                 if (measure(text) > room) continue
                 const w = measure(text) + 6
                 const sides = x > width * 0.6 ? [true, false] : [false, true]
@@ -148,6 +173,7 @@ def add_feature_focus(
                     const box = {l: left, r: left + w, t: top, b: top + 16}
                     if (box.l < 0 || box.r > width || box.t < 0 || box.b > height) continue
                     if (boxes.some((o) => box.l < o.r && box.r > o.l && box.t < o.b && box.b > o.t)) continue
+                    if (covers(box)) continue
                     spot = {box, right, lift}
                     break
                   }
@@ -155,20 +181,34 @@ def add_feature_focus(
                 }
                 if (!spot) continue
                 boxes.push(spot.box)
-                labels.x.push(name.x)
-                labels.y.push(name.y)
+                labels.x.push(group.x)
+                labels.y.push(group.y)
                 labels.text.push(text)
                 labels.align.push(spot.right ? 'right' : 'left')
                 labels.x_offset.push(spot.right ? -6 : 6)
                 labels.y_offset.push(spot.lift)
+                if (spot.lift !== 0) {
+                  // From the point's edge to the name's near end.
+                  const endX = spot.right ? x - 6 : x + 6
+                  const endY = y - spot.lift
+                  const length = Math.hypot(endX - x, endY - y)
+                  lines.x0.push(dataX(x + ((endX - x) / length) * 4))
+                  lines.y0.push(dataY(y + ((endY - y) / length) * 4))
+                  lines.x1.push(dataX(endX))
+                  lines.y1.push(dataY(endY))
+                }
               }
               names.data = labels
+              leaders.data = lines
             }
-            run(0)
+            // Once a frame, however many of the view's ends and sizes change in it.
+            if (names.__metabis_placing) return
+            names.__metabis_placing = true
+            requestAnimationFrame(() => { names.__metabis_placing = false; run(0) })
             """,
         )
-        plot.x_range.js_on_change("end", place)
-        plot.y_range.js_on_change("end", place)
+        for model, attribute in ((plot.x_range, "start"), (plot.x_range, "end"), (plot.y_range, "start"), (plot.y_range, "end"), (plot, "inner_width"), (plot, "inner_height")):
+            model.js_on_change(attribute, place)
     update = CustomJS(
         args=dict(
             plot=plot,
