@@ -47,16 +47,16 @@ def test_human1_transport_divides_into_nine_subsystems_of_its_category(model):
 
     assert "transport_reactions" not in model.get_subsystems()
     assert sizes == {
-        "Transport, extracellular": 2791,
-        "Transport, mitochondrial": 485,
-        "Transport, endoplasmic reticular": 250,
-        "Transport, lysosomal": 183,
+        "Transport, extracellular": 2719,
+        "Transport, mitochondrial": 430,
+        "Transport, endoplasmic reticular": 251,
+        "Transport, lysosomal": 180,
         "Transport, peroxisomal": 179,
-        "Transport, Golgi apparatus": 116,
-        "Transport, nuclear": 94,
-        "Transport, between organelles": 47,
-        "Transport, within one compartment": 12,
-        "Exchange/demand reactions": 1658,
+        "Transport, Golgi apparatus": 114,
+        "Transport, nuclear": 95,
+        "Transport, between organelles": 46,
+        "Transport, within one compartment": 4,
+        "Exchange/demand reactions": 1652,
     }
 
 

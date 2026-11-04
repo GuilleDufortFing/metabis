@@ -155,7 +155,7 @@
       "glyph_class": "metabolite",
       "label": "MAM01398c",
       "x": 248.0,
-      "y": 538.0,
+      "y": 467.0,
       "width": 60.0,
       "height": 40.0,
       "original_id": "MAM01398c",
@@ -166,7 +166,7 @@
       "glyph_class": "metabolite",
       "label": "MAM03106c",
       "x": 248.0,
-      "y": 467.0,
+      "y": 538.0,
       "width": 40.0,
       "height": 30.0,
       "original_id": "MAM03106c",
@@ -182,12 +182,12 @@
       "height": 70.0,
       "reaction_id": "MAR01450",
       "enzymes": [
-        "ENSG00000103415",
-        "ENSG00000100292"
+        "ENSG00000100292",
+        "ENSG00000103415"
       ],
       "glyph_ids": [
-        "g_r_MAR01450_ENSG00000103415",
-        "g_r_MAR01450_ENSG00000100292"
+        "g_r_MAR01450_ENSG00000100292",
+        "g_r_MAR01450_ENSG00000103415"
       ],
       "outline_color": "#7B68EE",
       "outline_width": 2,
@@ -197,9 +197,9 @@
       ]
     },
     {
-      "id": "g_r_MAR01450_ENSG00000103415",
+      "id": "g_r_MAR01450_ENSG00000100292",
       "glyph_class": "gene",
-      "label": "ENSG00000103415",
+      "label": "ENSG00000100292",
       "x": 149.0,
       "y": 197.0,
       "width": 60.0,
@@ -208,9 +208,9 @@
       "enzyme_group": "eg_r_MAR01450"
     },
     {
-      "id": "g_r_MAR01450_ENSG00000100292",
+      "id": "g_r_MAR01450_ENSG00000103415",
       "glyph_class": "gene",
-      "label": "ENSG00000100292",
+      "label": "ENSG00000103415",
       "x": 149.0,
       "y": 227.0,
       "width": 60.0,

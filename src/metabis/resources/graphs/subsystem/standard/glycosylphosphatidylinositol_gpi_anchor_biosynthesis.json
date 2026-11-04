@@ -14,7 +14,7 @@
       "glyph_class": "reaction",
       "label": "MAR08378",
       "x": 149.0,
-      "y": 495.0,
+      "y": 494.0,
       "width": 50.0,
       "height": 50.0,
       "original_id": "MAR08378"
@@ -54,7 +54,7 @@
       "glyph_class": "metabolite",
       "label": "MAM01733c",
       "x": 30.0,
-      "y": 489.0,
+      "y": 640.0,
       "width": 60.0,
       "height": 40.0,
       "original_id": "MAM01733c",
@@ -65,7 +65,7 @@
       "glyph_class": "metabolite",
       "label": "MAM02039c",
       "x": 30.0,
-      "y": 636.0,
+      "y": 493.0,
       "width": 40.0,
       "height": 30.0,
       "original_id": "MAM02039c",
@@ -87,7 +87,7 @@
       "glyph_class": "metabolite",
       "label": "MAM02645c",
       "x": 30.0,
-      "y": 565.0,
+      "y": 564.0,
       "width": 60.0,
       "height": 40.0,
       "original_id": "MAM02645c",
@@ -98,7 +98,7 @@
       "glyph_class": "metabolite",
       "label": "MAM00205c",
       "x": 268.0,
-      "y": 603.0,
+      "y": 602.0,
       "width": 60.0,
       "height": 40.0,
       "original_id": "MAM00205c",
@@ -109,7 +109,7 @@
       "glyph_class": "metabolite",
       "label": "MAM01734c",
       "x": 268.0,
-      "y": 527.0,
+      "y": 526.0,
       "width": 60.0,
       "height": 40.0,
       "original_id": "MAM01734c",
@@ -230,7 +230,7 @@
       "glyph_class": "enzyme_group",
       "label": "Enzymes for MAR08378",
       "x": 149.0,
-      "y": 625.0,
+      "y": 624.0,
       "width": 70.0,
       "height": 70.0,
       "reaction_id": "MAR08378",
@@ -259,24 +259,22 @@
       "height": 130.0,
       "reaction_id": "MAR08379",
       "enzymes": [
-        "ENSG00000145337",
-        "ENSG00000138641",
         "ENSG00000185808",
-        "ENSG00000135845",
         "ENSG00000007541",
         "ENSG00000100564",
+        "ENSG00000165195",
         "ENSG00000255072",
-        "ENSG00000165195"
+        "ENSG00000145337",
+        "ENSG00000135845"
       ],
       "glyph_ids": [
-        "g_r_MAR08379_ENSG00000145337",
-        "g_r_MAR08379_ENSG00000138641",
         "g_r_MAR08379_ENSG00000185808",
-        "g_r_MAR08379_ENSG00000135845",
         "g_r_MAR08379_ENSG00000007541",
         "g_r_MAR08379_ENSG00000100564",
+        "g_r_MAR08379_ENSG00000165195",
         "g_r_MAR08379_ENSG00000255072",
-        "g_r_MAR08379_ENSG00000165195"
+        "g_r_MAR08379_ENSG00000145337",
+        "g_r_MAR08379_ENSG00000135845"
       ],
       "outline_color": "#7B68EE",
       "outline_width": 2,
@@ -334,7 +332,7 @@
       "glyph_class": "gene",
       "label": "ENSG00000130714",
       "x": 149.0,
-      "y": 610.0,
+      "y": 609.0,
       "width": 60.0,
       "height": 30.0,
       "associated_reaction": "r_MAR08378",
@@ -345,51 +343,18 @@
       "glyph_class": "gene",
       "label": "ENSG00000009830",
       "x": 149.0,
-      "y": 640.0,
+      "y": 639.0,
       "width": 60.0,
       "height": 30.0,
       "associated_reaction": "r_MAR08378",
       "enzyme_group": "eg_r_MAR08378"
     },
     {
-      "id": "g_r_MAR08379_ENSG00000145337",
-      "glyph_class": "gene",
-      "label": "ENSG00000145337",
-      "x": 149.0,
-      "y": 140.0,
-      "width": 60.0,
-      "height": 30.0,
-      "associated_reaction": "r_MAR08379",
-      "enzyme_group": "eg_r_MAR08379"
-    },
-    {
-      "id": "g_r_MAR08379_ENSG00000138641",
-      "glyph_class": "gene",
-      "label": "ENSG00000138641",
-      "x": 209.0,
-      "y": 140.0,
-      "width": 60.0,
-      "height": 30.0,
-      "associated_reaction": "r_MAR08379",
-      "enzyme_group": "eg_r_MAR08379"
-    },
-    {
       "id": "g_r_MAR08379_ENSG00000185808",
       "glyph_class": "gene",
       "label": "ENSG00000185808",
       "x": 149.0,
-      "y": 170.0,
-      "width": 60.0,
-      "height": 30.0,
-      "associated_reaction": "r_MAR08379",
-      "enzyme_group": "eg_r_MAR08379"
-    },
-    {
-      "id": "g_r_MAR08379_ENSG00000135845",
-      "glyph_class": "gene",
-      "label": "ENSG00000135845",
-      "x": 209.0,
-      "y": 170.0,
+      "y": 140.0,
       "width": 60.0,
       "height": 30.0,
       "associated_reaction": "r_MAR08379",
@@ -399,8 +364,8 @@
       "id": "g_r_MAR08379_ENSG00000007541",
       "glyph_class": "gene",
       "label": "ENSG00000007541",
-      "x": 149.0,
-      "y": 200.0,
+      "x": 209.0,
+      "y": 140.0,
       "width": 60.0,
       "height": 30.0,
       "associated_reaction": "r_MAR08379",
@@ -410,19 +375,8 @@
       "id": "g_r_MAR08379_ENSG00000100564",
       "glyph_class": "gene",
       "label": "ENSG00000100564",
-      "x": 209.0,
-      "y": 200.0,
-      "width": 60.0,
-      "height": 30.0,
-      "associated_reaction": "r_MAR08379",
-      "enzyme_group": "eg_r_MAR08379"
-    },
-    {
-      "id": "g_r_MAR08379_ENSG00000255072",
-      "glyph_class": "gene",
-      "label": "ENSG00000255072",
       "x": 149.0,
-      "y": 230.0,
+      "y": 170.0,
       "width": 60.0,
       "height": 30.0,
       "associated_reaction": "r_MAR08379",
@@ -433,6 +387,39 @@
       "glyph_class": "gene",
       "label": "ENSG00000165195",
       "x": 209.0,
+      "y": 170.0,
+      "width": 60.0,
+      "height": 30.0,
+      "associated_reaction": "r_MAR08379",
+      "enzyme_group": "eg_r_MAR08379"
+    },
+    {
+      "id": "g_r_MAR08379_ENSG00000255072",
+      "glyph_class": "gene",
+      "label": "ENSG00000255072",
+      "x": 149.0,
+      "y": 200.0,
+      "width": 60.0,
+      "height": 30.0,
+      "associated_reaction": "r_MAR08379",
+      "enzyme_group": "eg_r_MAR08379"
+    },
+    {
+      "id": "g_r_MAR08379_ENSG00000145337",
+      "glyph_class": "gene",
+      "label": "ENSG00000145337",
+      "x": 209.0,
+      "y": 200.0,
+      "width": 60.0,
+      "height": 30.0,
+      "associated_reaction": "r_MAR08379",
+      "enzyme_group": "eg_r_MAR08379"
+    },
+    {
+      "id": "g_r_MAR08379_ENSG00000135845",
+      "glyph_class": "gene",
+      "label": "ENSG00000135845",
+      "x": 149.0,
       "y": 230.0,
       "width": 60.0,
       "height": 30.0,
@@ -1311,24 +1298,22 @@
       "height": 130.0,
       "reaction_id": "MAR07185",
       "enzymes": [
-        "ENSG00000145337",
-        "ENSG00000138641",
         "ENSG00000185808",
-        "ENSG00000135845",
         "ENSG00000007541",
         "ENSG00000100564",
+        "ENSG00000165195",
         "ENSG00000255072",
-        "ENSG00000165195"
+        "ENSG00000145337",
+        "ENSG00000135845"
       ],
       "glyph_ids": [
-        "g_r_MAR07185_ENSG00000145337",
-        "g_r_MAR07185_ENSG00000138641",
         "g_r_MAR07185_ENSG00000185808",
-        "g_r_MAR07185_ENSG00000135845",
         "g_r_MAR07185_ENSG00000007541",
         "g_r_MAR07185_ENSG00000100564",
+        "g_r_MAR07185_ENSG00000165195",
         "g_r_MAR07185_ENSG00000255072",
-        "g_r_MAR07185_ENSG00000165195"
+        "g_r_MAR07185_ENSG00000145337",
+        "g_r_MAR07185_ENSG00000135845"
       ],
       "outline_color": "#7B68EE",
       "outline_width": 2,
@@ -1614,13 +1599,13 @@
       "reaction_id": "MAR08393",
       "enzymes": [
         "ENSG00000174227",
-        "ENSG00000165282",
-        "ENSG00000151665"
+        "ENSG00000151665",
+        "ENSG00000165282"
       ],
       "glyph_ids": [
         "g_r_MAR08393_ENSG00000174227",
-        "g_r_MAR08393_ENSG00000165282",
-        "g_r_MAR08393_ENSG00000151665"
+        "g_r_MAR08393_ENSG00000151665",
+        "g_r_MAR08393_ENSG00000165282"
       ],
       "outline_color": "#7B68EE",
       "outline_width": 2,
@@ -1686,13 +1671,13 @@
       "reaction_id": "MAR08396",
       "enzymes": [
         "ENSG00000174227",
-        "ENSG00000165282",
-        "ENSG00000151665"
+        "ENSG00000151665",
+        "ENSG00000165282"
       ],
       "glyph_ids": [
         "g_r_MAR08396_ENSG00000174227",
-        "g_r_MAR08396_ENSG00000165282",
-        "g_r_MAR08396_ENSG00000151665"
+        "g_r_MAR08396_ENSG00000151665",
+        "g_r_MAR08396_ENSG00000165282"
       ],
       "outline_color": "#7B68EE",
       "outline_width": 2,
@@ -1780,13 +1765,13 @@
       "reaction_id": "MAR08401",
       "enzymes": [
         "ENSG00000174227",
-        "ENSG00000165282",
-        "ENSG00000151665"
+        "ENSG00000151665",
+        "ENSG00000165282"
       ],
       "glyph_ids": [
         "g_r_MAR08401_ENSG00000174227",
-        "g_r_MAR08401_ENSG00000165282",
-        "g_r_MAR08401_ENSG00000151665"
+        "g_r_MAR08401_ENSG00000151665",
+        "g_r_MAR08401_ENSG00000165282"
       ],
       "outline_color": "#7B68EE",
       "outline_width": 2,
@@ -1808,15 +1793,15 @@
         "ENSG00000087111",
         "ENSG00000142892",
         "ENSG00000101464",
-        "ENSG00000197858",
-        "ENSG00000124155"
+        "ENSG00000124155",
+        "ENSG00000197858"
       ],
       "glyph_ids": [
         "g_r_MAR08402_ENSG00000087111",
         "g_r_MAR08402_ENSG00000142892",
         "g_r_MAR08402_ENSG00000101464",
-        "g_r_MAR08402_ENSG00000197858",
-        "g_r_MAR08402_ENSG00000124155"
+        "g_r_MAR08402_ENSG00000124155",
+        "g_r_MAR08402_ENSG00000197858"
       ],
       "outline_color": "#7B68EE",
       "outline_width": 2,
@@ -1860,15 +1845,15 @@
         "ENSG00000087111",
         "ENSG00000142892",
         "ENSG00000101464",
-        "ENSG00000197858",
-        "ENSG00000124155"
+        "ENSG00000124155",
+        "ENSG00000197858"
       ],
       "glyph_ids": [
         "g_r_MAR08404_ENSG00000087111",
         "g_r_MAR08404_ENSG00000142892",
         "g_r_MAR08404_ENSG00000101464",
-        "g_r_MAR08404_ENSG00000197858",
-        "g_r_MAR08404_ENSG00000124155"
+        "g_r_MAR08404_ENSG00000124155",
+        "g_r_MAR08404_ENSG00000197858"
       ],
       "outline_color": "#7B68EE",
       "outline_width": 2,
@@ -1912,15 +1897,15 @@
         "ENSG00000087111",
         "ENSG00000142892",
         "ENSG00000101464",
-        "ENSG00000197858",
-        "ENSG00000124155"
+        "ENSG00000124155",
+        "ENSG00000197858"
       ],
       "glyph_ids": [
         "g_r_MAR08406_ENSG00000087111",
         "g_r_MAR08406_ENSG00000142892",
         "g_r_MAR08406_ENSG00000101464",
-        "g_r_MAR08406_ENSG00000197858",
-        "g_r_MAR08406_ENSG00000124155"
+        "g_r_MAR08406_ENSG00000124155",
+        "g_r_MAR08406_ENSG00000197858"
       ],
       "outline_color": "#7B68EE",
       "outline_width": 2,
@@ -1942,15 +1927,15 @@
         "ENSG00000087111",
         "ENSG00000142892",
         "ENSG00000101464",
-        "ENSG00000197858",
-        "ENSG00000124155"
+        "ENSG00000124155",
+        "ENSG00000197858"
       ],
       "glyph_ids": [
         "g_r_MAR08407_ENSG00000087111",
         "g_r_MAR08407_ENSG00000142892",
         "g_r_MAR08407_ENSG00000101464",
-        "g_r_MAR08407_ENSG00000197858",
-        "g_r_MAR08407_ENSG00000124155"
+        "g_r_MAR08407_ENSG00000124155",
+        "g_r_MAR08407_ENSG00000197858"
       ],
       "outline_color": "#7B68EE",
       "outline_width": 2,
@@ -1960,44 +1945,11 @@
       ]
     },
     {
-      "id": "g_r_MAR07185_ENSG00000145337",
-      "glyph_class": "gene",
-      "label": "ENSG00000145337",
-      "x": 149.0,
-      "y": 1378.0,
-      "width": 60.0,
-      "height": 30.0,
-      "associated_reaction": "r_MAR07185",
-      "enzyme_group": "eg_r_MAR07185"
-    },
-    {
-      "id": "g_r_MAR07185_ENSG00000138641",
-      "glyph_class": "gene",
-      "label": "ENSG00000138641",
-      "x": 209.0,
-      "y": 1378.0,
-      "width": 60.0,
-      "height": 30.0,
-      "associated_reaction": "r_MAR07185",
-      "enzyme_group": "eg_r_MAR07185"
-    },
-    {
       "id": "g_r_MAR07185_ENSG00000185808",
       "glyph_class": "gene",
       "label": "ENSG00000185808",
       "x": 149.0,
-      "y": 1408.0,
-      "width": 60.0,
-      "height": 30.0,
-      "associated_reaction": "r_MAR07185",
-      "enzyme_group": "eg_r_MAR07185"
-    },
-    {
-      "id": "g_r_MAR07185_ENSG00000135845",
-      "glyph_class": "gene",
-      "label": "ENSG00000135845",
-      "x": 209.0,
-      "y": 1408.0,
+      "y": 1378.0,
       "width": 60.0,
       "height": 30.0,
       "associated_reaction": "r_MAR07185",
@@ -2007,8 +1959,8 @@
       "id": "g_r_MAR07185_ENSG00000007541",
       "glyph_class": "gene",
       "label": "ENSG00000007541",
-      "x": 149.0,
-      "y": 1438.0,
+      "x": 209.0,
+      "y": 1378.0,
       "width": 60.0,
       "height": 30.0,
       "associated_reaction": "r_MAR07185",
@@ -2018,19 +1970,8 @@
       "id": "g_r_MAR07185_ENSG00000100564",
       "glyph_class": "gene",
       "label": "ENSG00000100564",
-      "x": 209.0,
-      "y": 1438.0,
-      "width": 60.0,
-      "height": 30.0,
-      "associated_reaction": "r_MAR07185",
-      "enzyme_group": "eg_r_MAR07185"
-    },
-    {
-      "id": "g_r_MAR07185_ENSG00000255072",
-      "glyph_class": "gene",
-      "label": "ENSG00000255072",
       "x": 149.0,
-      "y": 1468.0,
+      "y": 1408.0,
       "width": 60.0,
       "height": 30.0,
       "associated_reaction": "r_MAR07185",
@@ -2041,6 +1982,39 @@
       "glyph_class": "gene",
       "label": "ENSG00000165195",
       "x": 209.0,
+      "y": 1408.0,
+      "width": 60.0,
+      "height": 30.0,
+      "associated_reaction": "r_MAR07185",
+      "enzyme_group": "eg_r_MAR07185"
+    },
+    {
+      "id": "g_r_MAR07185_ENSG00000255072",
+      "glyph_class": "gene",
+      "label": "ENSG00000255072",
+      "x": 149.0,
+      "y": 1438.0,
+      "width": 60.0,
+      "height": 30.0,
+      "associated_reaction": "r_MAR07185",
+      "enzyme_group": "eg_r_MAR07185"
+    },
+    {
+      "id": "g_r_MAR07185_ENSG00000145337",
+      "glyph_class": "gene",
+      "label": "ENSG00000145337",
+      "x": 209.0,
+      "y": 1438.0,
+      "width": 60.0,
+      "height": 30.0,
+      "associated_reaction": "r_MAR07185",
+      "enzyme_group": "eg_r_MAR07185"
+    },
+    {
+      "id": "g_r_MAR07185_ENSG00000135845",
+      "glyph_class": "gene",
+      "label": "ENSG00000135845",
+      "x": 149.0,
       "y": 1468.0,
       "width": 60.0,
       "height": 30.0,
@@ -2202,9 +2176,9 @@
       "enzyme_group": "eg_r_MAR08393"
     },
     {
-      "id": "g_r_MAR08393_ENSG00000165282",
+      "id": "g_r_MAR08393_ENSG00000151665",
       "glyph_class": "gene",
-      "label": "ENSG00000165282",
+      "label": "ENSG00000151665",
       "x": 1727.0,
       "y": 2505.0,
       "width": 60.0,
@@ -2213,9 +2187,9 @@
       "enzyme_group": "eg_r_MAR08393"
     },
     {
-      "id": "g_r_MAR08393_ENSG00000151665",
+      "id": "g_r_MAR08393_ENSG00000165282",
       "glyph_class": "gene",
-      "label": "ENSG00000151665",
+      "label": "ENSG00000165282",
       "x": 1727.0,
       "y": 2535.0,
       "width": 60.0,
@@ -2268,9 +2242,9 @@
       "enzyme_group": "eg_r_MAR08396"
     },
     {
-      "id": "g_r_MAR08396_ENSG00000165282",
+      "id": "g_r_MAR08396_ENSG00000151665",
       "glyph_class": "gene",
-      "label": "ENSG00000165282",
+      "label": "ENSG00000151665",
       "x": 1995.0,
       "y": 1770.0,
       "width": 60.0,
@@ -2279,9 +2253,9 @@
       "enzyme_group": "eg_r_MAR08396"
     },
     {
-      "id": "g_r_MAR08396_ENSG00000151665",
+      "id": "g_r_MAR08396_ENSG00000165282",
       "glyph_class": "gene",
-      "label": "ENSG00000151665",
+      "label": "ENSG00000165282",
       "x": 1995.0,
       "y": 1800.0,
       "width": 60.0,
@@ -2345,9 +2319,9 @@
       "enzyme_group": "eg_r_MAR08401"
     },
     {
-      "id": "g_r_MAR08401_ENSG00000165282",
+      "id": "g_r_MAR08401_ENSG00000151665",
       "glyph_class": "gene",
-      "label": "ENSG00000165282",
+      "label": "ENSG00000151665",
       "x": 1161.0,
       "y": 1330.0,
       "width": 60.0,
@@ -2356,9 +2330,9 @@
       "enzyme_group": "eg_r_MAR08401"
     },
     {
-      "id": "g_r_MAR08401_ENSG00000151665",
+      "id": "g_r_MAR08401_ENSG00000165282",
       "glyph_class": "gene",
-      "label": "ENSG00000151665",
+      "label": "ENSG00000165282",
       "x": 1161.0,
       "y": 1360.0,
       "width": 60.0,
@@ -2400,9 +2374,9 @@
       "enzyme_group": "eg_r_MAR08402"
     },
     {
-      "id": "g_r_MAR08402_ENSG00000197858",
+      "id": "g_r_MAR08402_ENSG00000124155",
       "glyph_class": "gene",
-      "label": "ENSG00000197858",
+      "label": "ENSG00000124155",
       "x": 2531.0,
       "y": 3198.0,
       "width": 60.0,
@@ -2411,9 +2385,9 @@
       "enzyme_group": "eg_r_MAR08402"
     },
     {
-      "id": "g_r_MAR08402_ENSG00000124155",
+      "id": "g_r_MAR08402_ENSG00000197858",
       "glyph_class": "gene",
-      "label": "ENSG00000124155",
+      "label": "ENSG00000197858",
       "x": 2471.0,
       "y": 3228.0,
       "width": 60.0,
@@ -2466,9 +2440,9 @@
       "enzyme_group": "eg_r_MAR08404"
     },
     {
-      "id": "g_r_MAR08404_ENSG00000197858",
+      "id": "g_r_MAR08404_ENSG00000124155",
       "glyph_class": "gene",
-      "label": "ENSG00000197858",
+      "label": "ENSG00000124155",
       "x": 2531.0,
       "y": 2903.0,
       "width": 60.0,
@@ -2477,9 +2451,9 @@
       "enzyme_group": "eg_r_MAR08404"
     },
     {
-      "id": "g_r_MAR08404_ENSG00000124155",
+      "id": "g_r_MAR08404_ENSG00000197858",
       "glyph_class": "gene",
-      "label": "ENSG00000124155",
+      "label": "ENSG00000197858",
       "x": 2471.0,
       "y": 2933.0,
       "width": 60.0,
@@ -2532,9 +2506,9 @@
       "enzyme_group": "eg_r_MAR08406"
     },
     {
-      "id": "g_r_MAR08406_ENSG00000197858",
+      "id": "g_r_MAR08406_ENSG00000124155",
       "glyph_class": "gene",
-      "label": "ENSG00000197858",
+      "label": "ENSG00000124155",
       "x": 1757.0,
       "y": 2053.0,
       "width": 60.0,
@@ -2543,9 +2517,9 @@
       "enzyme_group": "eg_r_MAR08406"
     },
     {
-      "id": "g_r_MAR08406_ENSG00000124155",
+      "id": "g_r_MAR08406_ENSG00000197858",
       "glyph_class": "gene",
-      "label": "ENSG00000124155",
+      "label": "ENSG00000197858",
       "x": 1697.0,
       "y": 2083.0,
       "width": 60.0,
@@ -2587,9 +2561,9 @@
       "enzyme_group": "eg_r_MAR08407"
     },
     {
-      "id": "g_r_MAR08407_ENSG00000197858",
+      "id": "g_r_MAR08407_ENSG00000124155",
       "glyph_class": "gene",
-      "label": "ENSG00000197858",
+      "label": "ENSG00000124155",
       "x": 1459.0,
       "y": 1455.0,
       "width": 60.0,
@@ -2598,9 +2572,9 @@
       "enzyme_group": "eg_r_MAR08407"
     },
     {
-      "id": "g_r_MAR08407_ENSG00000124155",
+      "id": "g_r_MAR08407_ENSG00000197858",
       "glyph_class": "gene",
-      "label": "ENSG00000124155",
+      "label": "ENSG00000197858",
       "x": 1399.0,
       "y": 1485.0,
       "width": 60.0,

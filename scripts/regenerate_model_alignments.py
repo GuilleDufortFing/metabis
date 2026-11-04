@@ -51,7 +51,14 @@ Usage::
 changes nothing; ``--write`` replaces the packaged files. The source models are
 downloaded once into ``--cache`` and verified against the SHA-256 recorded here.
 No public copy of HMR 1.0 was found, so it has no table and
-``alignment_HMR1.0.txt`` is not regenerated; it holds no reversal.
+``alignment_HMR1.0.txt`` is not regenerated; it holds no reversal. ``--write``
+keeps its values for the Human1 reactions the packaged model still has and
+gives the reactions it adds 0: HMR 1.0 has no counterpart to them that this
+script could read.
+
+Each file lists the packaged model's reactions, in its order, so after a new
+Human1 release (``scripts/import_human_gem.py``) the reactions it removed leave
+every file and those it adds come in, which ``--check`` reports.
 """
 
 from __future__ import annotations
@@ -147,29 +154,38 @@ SOURCES = {
 # Rows the stoichiometry leaves open, read from both equations by hand: each source
 # reaction keeps the Human1 reaction its identifier names, in the orientation given.
 # They share their main metabolites but not their cofactors or names: the models
-# give r0400's cofactors opposite sides; name glycogenin's two forms each other's
-# way in GGNG; write r1450's acyl-CoAs as HC01409 (hexanoyl-CoA) and HC01410
-# ((2E)-hexenoyl-CoA); lump OIVD2m's 2-oxoisovalerate dehydrogenase where Human1
-# has its first step, which also runs forward; hydrolyse SCP21x's CoA in Human1
-# only, as phytanoyl-CoA enters the peroxisome; move HMR_1630's THCA-CoA and
-# HMR_1666's cholate through the mitochondrion where Human1 has the peroxisome;
-# and reduce r1135's and HMR_1748's sterols with one cofactor and Human1's with
-# another. AK2LGCHOLt takes lysophosphatidylcholine out of the extracellular
-# space, as Human1's exchange does, and biomass_reaction makes biomass from its
-# parts, as Human1's does.
+# give r0400's cofactors opposite sides; write r1450's acyl-CoAs as HC01409
+# (hexanoyl-CoA) and HC01410 ((2E)-hexenoyl-CoA); lump OIVD2m's
+# 2-oxoisovalerate dehydrogenase where Human1 has its first step, which also runs
+# forward; hydrolyse SCP21x's CoA in Human1 only, as phytanoyl-CoA enters the
+# peroxisome; move HMR_1630's THCA-CoA and HMR_1666's cholate through the
+# mitochondrion where Human1 has the peroxisome; and reduce r1135's, HMR_1500's and
+# HMR_1748's sterols with one cofactor and Human1's with another. Human-GEM 2
+# corrected four reactions the sources still write as Human1 1.x did: the
+# 26-hydroxylation of P45027A12m's and HMR_1610's cholestane tetrol is an oxidation
+# by NADP+ in the sources and CYP27A1's monooxygenation in Human1; SFCYSc makes
+# S-sulfocysteine from cysteine, Human1 from cystine; r0927's acetone leaves the
+# mitochondrion for the extracellular space, Human1's for the cytosol; and
+# HMR_6401 octanoylates apoA1 in the cytosol, Human1 the glycine cleavage system's
+# H protein in the mitochondrion. biomass_reaction makes biomass from its parts,
+# as Human1's does.
 _ALIGNED = {
-    "GGNG": "MAR05395",
     "OIVD2m": "MAR06416",
     "SCP21x": "MAR03481",
     "r0400": "MAR04531",
     "r1450": "MAR03156",
-    "AK2LGCHOLt": "MAR09172",
+    "HMR_1500": "MAR01500",
+    "HMR_1610": "MAR01610",
     "HMR_1630": "MAR01629",
     "HMR_1666": "MAR01665",
     "HMR_1748": "MAR01748",
     "HMR_3748": "MAR06416",
     "HMR_3481": "MAR03481",
+    "HMR_6401": "MAR06402",
+    "P45027A12m": "MAR01610",
+    "SFCYSc": "MAR08993",
     "biomass_reaction": "MAR04413",
+    "r0927": "MAR02222",
     "r1135": "MAR02301",
 }
 
@@ -179,34 +195,32 @@ def _aligned(*sources: str, sbml: bool = False) -> dict[str, tuple[str, int]]:
 
 
 READ_BY_HAND: dict[str, dict[str, tuple[str, int]]] = {
-    "RECON1": _aligned("GGNG", "OIVD2m", "SCP21x"),
-    "RECON2": _aligned("GGNG", "OIVD2m", "SCP21x", "r0400", "r1450", "AK2LGCHOLt"),
-    "RECON2.2": _aligned("GGNG", "OIVD2m", "SCP21x", "r0400", "biomass_reaction", "r1135", sbml=True),
-    "RECON3D": _aligned("GGNG", "OIVD2m", "SCP21x", "HMR_1630", "HMR_1666", "HMR_1748"),
-    "HMR2.0": _aligned("HMR_1630", "HMR_1666", "HMR_3481", "HMR_3748"),
+    "RECON1": _aligned("OIVD2m", "SCP21x", "P45027A12m"),
+    "RECON2": _aligned("OIVD2m", "SCP21x", "r0400", "r1450", "P45027A12m", "SFCYSc", "r0927", "r1135"),
+    "RECON2.2": _aligned(
+        "OIVD2m", "SCP21x", "r0400", "biomass_reaction", "P45027A12m", "SFCYSc", "r0927", sbml=True
+    ),
+    "RECON3D": _aligned(
+        "OIVD2m", "SCP21x", "HMR_1500", "HMR_1630", "HMR_1666", "HMR_1748", "P45027A12m", "SFCYSc", "r0927",
+        "r1135",
+    ),
+    "HMR2.0": _aligned("HMR_1500", "HMR_1610", "HMR_1630", "HMR_1666", "HMR_3481", "HMR_3748", "HMR_6401"),
 }
 
 # Source reactions whose identifier names a Human1 reaction that shares none of
 # their chemistry, and no Human1 reaction has it: the table pairs them with none,
 # so loading leaves them unmapped instead of putting their scores on another
-# reaction. CITL (citrate lyase) is filed under chitobiose hydrolysis, DHAPAx
-# under 3-dehydro-L-gulonate decarboxylation, DSAT under deoxyribose transport,
-# FTCD under fructose symport, r1446 (butyryl-CoA dehydrogenation) under
-# dodecenoyl-CoA hydration, Recon1's C110CPT2m (a carnitine transferase) under
-# an acylcarnitine antiport and GDCHOLAtx (glycodeoxycholate transport) under a
-# ganglioside's. Recon1 and Recon 2.2 also use the dolichol pathway's IDs for
-# other steps than Recon2 and Recon3D, whose meaning Human1 follows.
-_UNRELATED = ("CITL", "DHAPAx", "DSAT", "FTCD", "r1446")
+# reaction. r1446 (butyryl-CoA dehydrogenation) is filed under dodecenoyl-CoA
+# hydration. Recon1 and Recon 2.2 also use the dolichol pathway's IDs for other
+# steps than Recon2 and Recon3D, whose meaning Human1 follows.
 _DOLICHOL = (
     "DOLPGT3_Ler", "DOLPGT3_Uer", "DOLPH_Uer", "DOLPMT3_Uer", "DOLPMT4_Uer", "DOLPMT_U", "DOLP_Uter",
 )
 NO_COUNTERPART: dict[str, frozenset[str]] = {
-    "RECON1": frozenset(
-        (*_UNRELATED[:4], "C110CPT2m", "GDCHOLAtx", "DOLPGT1_Ler", "DOLPMT4_Ler", *_DOLICHOL[1:])
-    ),
-    "RECON2": frozenset(_UNRELATED),
+    "RECON1": frozenset(("DOLPGT1_Ler", "DOLPMT4_Ler", *_DOLICHOL[1:])),
+    "RECON2": frozenset(("r1446",)),
     "RECON2.2": frozenset("R_" + s for s in (*_DOLICHOL, "r1446")),
-    "RECON3D": frozenset(("CITL", "DSAT", "r1446")),
+    "RECON3D": frozenset(("r1446",)),
 }
 
 # SBML and BiGG identifiers escape what an ID may not hold.
@@ -630,6 +644,10 @@ def build(
     return rows, values, report
 
 
+# Source models with no public copy, whose file is carried over (see above).
+UNSOURCED = ("HMR1.0",)
+
+
 def packaged(name: str) -> tuple[list[str], dict[str, int]]:
     order, values = [], {}
     for line in (ALIGNMENTS / f"alignment_{name}.txt").read_text().splitlines():
@@ -662,15 +680,16 @@ def main() -> None:
 
     human1 = Human1(MetabolicModel(use_cache=False))
     chemistry = Chemistry(human1)
+    order = list(human1.model.get_reactions(format="mar_id"))
     for name in arguments.model or sorted(SOURCES):
         source = SOURCES[name]
         rows, values, report = build(name, source, arguments.cache, human1, chemistry)
-        order, current = packaged(name)
-        if set(order) != set(human1.model.get_reactions(format="mar_id")):
-            raise SystemExit(f"alignment_{name}.txt does not list every Human1 reaction once")
+        listed, current = packaged(name)
         regenerated = {mar_id: values.get(mar_id, 0) for mar_id in order}
         counts = collections.Counter(regenerated.values())
-        changes = collections.Counter((current[m], regenerated[m]) for m in order if current[m] != regenerated[m])
+        changes = collections.Counter(
+            (current[m], regenerated[m]) for m in order if m in current and current[m] != regenerated[m]
+        )
         table_path = ALIGNMENTS / f"reactions_{name}.tsv"
         text = table_text(name, source, rows)
         print(f"\n{name}: {source.origin}")
@@ -682,6 +701,7 @@ def main() -> None:
         print("  changes from the packaged file: " + (
             ", ".join(f"{before:+d} -> {after:+d}: {n:,}" for (before, after), n in sorted(changes.items())) or "none"
         ))
+        print(_release_change(listed, order))
         for heading, items in sorted(report.items()):
             print(f"  {heading}: {len(items)}")
             for item in items[:8]:
@@ -691,7 +711,24 @@ def main() -> None:
             (ALIGNMENTS / f"alignment_{name}.txt").write_text(
                 "".join(f"{mar_id} : {regenerated[mar_id]}\n" for mar_id in order)
             )
+    for name in UNSOURCED:
+        if arguments.model and name not in arguments.model:
+            continue
+        listed, current = packaged(name)
+        print(f"\n{name}: no public copy, carried over")
+        print(_release_change(listed, order))
+        if arguments.write:
+            (ALIGNMENTS / f"alignment_{name}.txt").write_text(
+                "".join(f"{mar_id} : {current.get(mar_id, 0)}\n" for mar_id in order)
+            )
     sys.stdout.flush()
+
+
+def _release_change(listed: list[str], order: list[str]) -> str:
+    removed, added = set(listed) - set(order), set(order) - set(listed)
+    if not removed and not added:
+        return "  Human1 reactions: as the packaged file lists them"
+    return f"  Human1 reactions: {len(removed):,} the model no longer has, {len(added):,} it adds"
 
 
 if __name__ == "__main__":

@@ -519,7 +519,7 @@ def test_public_enrichment_path_from_loaded_workspace_to_export(human1_model):
     assert glycolysis.reaction_ids == tuple(
         sorted(human1_model.get_reactions_for_subsystem(glycolysis.subsystem_id))
     )
-    assert len(glycolysis.reaction_ids) == 44
+    assert len(glycolysis.reaction_ids) == 43
 
     source_annotation = next(
         annotation for annotation in annotations if len(annotation.reaction_ids) >= 3

@@ -348,8 +348,8 @@ def test_a_table_pairing_still_counts_how_lumped_its_source_is(tmp_path, model):
 
 
 def test_a_table_row_with_no_human1_reaction_leaves_the_id_unmapped(tmp_path, model):
-    # The legacy aliases file CITL, citrate lyase, under chitobiose hydrolysis.
-    loaded = declared(tmp_path, model, {"CITL_pos": [1.0, 2.0, 3.0]}, {"CITL": ("", 0)})
+    # Recon2's r1446, butyryl-CoA dehydrogenation, under dodecenoyl-CoA hydration.
+    loaded = declared(tmp_path, model, {"r1446_pos": [1.0, 2.0, 3.0]}, {"r1446": ("", 0)})
 
     assert loaded.get_reaction_df().empty
     assert loaded.mapping_stats["unmapped_count"] == 1

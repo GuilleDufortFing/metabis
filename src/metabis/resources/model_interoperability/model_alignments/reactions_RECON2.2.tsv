@@ -153,7 +153,7 @@ source_id	human1_id	orientation	basis
 3HPVSCOAitm	MAR12895	1	identifier and chemistry
 3HPVSCOAitx	MAR12896	1	identifier and chemistry
 3HPVSTETCOAhcm	MAR12371	1	identifier and chemistry
-3HPVSTETCOAhcx	MAR12372	1	metabolites
+3HPVSTETCOAhcx	MAR12372	1	identifier and chemistry
 3HPVSTETCOAitm	MAR12897	1	identifier and chemistry
 3HPVSTETCOAitx	MAR12898	1	identifier and chemistry
 3HPVSTEThc	MAR12992	1	identifier and chemistry
@@ -265,7 +265,7 @@ source_id	human1_id	orientation	basis
 5HOXINDACTOXm	MAR00051	1	identifier and chemistry
 5HOXINOXDA	MAR04558	1	metabolites
 5HTRPDOX	MAR06716	1	identifier and chemistry
-5HTRPVESSEC	MAR00052	1	identifier and chemistry
+5HTRPVESSEC	MAR07634	1	chemistry
 5HXKYNDCL	MAR06718	1	identifier and chemistry
 5HXKYNOXDA	MAR06719	1	metabolites
 5MTAte	MAR09004	1	identifier and chemistry
@@ -351,8 +351,8 @@ source_id	human1_id	orientation	basis
 7HPVStev	MAR12459	1	identifier and chemistry
 7THFtl	MAR08127	1	identifier and chemistry
 7THFtm	MAR08128	1	identifier and chemistry
-A4GALTc	MAR00801	1	metabolites
-A4GALTg	MAR08148	1	metabolites
+A4GALTc	MAR00801	1	identifier and chemistry
+A4GALTg	MAR08148	1	identifier and chemistry
 A4GNT1g	MAR08254	1	identifier and chemistry
 A4GNT2g	MAR08255	1	identifier and chemistry
 AACOAT	MAR01436	1	identifier and chemistry
@@ -401,7 +401,7 @@ ACCOAgt	MAR08225	1	identifier and chemistry
 ACCOAtn	MAR01090	1	identifier and chemistry
 ACCOAtr	MAR00057	1	identifier and chemistry
 ACETONEt2	MAR08364	1	identifier and chemistry
-ACETONEt2m	MAR08365	1	identifier and chemistry
+ACETONEt2m	MAR02222	-1	chemistry
 ACGAGBSIDEtg	MAR08199	1	identifier and chemistry
 ACGAGBSIDEtl	MAR08200	1	identifier and chemistry
 ACGALFUCGALACGALFUC12GAL14ACGLCGALGLUSIDEte	MAR08290	-1	identifier and chemistry
@@ -410,19 +410,16 @@ ACGALFUCGALACGALFUCGALACGLCGAL14ACGLCGALGLUSIDEte	MAR08297	-1	identifier and che
 ACGALFUCGALACGALFUCGALACGLCGAL14ACGLCGALGLUSIDEtg	MAR08296	-1	identifier and chemistry
 ACGALK	MAR08366	1	identifier and chemistry
 ACGALK2	MAR08367	1	identifier and chemistry
-ACGALtlg	MAR08193	-1	identifier and chemistry
 ACGALtly	MAR08370	1	identifier and chemistry
 ACGAM2E	MAR04527	-1	identifier and chemistry
 ACGAM6PSi	MAR04628	1	identifier and chemistry
 ACGAMK	MAR04524	1	identifier and chemistry
 ACGAMPM	MAR04631	1	identifier and chemistry
 ACGAMtly	MAR04962	1	identifier and chemistry
-ACGBGBSIDEtg	MAR08195	1	identifier and chemistry
-ACGBGBSIDEtl	MAR08196	1	identifier and chemistry
 ACGPID	MAR08380	1	identifier and chemistry
 ACGSm	MAR08416	1	identifier and chemistry
 ACHEe	MAR08421	1	identifier and chemistry
-ACHVESSEC	MAR00058	1	identifier and chemistry
+ACHVESSEC	MAR07681	1	chemistry
 ACHtn	MAR08363	-1	identifier and chemistry
 ACITL	MAR04149	1	identifier and chemistry
 ACMPGLUChr	MAR12462	1	identifier and chemistry
@@ -517,7 +514,7 @@ ADRNCOAtx	MAR00063	1	identifier and chemistry
 ADRNCPT1	MAR02759	1	identifier and chemistry
 ADRNCPT2	MAR02761	-1	identifier and chemistry
 ADRNCRNt	MAR00064	1	identifier and chemistry
-ADRNLPVESSEC	MAR00065	1	identifier and chemistry
+ADRNLPVESSEC	MAR07635	1	chemistry
 ADRNt	MAR00412	1	identifier and chemistry
 ADSELK	MAR07129	1	identifier and chemistry
 ADSK	MAR04186	1	identifier and chemistry
@@ -806,10 +803,9 @@ B3GNT32g	MAR08250	1	identifier and chemistry
 B3GNT33g	MAR08251	1	identifier and chemistry
 B3GNT34g	MAR08151	1	identifier and chemistry
 B3GNT35g	MAR08152	1	identifier and chemistry
-B3GNT36g	MAR08194	1	identifier and chemistry
 B3GNT37g	MAR08173	1	identifier and chemistry
-B3GNT39g	MAR08147	1	metabolites
-B3GNT51g	MAR08275	1	metabolites
+B3GNT39g	MAR08147	1	identifier and chemistry
+B3GNT51g	MAR08275	1	identifier and chemistry
 BAAT1x	MAR00083	1	identifier and chemistry
 BAAT2x	MAR01667	1	identifier and chemistry
 BAAT4x	MAR00085	1	identifier and chemistry
@@ -818,7 +814,7 @@ BACCL	MAR07668	1	identifier and chemistry
 BACCLm	MAR00086	1	identifier and chemistry
 BALABETAtc	MAR09601	1	identifier and chemistry
 BALAPAT1tc	MAR06866	1	identifier and chemistry
-BALAVECSEC	MAR00087	1	identifier and chemistry
+BALAVECSEC	MAR07736	1	chemistry
 BALAtmr	MAR04953	1	identifier and chemistry
 BAMPPALDOX	MAR07993	1	identifier and chemistry
 BAMPPALDOXm	MAR00088	1	identifier and chemistry
@@ -859,7 +855,6 @@ BTNPLm	MAR00092	1	identifier and chemistry
 BTNTe	MAR06870	1	identifier and chemistry
 BTNt2	MAR07666	1	identifier and chemistry
 BTNt2m	MAR00093	1	identifier and chemistry
-BTNt3i	MAR00094	1	identifier and chemistry
 BTNt4i	MAR00095	1	identifier and chemistry
 BTNtn	MAR07665	1	identifier and chemistry
 BUP2	MAR04819	1	metabolites
@@ -943,8 +938,6 @@ C4DCCACT	MAR04661	1	identifier and chemistry
 C4DCe	MAR11258	-1	identifier and chemistry
 C4OHc	MAR04671	1	identifier and chemistry
 C4STMO1r	MAR00116	1	identifier and chemistry
-C4STMO2Pr	MAR00117	1	identifier and chemistry
-C4STMO2r	MAR00118	1	identifier and chemistry
 C4tcx	MAR04674	1	identifier and chemistry
 C4tmc	MAR04677	1	identifier and chemistry
 C4x	MAR04678	1	identifier and chemistry
@@ -1014,7 +1007,7 @@ CHLtm	MAR08657	1	identifier and chemistry
 CHOLATEt	MAR08659	1	identifier and chemistry
 CHOLATEt2	MAR08660	1	identifier and chemistry
 CHOLATEt3	MAR08658	1	identifier and chemistry
-CHOLD2m	MAR08441	1	identifier and chemistry
+CHOLD2m	MAR08441	1	metabolites
 CHOLESTTDe	MAR00018	1	identifier and chemistry
 CHOLK	MAR00636	1	identifier and chemistry
 CHOLPtg	MAR08243	1	identifier and chemistry
@@ -1115,11 +1108,11 @@ CRVS1tev	MAR12534	1	identifier and chemistry
 CRVS23M24hc	MAR12535	1	identifier and chemistry
 CRVSATPthc	MAR12536	1	identifier and chemistry
 CRVSATPtu	MAR12537	1	identifier and chemistry
-CRVSM1SPhc	MAR12538	1	identifier and chemistry
+CRVSM1SPhc	MAR12538	1	metabolites
 CRVSM1hc	MAR12539	1	identifier and chemistry
 CRVSM1hr	MAR12540	1	identifier and chemistry
 CRVSM1teb	MAR12541	1	identifier and chemistry
-CRVSM22hc	MAR12542	1	identifier and chemistry
+CRVSM22hc	MAR12542	1	metabolites
 CRVSM22itr	MAR12940	1	identifier and chemistry
 CRVSM23hc	MAR12543	1	identifier and chemistry
 CRVSM23hr	MAR12544	1	identifier and chemistry
@@ -1128,7 +1121,7 @@ CRVSM23tev	MAR12546	1	identifier and chemistry
 CRVSM24itr	MAR12941	1	identifier and chemistry
 CRVSM24teb	MAR12547	1	identifier and chemistry
 CRVSM24tev	MAR12548	1	identifier and chemistry
-CRVSM31hc	MAR12549	1	identifier and chemistry
+CRVSM31hc	MAR12549	1	metabolites
 CRVSM31itr	MAR12942	1	identifier and chemistry
 CRVSitr	MAR12939	1	identifier and chemistry
 CRVSthc	MAR12551	1	identifier and chemistry
@@ -1290,7 +1283,7 @@ DECDPtm	MAR06902	1	identifier and chemistry
 DEDOLP1_U	MAR07258	1	metabolites
 DEDOLP2_U	MAR07259	1	metabolites
 DEDOLR_U	MAR07260	1	metabolites
-DELACCRVSM23hc	MAR12561	1	identifier and chemistry
+DELACCRVSM23hc	MAR12561	1	metabolites
 DEOXFVShc	MAR12562	1	metabolites
 DEOXFVSitx	MAR12944	1	identifier and chemistry
 DEOXFVStev	MAR12563	1	identifier and chemistry
@@ -1321,7 +1314,6 @@ DGSNtm	MAR04997	1	identifier and chemistry
 DGTPtn	MAR07862	1	identifier and chemistry
 DGULND	MAR08353	1	identifier and chemistry
 DHAAt1r	MAR08846	-1	identifier and chemistry
-DHAPtc	MAR08111	1	identifier and chemistry
 DHCHOLESTANATEtm	MAR00221	1	identifier and chemistry
 DHCR243r	MAR00222	1	identifier and chemistry
 DHCR71r	MAR00227	1	identifier and chemistry
@@ -1349,8 +1341,8 @@ DHPR2	MAR08740	1	identifier and chemistry
 DIDPtn	MAR07877	1	identifier and chemistry
 DIGALSGALSIDEte	MAR08214	1	chemistry
 DIGALSGALSIDEtg	MAR08213	1	identifier and chemistry
-DIGALSIDEtg	MAR08215	1	metabolites
-DIGALSIDEtl	MAR08216	1	metabolites
+DIGALSIDEtg	MAR08215	1	identifier and chemistry
+DIGALSIDEtl	MAR08216	1	identifier and chemistry
 DINt	MAR06369	-1	identifier and chemistry
 DITPtn	MAR07855	1	identifier and chemistry
 DKMPPD	MAR00251	1	identifier and chemistry
@@ -1374,59 +1366,6 @@ DM_atp_c_	MAR03964	1	identifier and chemistry
 DNADtn	MAR04274	1	identifier and chemistry
 DNAMTSEn	MAR08640	1	identifier and chemistry
 DNAMTn	MAR08641	1	identifier and chemistry
-DNDPt12m	MAR06335	1	identifier and chemistry
-DNDPt13m	MAR06332	1	identifier and chemistry
-DNDPt18m	MAR06337	1	identifier and chemistry
-DNDPt19m	MAR06334	1	identifier and chemistry
-DNDPt1m	MAR06341	1	identifier and chemistry
-DNDPt20m	MAR07815	1	identifier and chemistry
-DNDPt21m	MAR07816	1	identifier and chemistry
-DNDPt22m	MAR07808	1	identifier and chemistry
-DNDPt26m	MAR07814	1	identifier and chemistry
-DNDPt27m	MAR07822	1	identifier and chemistry
-DNDPt29m	MAR07804	1	identifier and chemistry
-DNDPt2m	MAR06338	1	identifier and chemistry
-DNDPt30m	MAR07825	1	identifier and chemistry
-DNDPt31m	MAR07826	1	identifier and chemistry
-DNDPt32m	MAR06333	1	identifier and chemistry
-DNDPt33m	MAR07810	1	identifier and chemistry
-DNDPt34m	MAR07818	1	identifier and chemistry
-DNDPt35m	MAR07806	1	identifier and chemistry
-DNDPt36m	MAR07824	1	identifier and chemistry
-DNDPt37m	MAR07827	1	identifier and chemistry
-DNDPt38m	MAR07828	1	identifier and chemistry
-DNDPt39m	MAR07829	1	identifier and chemistry
-DNDPt3m	MAR07830	1	identifier and chemistry
-DNDPt40m	MAR07831	1	identifier and chemistry
-DNDPt41m	MAR07832	1	identifier and chemistry
-DNDPt42m	MAR06343	1	identifier and chemistry
-DNDPt43m	MAR06340	1	identifier and chemistry
-DNDPt44m	MAR07833	1	identifier and chemistry
-DNDPt45m	MAR07834	1	identifier and chemistry
-DNDPt46m	MAR07835	1	identifier and chemistry
-DNDPt47m	MAR07836	1	identifier and chemistry
-DNDPt48m	MAR07837	1	identifier and chemistry
-DNDPt49m	MAR07838	1	identifier and chemistry
-DNDPt4m	MAR07839	1	identifier and chemistry
-DNDPt50m	MAR07840	1	identifier and chemistry
-DNDPt51m	MAR07841	1	identifier and chemistry
-DNDPt52m	MAR07842	1	identifier and chemistry
-DNDPt53m	MAR07843	1	identifier and chemistry
-DNDPt54m	MAR07844	1	identifier and chemistry
-DNDPt55m	MAR07845	1	identifier and chemistry
-DNDPt56m	MAR07846	1	identifier and chemistry
-DNDPt57m	MAR06339	1	identifier and chemistry
-DNDPt58m	MAR06342	1	identifier and chemistry
-DNDPt59m	MAR07847	1	identifier and chemistry
-DNDPt5m	MAR07848	1	identifier and chemistry
-DNDPt60m	MAR07849	1	identifier and chemistry
-DNDPt61m	MAR07850	1	identifier and chemistry
-DNDPt62m	MAR07851	1	identifier and chemistry
-DNDPt63m	MAR07852	1	identifier and chemistry
-DNDPt6m	MAR07853	1	identifier and chemistry
-DNDPt7m	MAR07854	1	identifier and chemistry
-DNDPt8m	MAR07812	1	identifier and chemistry
-DNDPt9m	MAR07820	1	identifier and chemistry
 DOCO13ECOAtxc	MAR04803	1	identifier and chemistry
 DOCO13EFATP	MAR04805	1	identifier and chemistry
 DOCOSACT	MAR00313	1	identifier and chemistry
@@ -1466,7 +1405,7 @@ DOPAMT	MAR06763	1	identifier and chemistry
 DOPAQNISO1	MAR06875	-1	identifier and chemistry
 DOPASFt	MAR08723	1	identifier and chemistry
 DOPASULT	MAR07689	1	identifier and chemistry
-DOPAVESSEC	MAR00334	1	identifier and chemistry
+DOPAVESSEC	MAR07636	1	chemistry
 DOPAt4_2_r	MAR06733	1	identifier and chemistry
 DOPAtu	MAR06732	-1	identifier and chemistry
 DORNOp	MAR08690	1	metabolites
@@ -1517,7 +1456,6 @@ EBP2r	MAR02339	-1	identifier and chemistry
 ECGISOr	MAR00447	1	identifier and chemistry
 ECOAH12m	MAR03753	1	identifier and chemistry
 ECOAH1m	MAR03164	-1	identifier and chemistry
-ECOAH1x	MAR03103	-1	identifier and chemistry
 ECOAH9m	MAR03785	1	identifier and chemistry
 EGMESTr	MAR08648	1	identifier and chemistry
 EHGLAT	MAR11399	1	identifier and chemistry
@@ -1693,7 +1631,7 @@ EX_CE4881(e)	MAR04376	1	identifier and chemistry
 EX_CE5797(e)	MAR04357	1	identifier and chemistry
 EX_CE5798(e)	MAR04359	1	identifier and chemistry
 EX_CLPND(e)	MAR00571	1	chemistry
-EX_HC00229(e)	MAR01954	1	one metabolite
+EX_HC00229(e)	MAR01954	1	identifier and chemistry
 EX_HC00250(e)	MAR09103	1	identifier and chemistry
 EX_HC00342(e)	MAR11350	1	identifier and chemistry
 EX_HC00822(e)	MAR04142	1	identifier and chemistry
@@ -1712,7 +1650,7 @@ EX_HC01787(e)	MAR09162	1	identifier and chemistry
 EX_HC02154(e)	MAR04154	1	identifier and chemistry
 EX_HC02160(e)	MAR01972	1	identifier and chemistry
 EX_HC02161(e)	MAR01975	1	identifier and chemistry
-EX_HC02172(e)	MAR09080	1	one metabolite
+EX_HC02172(e)	MAR09080	1	identifier and chemistry
 EX_HC02179(e)	MAR10348	1	chemistry
 EX_HC02180(e)	MAR10346	1	identifier and chemistry
 EX_HC02187(e)	MAR04195	1	identifier and chemistry
@@ -1935,7 +1873,6 @@ EX_fol(e)	MAR09146	1	identifier and chemistry
 EX_for(e)	MAR09318	1	identifier and chemistry
 EX_fru(e)	MAR09139	1	identifier and chemistry
 EX_fuc13galacglcgal14acglcgalgluside_hs(e)	MAR09319	1	identifier and chemistry
-EX_fuc14galacglcgalgluside_hs(e)	MAR09320	1	identifier and chemistry
 EX_fuc_L(e)	MAR09330	1	identifier and chemistry
 EX_fucacgalfucgalacglcgalgluside_hs(e)	MAR09321	1	identifier and chemistry
 EX_fucacngal14acglcgalgluside_hs(e)	MAR09322	1	identifier and chemistry
@@ -1943,7 +1880,7 @@ EX_fucfuc12gal14acglcgalgluside_hs(e)	MAR00585	1	identifier and chemistry
 EX_fucfuc132galacglcgal14acglcgalgluside_hs(e)	MAR09324	1	identifier and chemistry
 EX_fucfucfucgalacglc13galacglcgal14acglcgalgluside_hs(e)	MAR09325	1	one metabolite
 EX_fucfucfucgalacglcgal14acglcgalgluside_hs(e)	MAR09326	1	one metabolite
-EX_fucfucgalacglcgalgluside_hs(e)	MAR00595	1	identifier and chemistry
+EX_fucfucgalacglcgalgluside_hs(e)	MAR09320	1	identifier and chemistry
 EX_fucgal14acglcgalgluside_hs(e)	MAR09327	1	identifier and chemistry
 EX_fucgalfucgalacglcgalgluside_hs(e)	MAR09328	1	one metabolite
 EX_fucgalgbside_hs(e)	MAR09329	1	identifier and chemistry
@@ -1955,7 +1892,7 @@ EX_g1p(e)	MAR01947	1	identifier and chemistry
 EX_gal(e)	MAR09140	1	identifier and chemistry
 EX_galacglcgalgbside_hs(e)	MAR09331	1	identifier and chemistry
 EX_galfuc12gal14acglcgalgluside_hs(e)	MAR09332	1	identifier and chemistry
-EX_galfucgalacglcgal14acglcgalgluside_hs(e)	MAR09698	1	one metabolite
+EX_galfucgalacglcgal14acglcgalgluside_hs(e)	MAR09698	1	identifier and chemistry
 EX_galgalfucfucgalacglcgalacglcgal14acglcgalgluside_hs(e)	MAR09334	1	identifier and chemistry
 EX_galgalgalthcrm_hs(e)	MAR09335	1	identifier and chemistry
 EX_galside_hs(e)	MAR04389	1	identifier and chemistry
@@ -2271,7 +2208,7 @@ FA180ACPH	MAR00725	1	identifier and chemistry
 FA181ACPH	MAR00726	1	identifier and chemistry
 FA1821ACPH	MAR00727	1	identifier and chemistry
 FA1822ACPH	MAR00728	1	identifier and chemistry
-FA182ACPH	MAR00729	1	identifier and chemistry
+FA182ACPH	MAR00729	1	metabolites
 FACOAL100i	MAR00180	1	chemistry
 FACOAL120i	MAR00188	1	chemistry
 FACOAL140i	MAR00196	1	identifier and chemistry
@@ -2324,14 +2261,14 @@ FAH3	MAR08038	1	identifier and chemistry
 FALDH	MAR08530	1	identifier and chemistry
 FALDtly	MAR08531	-1	identifier and chemistry
 FALDtm	MAR08532	-1	identifier and chemistry
-FAOXC101C102m	MAR03294	1	metabolites
+FAOXC101C102m	MAR03294	1	identifier and chemistry
 FAOXC101C102x	MAR02818	1	metabolites
 FAOXC101C8m	MAR03146	1	metabolites
 FAOXC101C8x	MAR04968	1	identifier and chemistry
 FAOXC101m	MAR03298	-1	identifier and chemistry
 FAOXC101x	MAR03323	-1	identifier and chemistry
-FAOXC102C101m	MAR04970	1	metabolites
-FAOXC102C101x	MAR04974	1	metabolites
+FAOXC102C101m	MAR04970	1	identifier and chemistry
+FAOXC102C101x	MAR04974	1	identifier and chemistry
 FAOXC102C103m	MAR04978	1	identifier and chemistry
 FAOXC102C103x	MAR04981	1	metabolites
 FAOXC102C81m	MAR04984	1	identifier and chemistry
@@ -2382,16 +2319,16 @@ FAOXC161C141x	MAR05189	1	metabolites
 FAOXC161C161OHm	MAR05190	1	identifier and chemistry
 FAOXC162C142m	MAR03283	1	metabolites
 FAOXC162C162OHm	MAR05192	1	identifier and chemistry
-FAOXC163C142x	MAR05193	1	identifier and chemistry
+FAOXC163C142x	MAR05193	1	metabolites
 FAOXC163C143m	MAR05194	1	identifier and chemistry
 FAOXC163C164Gm	MAR03456	1	metabolites
 FAOXC163C164x	MAR05196	1	metabolites
 FAOXC163GC142m	MAR03283	1	metabolites
 FAOXC163Gm	MAR03458	1	identifier and chemistry
-FAOXC163x	MAR05235	1	identifier and chemistry
+FAOXC163x	MAR05235	1	metabolites
 FAOXC164C143m	MAR05242	1	identifier and chemistry
 FAOXC164C143x	MAR05256	1	identifier and chemistry
-FAOXC164C163x	MAR05293	1	identifier and chemistry
+FAOXC164C163x	MAR05293	1	metabolites
 FAOXC164C165m	MAR05298	1	metabolites
 FAOXC164C165x	MAR05300	1	metabolites
 FAOXC164GC163m	MAR03457	1	identifier and chemistry
@@ -2405,9 +2342,9 @@ FAOXC16DCC14DCx	MAR05331	1	metabolites
 FAOXC16DCr	MAR05334	1	identifier and chemistry
 FAOXC16OHC16r	MAR05341	1	identifier and chemistry
 FAOXC170150m	MAR05343	1	chemistry
-FAOXC180	MAR00776	1	identifier and chemistry
+FAOXC180	MAR03118	1	metabolites
 FAOXC180x	MAR00777	1	metabolites
-FAOXC1811601m	MAR00778	1	identifier and chemistry
+FAOXC1811601m	MAR03146	1	metabolites
 FAOXC181C161m	MAR05345	1	identifier and chemistry
 FAOXC181C161x	MAR05350	1	metabolites
 FAOXC181C181OHm	MAR05355	1	identifier and chemistry
@@ -2419,7 +2356,7 @@ FAOXC183806x	MAR00800	1	metabolites
 FAOXC183C163Gm	MAR03455	-1	metabolites
 FAOXC183C163m	MAR05359	1	identifier and chemistry
 FAOXC184C163m	MAR05360	1	identifier and chemistry
-FAOXC184C163x	MAR05364	1	identifier and chemistry
+FAOXC184C163x	MAR05364	1	metabolites
 FAOXC184C164m	MAR05365	1	identifier and chemistry
 FAOXC184C164x	MAR05366	1	metabolites
 FAOXC184m	MAR05367	1	identifier and chemistry
@@ -2432,25 +2369,25 @@ FAOXC200180x	MAR00872	1	metabolites
 FAOXC201C181x	MAR05372	1	metabolites
 FAOXC2031836m	MAR00874	1	identifier and chemistry
 FAOXC204184m2	MAR00922	1	chemistry
-FAOXC204C184m	MAR05373	1	identifier and chemistry
+FAOXC204C184m	MAR05373	1	metabolites
 FAOXC204C205x	MAR05374	1	metabolites
 FAOXC2051843m	MAR00923	1	identifier and chemistry
 FAOXC2051843x	MAR00927	1	identifier and chemistry
 FAOXC205C184x	MAR05375	1	identifier and chemistry
-FAOXC205C185m	MAR05376	1	metabolites
+FAOXC205C185m	MAR05376	1	identifier and chemistry
 FAOXC221C201x	MAR05377	1	metabolites
 FAOXC2242046m	MAR00930	1	identifier and chemistry
 FAOXC2242046x	MAR00952	1	metabolites
 FAOXC2252053x	MAR00968	1	metabolites
-FAOXC225C204m	MAR05378	1	identifier and chemistry
-FAOXC225C204x	MAR05379	1	identifier and chemistry
+FAOXC225C204m	MAR05378	1	metabolites
+FAOXC225C204x	MAR05379	1	metabolites
 FAOXC225C226m	MAR05380	1	identifier and chemistry
 FAOXC225C226x	MAR05382	1	metabolites
 FAOXC225m	MAR05383	1	identifier and chemistry
 FAOXC225x	MAR05402	1	identifier and chemistry
 FAOXC226205m	MAR00970	1	metabolites
 FAOXC226205x	MAR00972	1	metabolites
-FAOXC226C205m	MAR05403	1	metabolites
+FAOXC226C205m	MAR05403	1	identifier and chemistry
 FAOXC226C225m	MAR05404	1	identifier and chemistry
 FAOXC226C225x	MAR05405	1	identifier and chemistry
 FAOXC226C227m	MAR05408	1	identifier and chemistry
@@ -2530,7 +2467,7 @@ FK	MAR04402	1	identifier and chemistry
 FKYNH	MAR04216	1	identifier and chemistry
 FMNALKPle	MAR08969	1	identifier and chemistry
 FMNAT	MAR06508	1	identifier and chemistry
-FOAXC122C101x	MAR06483	1	identifier and chemistry
+FOAXC122C101x	MAR06483	1	metabolites
 FOLABCCte	MAR09882	1	identifier and chemistry
 FOLOAT1tc	MAR09883	1	identifier and chemistry
 FOLOAT2tc	MAR09884	1	identifier and chemistry
@@ -2574,8 +2511,6 @@ FTHFL	MAR04338	1	identifier and chemistry
 FTHFLm	MAR04340	1	identifier and chemistry
 FUC13GALACGLCGAL14ACGLCGALGLUSIDEte	MAR08336	-1	identifier and chemistry
 FUC13GALACGLCGAL14ACGLCGALGLUSIDEtg	MAR08335	-1	identifier and chemistry
-FUC14GALACGLCGALGLUSIDEte	MAR08273	-1	identifier and chemistry
-FUC14GALACGLCGALGLUSIDEtg	MAR08272	-1	identifier and chemistry
 FUCACGALFUCGALACGLCGALGLUSIDEte	MAR08266	-1	identifier and chemistry
 FUCACGALFUCGALACGLCGALGLUSIDEtg	MAR08265	-1	identifier and chemistry
 FUCACNGAL14ACGLCGALGLUSIDEte	MAR08873	-1	identifier and chemistry
@@ -2594,8 +2529,8 @@ FUCFUCFUCGALACGLC13GALACGLCGAL14ACGLCGALGLUSIDEte	MAR08311	-1	metabolites
 FUCFUCFUCGALACGLC13GALACGLCGAL14ACGLCGALGLUSIDEtg	MAR08310	-1	metabolites
 FUCFUCFUCGALACGLCGAL14ACGLCGALGLUSIDEte	MAR08315	-1	metabolites
 FUCFUCFUCGALACGLCGAL14ACGLCGALGLUSIDEtg	MAR08314	-1	metabolites
-FUCFUCGALACGLCGALGLUSIDEte	MAR01076	1	identifier and chemistry
-FUCFUCGALACGLCGALGLUSIDEtg	MAR01078	1	identifier and chemistry
+FUCFUCGALACGLCGALGLUSIDEte	MAR08273	-1	identifier and chemistry
+FUCFUCGALACGLCGALGLUSIDEtg	MAR08272	-1	identifier and chemistry
 FUCGAL14ACGLCGALGLUSIDEte	MAR08324	-1	identifier and chemistry
 FUCGAL14ACGLCGALGLUSIDEtg	MAR08323	-1	identifier and chemistry
 FUCGALFUCGALACGLCGALGLUSIDEte	MAR08270	-1	metabolites
@@ -2619,13 +2554,13 @@ FUT17g	MAR08294	1	identifier and chemistry
 FUT18g	MAR01083	1	identifier and chemistry
 FUT32g	MAR08319	1	identifier and chemistry
 FUT33g	MAR08264	1	identifier and chemistry
-FUT34g	MAR01118	1	identifier and chemistry
+FUT34g	MAR08271	1	identifier and chemistry
 FUT35g	MAR08268	1	identifier and chemistry
 FUT910g	MAR08308	1	identifier and chemistry
 FUT911g	MAR08309	1	identifier and chemistry
 FUT91g	MAR08322	1	identifier and chemistry
 FUT92g	MAR08326	1	identifier and chemistry
-FUT93g	MAR01141	1	identifier and chemistry
+FUT93g	MAR08287	1	identifier and chemistry
 FUT94g	MAR08330	1	identifier and chemistry
 FUT95g	MAR08331	1	identifier and chemistry
 FUT96g	MAR08332	1	identifier and chemistry
@@ -2679,7 +2614,6 @@ G1PTT	MAR07696	1	identifier and chemistry
 G2M8MASNterg	MAR07296	1	identifier and chemistry
 G3M8MASNterg	MAR07295	1	identifier and chemistry
 G3PD1	MAR00479	-1	identifier and chemistry
-G3PD2m	MAR01169	1	identifier and chemistry
 G5SADrm	MAR03820	-1	identifier and chemistry
 G5SDym	MAR03897	1	identifier and chemistry
 G6PDA	MAR04299	1	metabolites
@@ -2689,11 +2623,11 @@ G6PDH2rer	MAR04304	1	identifier and chemistry
 G6PPer	MAR04521	1	identifier and chemistry
 G6Pter	MAR04856	1	identifier and chemistry
 GABABGTtc	MAR09886	1	identifier and chemistry
-GABAVESSEC	MAR01314	1	identifier and chemistry
+GABAVESSEC	MAR07738	1	chemistry
 GACMTRc	MAR04583	-1	identifier and chemistry
 GACPAILter	MAR08382	1	identifier and chemistry
 GAL3ST11	MAR08206	1	identifier and chemistry
-GAL3ST12	MAR08212	1	metabolites
+GAL3ST12	MAR08212	1	identifier and chemistry
 GALACGLCGALGBSIDEte	MAR08154	1	identifier and chemistry
 GALACGLCGALGBSIDEtg	MAR08153	1	identifier and chemistry
 GALASE10ly	MAR07408	1	identifier and chemistry
@@ -2718,19 +2652,19 @@ GALASE9ly	MAR07404	1	identifier and chemistry
 GALC	MAR08210	1	identifier and chemistry
 GALFUC12GAL14ACGLCGALGLUSIDEte	MAR08283	-1	identifier and chemistry
 GALFUC12GAL14ACGLCGALGLUSIDEtg	MAR08282	-1	identifier and chemistry
-GALFUCGALACGLCGAL14ACGLCGALGLUSIDEte	MAR09646	-1	metabolites
-GALFUCGALACGLCGAL14ACGLCGALGLUSIDEtg	MAR01340	1	metabolites
+GALFUCGALACGLCGAL14ACGLCGALGLUSIDEte	MAR09646	-1	identifier and chemistry
+GALFUCGALACGLCGAL14ACGLCGALGLUSIDEtg	MAR08299	-1	identifier and chemistry
 GALGALFUCFUCGALACGLCGALACGLCGAL14ACGLCGALGLUSIDEte	MAR08304	-1	identifier and chemistry
 GALGALFUCFUCGALACGLCGALACGLCGAL14ACGLCGALGLUSIDEtg	MAR08303	-1	identifier and chemistry
 GALGALGALTHCRMte	MAR08253	1	identifier and chemistry
 GALGALGALTHCRMtg	MAR08252	1	identifier and chemistry
-GALGLUSIDEtg	MAR01348	1	identifier and chemistry
-GALGLUSIDEtl	MAR01349	1	identifier and chemistry
-GALGT1	MAR01351	1	identifier and chemistry
+GALGLUSIDEtg	MAR08145	1	identifier and chemistry
+GALGLUSIDEtl	MAR08202	1	identifier and chemistry
+GALGT1	MAR08165	1	identifier and chemistry
 GALGT2	MAR08190	1	identifier and chemistry
 GALGT3	MAR08191	1	identifier and chemistry
 GALGT4	MAR08192	1	identifier and chemistry
-GALK	MAR04130	1	chemistry
+GALK	MAR04130	1	identifier and chemistry
 GALNACT1g	MAR07206	1	identifier and chemistry
 GALNACT2g	MAR07496	1	identifier and chemistry
 GALNACT3g	MAR07521	1	identifier and chemistry
@@ -2765,9 +2699,9 @@ GBSIDEte	MAR08878	1	identifier and chemistry
 GBSIDEtl	MAR08203	1	identifier and chemistry
 GCALDD	MAR08775	1	identifier and chemistry
 GCALDDm	MAR08778	1	identifier and chemistry
-GCC2am	MAR08433	1	metabolites
-GCC2bim	MAR08434	1	metabolites
 GCC2cm	MAR06409	-1	identifier and chemistry
+GCCam	MAR08433	1	metabolites
+GCCbim	MAR08434	1	metabolites
 GCHOLAt	MAR08879	1	identifier and chemistry
 GCHOLAt2	MAR01863	1	identifier and chemistry
 GCHOLAt3	MAR01868	1	identifier and chemistry
@@ -2801,7 +2735,7 @@ GGH_7DHFl	MAR08140	1	identifier and chemistry
 GGH_7THFe	MAR08141	1	identifier and chemistry
 GGH_7THFl	MAR08142	1	identifier and chemistry
 GGLUCT	MAR08770	1	identifier and chemistry
-GGNG	MAR05395	1	read by hand
+GGNG	MAR05395	1	metabolites
 GGT5r	MAR08548	1	identifier and chemistry
 GGT6	MAR08549	-1	identifier and chemistry
 GGT_U	MAR07254	1	metabolites
@@ -2814,8 +2748,8 @@ GK1m	MAR04135	-1	identifier and chemistry
 GLACO	MAR08349	1	identifier and chemistry
 GLACOm	MAR01372	1	identifier and chemistry
 GLACter	MAR08350	1	identifier and chemistry
-GLAl	MAR08217	1	metabolites
-GLB1	MAR00786	1	metabolites
+GLAl	MAR08217	1	identifier and chemistry
+GLB1	MAR00786	1	identifier and chemistry
 GLBRAN	MAR05397	1	identifier and chemistry
 GLC3MEACPhr	MAR12728	1	identifier and chemistry
 GLC3MEACPitr	MAR12952	1	identifier and chemistry
@@ -2868,7 +2802,7 @@ GLNATB0tc	MAR06896	1	identifier and chemistry
 GLNB0AT3tc	MAR06896	1	identifier and chemistry
 GLNCYSNaEx	MAR05624	1	identifier and chemistry
 GLNLASEer	MAR08346	-1	identifier and chemistry
-GLNS	MAR03890	1	metabolites
+GLNS	MAR20191	1	metabolites, any compartment
 GLNSERNaEx	MAR05619	1	identifier and chemistry
 GLNTHRNaEx	MAR05629	1	identifier and chemistry
 GLNt4	MAR05308	1	identifier and chemistry
@@ -2903,7 +2837,6 @@ GLYATm	MAR03847	-1	identifier and chemistry
 GLYB0AT3tc	MAR09616	1	identifier and chemistry
 GLYBt4_2_r	MAR08889	1	identifier and chemistry
 GLYBtm	MAR08890	-1	identifier and chemistry
-GLYC3PFADm	MAR00449	1	identifier and chemistry
 GLYC3Ptmc	MAR08891	-1	identifier and chemistry
 GLYCK2	MAR08781	1	identifier and chemistry
 GLYCLTDy	MAR07702	1	identifier and chemistry
@@ -2929,7 +2862,7 @@ GLYPROPRO1c	MAR11414	1	identifier and chemistry
 GLYSARCNc	MAR06915	1	identifier and chemistry
 GLYSARPEPT1tc	MAR06917	1	identifier and chemistry
 GLYSNAT5tc	MAR09606	1	identifier and chemistry
-GLYVESSEC	MAR01396	1	identifier and chemistry
+GLYVESSEC	MAR07737	1	chemistry
 GLYitr	MAR13004	1	identifier and chemistry
 GLYt2r	MAR06371	1	identifier and chemistry
 GLYt2rL	MAR01386	1	identifier and chemistry
@@ -3077,7 +3010,7 @@ HIBDm	MAR03757	1	identifier and chemistry
 HISD	MAR04437	1	metabolites
 HISDC	MAR04428	1	identifier and chemistry
 HISTASE	MAR08783	1	metabolites
-HISTAVESSEC	MAR01442	1	identifier and chemistry
+HISTAVESSEC	MAR07633	1	chemistry
 HISTAtu	MAR04999	-1	identifier and chemistry
 HIShPTtc	MAR07101	1	identifier and chemistry
 HISt4	MAR05333	1	identifier and chemistry
@@ -3102,7 +3035,6 @@ HOCDACBP	MAR06528	1	identifier and chemistry
 HOCTDACBP	MAR06538	1	identifier and chemistry
 HOCTDEC2CRNe	MAR11243	-1	identifier and chemistry
 HOCTDECCRNe	MAR11244	-1	identifier and chemistry
-HOMt4	MAR06379	1	identifier and chemistry
 HOXG	MAR01450	1	identifier and chemistry
 HPACtr	MAR08907	1	identifier and chemistry
 HPCLx	MAR03486	1	metabolites
@@ -3168,10 +3100,10 @@ ICDHxm	MAR03957	1	identifier and chemistry
 ICDHy	MAR00710	1	identifier and chemistry
 ICDHyp	MAR00712	1	identifier and chemistry
 ICDHyrm	MAR03958	1	identifier and chemistry
-IDHPOXOX2b	MAR08543	1	identifier and chemistry
+IDHPOXOX2b	MAR06794	1	chemistry
 IDHPOXOX3	MAR06796	1	identifier and chemistry
 IDHPOXOX4	MAR06795	1	identifier and chemistry
-IDHPOXOXb	MAR08544	1	identifier and chemistry
+IDHPOXOXb	MAR06793	1	chemistry
 IDOAASE1ly	MAR07230	1	identifier and chemistry
 IDOAASE2ly	MAR07242	1	identifier and chemistry
 IDOAASE3ly	MAR07248	1	identifier and chemistry
@@ -3249,7 +3181,6 @@ LCTStl	MAR08763	1	identifier and chemistry
 LCYSTAT	MAR08066	-1	identifier and chemistry
 LCYSTATm	MAR08067	-1	identifier and chemistry
 LCYSTCBOXL	MAR08065	1	identifier and chemistry
-LDH_D	MAR08512	1	identifier and chemistry
 LDH_L	MAR04388	-1	identifier and chemistry
 LDH_Lm	MAR04280	-1	identifier and chemistry
 LEUATB0tc	MAR09595	1	identifier and chemistry
@@ -3372,7 +3303,6 @@ LYStiDF	MAR05071	1	identifier and chemistry
 LYStip	MAR08016	1	identifier and chemistry
 LYStm	MAR06321	-1	identifier and chemistry
 LYStn	MAR08918	1	identifier and chemistry
-L_LACDcm	MAR08514	1	identifier and chemistry
 L_LACt2r	MAR05998	1	identifier and chemistry
 L_LACt4r	MAR08515	1	identifier and chemistry
 L_LACtcm	MAR01485	1	identifier and chemistry
@@ -3447,7 +3377,6 @@ MELATNOX	MAR08566	1	identifier and chemistry
 MEOHt2	MAR05296	-1	identifier and chemistry
 MEOHtly	MAR08753	1	identifier and chemistry
 MEOHtr	MAR08921	1	identifier and chemistry
-MEPIVESSte	MAR01518	1	identifier and chemistry
 MERACMPtep	MAR12787	1	identifier and chemistry
 MERACMPthc	MAR12788	1	identifier and chemistry
 MERCPLACCYSt	MAR08686	1	identifier and chemistry
@@ -3616,8 +3545,7 @@ NADtm	MAR08982	1	identifier and chemistry
 NADtn	MAR07773	-1	identifier and chemistry
 NADtru	MAR07772	1	identifier and chemistry
 NAGA2ly	MAR01524	1	identifier and chemistry
-NAGAlby	MAR08197	1	identifier and chemistry
-NAGAly	MAR08201	1	identifier and chemistry
+NAGAly	MAR08201	1	metabolites
 NAGLCAly	MAR07468	1	identifier and chemistry
 NAHCO3_HCLt	MAR01525	1	identifier and chemistry
 NAIt	MAR08924	1	identifier and chemistry
@@ -3632,7 +3560,7 @@ NCAMDe	MAR04969	1	identifier and chemistry
 NCCt	MAR06524	1	identifier and chemistry
 NCKt	MAR07631	-1	identifier and chemistry
 NCNt	MAR01529	1	identifier and chemistry
-NDERSVhc	MAR12792	1	identifier and chemistry
+NDERSVhc	MAR12792	1	metabolites
 NDERSVitr	MAR12970	1	identifier and chemistry
 NDERSVteb	MAR12793	1	identifier and chemistry
 NDP10ex	MAR04342	1	identifier and chemistry
@@ -3700,7 +3628,7 @@ NP1	MAR04662	-1	identifier and chemistry
 NPTHLte	MAR07111	1	identifier and chemistry
 NRPPHRSFt	MAR08095	1	identifier and chemistry
 NRPPHRSULT	MAR08094	1	identifier and chemistry
-NRPPHRVESSEC	MAR01555	1	identifier and chemistry
+NRPPHRVESSEC	MAR07637	1	chemistry
 NRPPHRt4_2_r	MAR06242	1	identifier and chemistry
 NRPPHRtu	MAR06241	-1	identifier and chemistry
 NRVNCCOAtx	MAR03020	1	identifier and chemistry
@@ -3744,6 +3672,7 @@ NTP3e	MAR04136	1	identifier and chemistry
 NTPP10	MAR07879	1	identifier and chemistry
 NTPP11	MAR08488	1	identifier and chemistry
 NTPP9	MAR08489	1	identifier and chemistry
+NaKt	MAR05429	1	chemistry
 O16G1e	MAR01560	1	identifier and chemistry
 O16G2e	MAR08584	1	identifier and chemistry
 O2St	MAR03959	1	identifier and chemistry
@@ -3790,8 +3719,6 @@ OMHPALTD	MAR06773	1	identifier and chemistry
 OMPDC	MAR04036	1	identifier and chemistry
 ONPTHLte	MAR08927	-1	identifier and chemistry
 OPAHir	MAR03889	1	identifier and chemistry
-ORETNF	MAR08703	1	identifier and chemistry
-ORETNF2	MAR08706	1	identifier and chemistry
 ORETNtn	MAR01563	1	identifier and chemistry
 ORETNtn2	MAR01564	1	identifier and chemistry
 ORNALArBATtc	MAR05940	1	identifier and chemistry
@@ -3825,12 +3752,12 @@ P4501B1r	MAR02047	1	identifier and chemistry
 P45021A1r	MAR07932	1	identifier and chemistry
 P45021A2r	MAR07928	1	identifier and chemistry
 P45027A11m	MAR01605	1	identifier and chemistry
-P45027A12m	MAR01610	1	identifier and chemistry
+P45027A12m	MAR01610	1	read by hand
 P45027A13m	MAR01614	1	identifier and chemistry
 P45027A14m	MAR01682	1	identifier and chemistry
-P45027A15m	MAR01567	1	identifier and chemistry
-P45027A16m	MAR01693	1	identifier and chemistry
-P45027A1m	MAR01784	1	identifier and chemistry
+P45027A15m	MAR01567	1	metabolites
+P45027A16m	MAR01693	1	metabolites
+P45027A1m	MAR01762	1	chemistry
 P4502A6	MAR08040	1	identifier and chemistry
 P4502C18	MAR08043	1	identifier and chemistry
 P4502C19	MAR08046	1	identifier and chemistry
@@ -3852,13 +3779,12 @@ P4504F121r	MAR08556	1	identifier and chemistry
 P4504F122r	MAR01128	1	identifier and chemistry
 P4504F123r	MAR08059	1	identifier and chemistry
 P4504F81r	MAR08555	1	identifier and chemistry
-P4507A1r	MAR01781	1	chemistry
+P4507A1r	MAR01581	1	metabolites
 P4507B11r	MAR01777	1	identifier and chemistry
 P4507B12r	MAR01574	1	identifier and chemistry
 P4508B11r	MAR01589	1	identifier and chemistry
 P4508B13r	MAR01590	1	identifier and chemistry
 P450LTB4r	MAR01575	1	identifier and chemistry
-P450SCC1m	MAR01578	1	identifier and chemistry
 P5CDm	MAR03822	1	identifier and chemistry
 P5CR	MAR03833	1	identifier and chemistry
 P5CRm	MAR08609	1	identifier and chemistry
@@ -3889,7 +3815,7 @@ PCHOLPr_hs	MAR08525	1	metabolites
 PCHOL_HSter	MAR00461	1	identifier and chemistry
 PCHOL_HStg	MAR00734	1	identifier and chemistry
 PCLAD	MAR04231	1	identifier and chemistry
-PCLYSOX	MAR09553	1	metabolites
+PCLYSOX	MAR06983	1	metabolites
 PCREATtmdiffir	MAR08430	1	identifier and chemistry
 PCRNtc	MAR01587	1	identifier and chemistry
 PCRNtm	MAR01588	1	identifier and chemistry
@@ -3910,7 +3836,6 @@ PEFLIP	MAR01594	1	identifier and chemistry
 PEFLIPm	MAR01596	1	identifier and chemistry
 PEPCK	MAR04101	1	identifier and chemistry
 PEPCKm	MAR04103	1	identifier and chemistry
-PEPLYStn	MAR01597	1	identifier and chemistry
 PERILLYLte	MAR08599	-1	identifier and chemistry
 PETHCT	MAR00651	1	identifier and chemistry
 PETOHMm_hs	MAR01603	1	identifier and chemistry
@@ -4022,7 +3947,6 @@ PNTEHe	MAR08986	1	identifier and chemistry
 PNTK	MAR04718	1	identifier and chemistry
 PNTKm	MAR01634	1	identifier and chemistry
 PNTORDe	MAR09057	-1	identifier and chemistry
-PNTOt5	MAR01636	1	identifier and chemistry
 PPA	MAR03977	1	identifier and chemistry
 PPA2	MAR05363	1	identifier and chemistry
 PPA2m	MAR08617	1	identifier and chemistry
@@ -4065,8 +3989,6 @@ PRISTtx	MAR01648	1	identifier and chemistry
 PRO1x	MAR03835	-1	identifier and chemistry
 PRO1xm	MAR03837	-1	identifier and chemistry
 PROAKGOX1r	MAR01649	1	identifier and chemistry
-PROD2	MAR08610	1	identifier and chemistry
-PROD2m	MAR08611	1	identifier and chemistry
 PRODt2r	MAR08929	1	identifier and chemistry
 PRODt2rL	MAR08928	-1	identifier and chemistry
 PROFVSCOAitx	MAR12973	1	identifier and chemistry
@@ -4127,11 +4049,11 @@ PTVSTGLUChc	MAR12812	1	identifier and chemistry
 PTVSTLAChc	MAR12813	1	identifier and chemistry
 PTVSTLACitr	MAR12974	1	identifier and chemistry
 PTVSTLACtev	MAR12814	1	identifier and chemistry
-PTVSTM13hr	MAR12815	1	identifier and chemistry
+PTVSTM13hr	MAR12815	1	metabolites
 PTVSTM13itr	MAR12975	1	identifier and chemistry
 PTVSTM13te	MAR12976	1	identifier and chemistry
 PTVSTM3eb	MAR12816	1	identifier and chemistry
-PTVSTM3hc	MAR12817	1	identifier and chemistry
+PTVSTM3hc	MAR12817	1	metabolites
 PTVSTM3itr	MAR12978	1	identifier and chemistry
 PTVSThc	MAR12818	1	identifier and chemistry
 PTVSTitr	MAR13021	1	identifier and chemistry
@@ -4179,7 +4101,7 @@ RADH	MAR06646	1	identifier and chemistry
 RADH2	MAR08698	-1	identifier and chemistry
 RADH3	MAR06675	1	identifier and chemistry
 RADH4	MAR08699	1	identifier and chemistry
-RAHY	MAR08700	1	identifier and chemistry
+RAHY	MAR06700	1	chemistry
 RAI1	MAR06651	1	identifier and chemistry
 RAI2	MAR08702	-1	identifier and chemistry
 RAI3	MAR06661	-1	identifier and chemistry
@@ -4220,8 +4142,8 @@ RE0567C	MAR02203	1	identifier and chemistry
 RE0568C	MAR02204	1	identifier and chemistry
 RE0569C	MAR02205	1	identifier and chemistry
 RE0569E	MAR02494	1	identifier and chemistry
-RE0570C	MAR02208	1	identifier and chemistry
-RE0571C	MAR02209	1	identifier and chemistry
+RE0570C	MAR02208	1	metabolites
+RE0571C	MAR02209	1	metabolites
 RE0572N	MAR02496	1	identifier and chemistry
 RE0573N	MAR02498	1	identifier and chemistry
 RE0574C	MAR02212	1	identifier and chemistry
@@ -4304,7 +4226,7 @@ RE0937C	MAR09479	1	identifier and chemistry
 RE0937E	MAR02641	1	identifier and chemistry
 RE0938C	MAR09480	1	identifier and chemistry
 RE0938E	MAR02643	1	identifier and chemistry
-RE0944C	MAR08572	1	identifier and chemistry
+RE0944C	MAR08572	1	metabolites
 RE0944E	MAR08573	1	identifier and chemistry
 RE0958C	MAR08568	1	identifier and chemistry
 RE0958E	MAR08569	1	identifier and chemistry
@@ -4343,16 +4265,12 @@ RE1236C	MAR06960	-1	identifier and chemistry
 RE1238X	MAR06930	-1	identifier and chemistry
 RE1240C	MAR06956	-1	identifier and chemistry
 RE1254C	MAR04740	1	identifier and chemistry
-RE1266C	MAR06924	1	identifier and chemistry
+RE1266C	MAR06924	1	metabolites
 RE1303C	MAR02115	1	identifier and chemistry
-RE1308C	MAR02129	1	identifier and chemistry
-RE1308M	MAR02130	-1	identifier and chemistry
-RE1309C	MAR02131	1	identifier and chemistry
+RE1308M	MAR02130	1	identifier and chemistry
 RE1309M	MAR02767	1	identifier and chemistry
-RE1310C	MAR02133	1	identifier and chemistry
-RE1310M	MAR02134	1	identifier and chemistry
-RE1311C	MAR02135	1	identifier and chemistry
-RE1311M	MAR02136	1	identifier and chemistry
+RE1310M	MAR02134	1	metabolites
+RE1311M	MAR02136	1	metabolites
 RE1317C	MAR09470	-1	identifier and chemistry
 RE1441G	MAR06580	1	identifier and chemistry
 RE1441R	MAR06581	1	identifier and chemistry
@@ -4370,7 +4288,7 @@ RE1517M	MAR03280	1	identifier and chemistry
 RE1517X	MAR02808	1	identifier and chemistry
 RE1518M	MAR03284	1	identifier and chemistry
 RE1518X	MAR02810	1	identifier and chemistry
-RE1519X	MAR02818	1	metabolites
+RE1519X	MAR02818	1	identifier and chemistry
 RE1520M	MAR03290	1	metabolites
 RE1520X	MAR03317	1	metabolites
 RE1521M	MAR03285	1	identifier and chemistry
@@ -4398,11 +4316,11 @@ RE1533M	MAR03287	1	identifier and chemistry
 RE1533X	MAR03315	1	identifier and chemistry
 RE1534M	MAR03293	1	identifier and chemistry
 RE1534X	MAR03320	1	identifier and chemistry
-RE1537C	MAR06961	1	metabolites
+RE1537C	MAR06961	1	identifier and chemistry
 RE1537X	MAR06962	1	metabolites
-RE1538C	MAR06963	1	metabolites
+RE1538C	MAR06963	1	identifier and chemistry
 RE1538X	MAR06964	1	metabolites
-RE1539C	MAR06958	1	metabolites
+RE1539C	MAR06958	1	identifier and chemistry
 RE1539X	MAR06959	1	metabolites
 RE1573M	MAR03288	1	metabolites
 RE1573X	MAR03316	1	metabolites
@@ -4423,7 +4341,7 @@ RE1635C	MAR02106	1	identifier and chemistry
 RE1635M	MAR02107	1	identifier and chemistry
 RE1635R	MAR02108	1	identifier and chemistry
 RE1635X	MAR02109	1	identifier and chemistry
-RE1651C	MAR06814	-1	identifier and chemistry
+RE1651C	MAR06814	-1	metabolites
 RE1653C	MAR06885	1	identifier and chemistry
 RE1691M	MAR06520	1	identifier and chemistry
 RE1699C	MAR02064	1	identifier and chemistry
@@ -4435,19 +4353,17 @@ RE1709N	MAR04540	1	identifier and chemistry
 RE1711C	MAR04561	-1	identifier and chemistry
 RE1711M	MAR02858	1	identifier and chemistry
 RE1796C	MAR02860	1	metabolites
-RE1796M	MAR02881	1	identifier and chemistry
-RE1796R	MAR01783	1	chemistry
-RE1803C	MAR01797	1	identifier and chemistry
+RE1796R	MAR01584	1	metabolites
+RE1803C	MAR01765	1	chemistry
 RE1804C	MAR02883	1	identifier and chemistry
-RE1804M	MAR02885	1	identifier and chemistry
+RE1804M	MAR02885	1	metabolites
 RE1806C	MAR02887	1	identifier and chemistry
 RE1806R	MAR01810	1	identifier and chemistry
 RE1807C	MAR02889	1	identifier and chemistry
-RE1807M	MAR02891	1	identifier and chemistry
+RE1807M	MAR02891	1	metabolites
 RE1808R	MAR01811	1	identifier and chemistry
 RE1809C	MAR02893	1	identifier and chemistry
 RE1809R	MAR01815	1	identifier and chemistry
-RE1810M	MAR02895	-1	identifier and chemistry
 RE1811C	MAR02933	1	identifier and chemistry
 RE1811R	MAR01817	1	identifier and chemistry
 RE1812C	MAR02934	1	identifier and chemistry
@@ -4484,9 +4400,9 @@ RE1830M	MAR01792	1	identifier and chemistry
 RE1834C	MAR01660	1	identifier and chemistry
 RE1834M	MAR01663	1	metabolites, any compartment
 RE1834X	MAR01663	1	identifier and chemistry
-RE1835C	MAR01718	1	metabolites
-RE1835M	MAR02940	1	metabolites
-RE1835X	MAR01716	1	metabolites
+RE1835C	MAR01718	1	identifier and chemistry
+RE1835M	MAR02940	1	identifier and chemistry
+RE1835X	MAR01716	1	identifier and chemistry
 RE1836C	MAR02941	1	identifier and chemistry
 RE1836M	MAR02950	1	identifier and chemistry
 RE1845C	MAR01723	1	identifier and chemistry
@@ -4506,7 +4422,7 @@ RE1905R	MAR06654	1	identifier and chemistry
 RE1906C	MAR02993	1	identifier and chemistry
 RE1906R	MAR06649	1	identifier and chemistry
 RE1907C	MAR06663	-1	identifier and chemistry
-RE1915C	MAR06877	-1	identifier and chemistry
+RE1915C	MAR06877	1	identifier and chemistry
 RE1916C	MAR06883	-1	identifier and chemistry
 RE1916X	MAR02995	1	identifier and chemistry
 RE1917C	MAR06878	-1	identifier and chemistry
@@ -4520,10 +4436,10 @@ RE1927C	MAR06759	1	identifier and chemistry
 RE1933C	MAR03920	1	identifier and chemistry
 RE1938C	MAR06641	1	identifier and chemistry
 RE1938R	MAR06642	1	identifier and chemistry
-RE1941C	MAR06664	1	identifier and chemistry
-RE1941R	MAR06665	1	identifier and chemistry
-RE1942C	MAR06681	1	identifier and chemistry
-RE1942R	MAR06682	1	identifier and chemistry
+RE1941C	MAR06664	1	metabolites
+RE1941R	MAR06665	1	metabolites
+RE1942C	MAR06681	1	metabolites
+RE1942R	MAR06682	1	metabolites
 RE1943C	MAR06657	1	identifier and chemistry
 RE1943R	MAR06658	1	identifier and chemistry
 RE1952C	MAR01002	1	identifier and chemistry
@@ -4557,8 +4473,8 @@ RE2067C	MAR01342	1	identifier and chemistry
 RE2068C	MAR01343	1	identifier and chemistry
 RE2069C	MAR01324	-1	identifier and chemistry
 RE2078M	MAR03016	1	identifier and chemistry
-RE2079R	MAR01333	-1	identifier and chemistry
-RE2080C	MAR01375	-1	identifier and chemistry
+RE2079R	MAR01333	1	identifier and chemistry
+RE2080C	MAR01375	-1	metabolites
 RE2081C	MAR04426	-1	identifier and chemistry
 RE2111M	MAR03772	-1	identifier and chemistry
 RE2112C	MAR01830	1	identifier and chemistry
@@ -4567,15 +4483,15 @@ RE2117M	MAR03743	-1	identifier and chemistry
 RE2122C	MAR06730	1	identifier and chemistry
 RE2124C	MAR06788	1	identifier and chemistry
 RE2127C	MAR09474	1	identifier and chemistry
-RE2128C	MAR06712	-1	identifier and chemistry
-RE2129C	MAR04554	-1	identifier and chemistry
-RE2130C	MAR06807	-1	identifier and chemistry
-RE2131C	MAR06744	-1	identifier and chemistry
-RE2132C	MAR06742	-1	identifier and chemistry
+RE2128C	MAR06712	1	identifier and chemistry
+RE2129C	MAR04554	1	identifier and chemistry
+RE2130C	MAR06807	1	identifier and chemistry
+RE2131C	MAR06744	1	identifier and chemistry
+RE2132C	MAR06742	1	identifier and chemistry
 RE2133C	MAR06715	1	identifier and chemistry
-RE2146C	MAR03031	1	identifier and chemistry
-RE2146R	MAR06686	1	metabolites
-RE2147C	MAR06679	1	identifier and chemistry
+RE2146C	MAR03031	1	metabolites
+RE2146R	MAR06686	1	identifier and chemistry
+RE2147C	MAR06679	1	metabolites
 RE2149C	MAR09573	1	identifier and chemistry
 RE2149R	MAR09574	1	identifier and chemistry
 RE2150C	MAR06666	1	identifier and chemistry
@@ -4593,7 +4509,6 @@ RE2221M	MAR03040	1	identifier and chemistry
 RE2223M	MAR05419	-1	identifier and chemistry
 RE2235C	MAR02053	1	identifier and chemistry
 RE2235R	MAR02054	1	identifier and chemistry
-RE2240C	MAR02137	1	identifier and chemistry
 RE2248C	MAR06683	1	chemistry
 RE2249C	MAR06687	1	identifier and chemistry
 RE2250C	MAR03041	1	identifier and chemistry
@@ -4621,26 +4536,22 @@ RE2319C	MAR02072	-1	identifier and chemistry
 RE2319M	MAR02073	-1	identifier and chemistry
 RE2319R	MAR02074	-1	identifier and chemistry
 RE2319X	MAR02075	-1	identifier and chemistry
-RE2327C	MAR03047	1	identifier and chemistry
+RE2327C	MAR03047	-1	metabolites
 RE2333C	MAR06953	1	identifier and chemistry
 RE2334C	MAR06954	1	identifier and chemistry
 RE2335C	MAR06973	-1	identifier and chemistry
 RE2346C	MAR02453	1	identifier and chemistry
-RE2349C	MAR04246	1	identifier and chemistry
+RE2349C	MAR04246	1	metabolites
 RE2349M	MAR03048	1	identifier and chemistry
 RE2360C	MAR01088	-1	identifier and chemistry
 RE2360N	MAR01091	-1	identifier and chemistry
 RE2373C	MAR06501	1	identifier and chemistry
 RE2375C	MAR03049	1	identifier and chemistry
 RE2377C	MAR03050	1	identifier and chemistry
-RE2382C	MAR06464	1	identifier and chemistry
 RE2382R	MAR06465	1	identifier and chemistry
-RE2383C	MAR06478	1	identifier and chemistry
 RE2383R	MAR06479	1	identifier and chemistry
 RE2386C	MAR02045	1	metabolites
-RE2387C	MAR06476	1	identifier and chemistry
 RE2387R	MAR06477	1	identifier and chemistry
-RE2398C	MAR06466	1	identifier and chemistry
 RE2398R	MAR06467	1	identifier and chemistry
 RE2404C	MAR06495	1	identifier and chemistry
 RE2404R	MAR03051	1	identifier and chemistry
@@ -4684,25 +4595,19 @@ RE2523C	MAR06824	-1	identifier and chemistry
 RE2523X	MAR03155	1	identifier and chemistry
 RE2524C	MAR06886	-1	identifier and chemistry
 RE2524X	MAR03159	1	identifier and chemistry
-RE2525C	MAR06815	-1	identifier and chemistry
-RE2525X	MAR03161	1	identifier and chemistry
-RE2526C	MAR06817	1	identifier and chemistry
 RE2533C	MAR06461	-1	identifier and chemistry
 RE2541C	MAR06492	1	identifier and chemistry
 RE2541E	MAR03162	1	identifier and chemistry
 RE2541L	MAR03165	1	identifier and chemistry
 RE2562C	MAR04563	1	identifier and chemistry
 RE2563C	MAR01347	1	identifier and chemistry
-RE2594C	MAR04248	-1	identifier and chemistry
+RE2594C	MAR04248	-1	metabolites
 RE2596C	MAR06722	1	identifier and chemistry
 RE2605C	MAR06606	1	identifier and chemistry
 RE2622C	MAR03169	1	identifier and chemistry
 RE2622R	MAR03207	1	identifier and chemistry
 RE2624X	MAR01632	-1	identifier and chemistry
 RE2625C	MAR01608	1	identifier and chemistry
-RE2625M	MAR01609	1	chemistry
-RE2626C	MAR03210	1	metabolites
-RE2626M	MAR03214	1	metabolites
 RE2632C	MAR03216	1	identifier and chemistry
 RE2632M	MAR01800	1	identifier and chemistry
 RE2633C	MAR03217	1	identifier and chemistry
@@ -4728,20 +4633,20 @@ RE2658R	MAR06660	-1	identifier and chemistry
 RE2659R	MAR06662	-1	identifier and chemistry
 RE2660C	MAR04541	1	identifier and chemistry
 RE2660N	MAR04542	1	identifier and chemistry
-RE2666C	MAR00924	1	metabolites
-RE2666G	MAR00925	1	metabolites
+RE2666C	MAR00924	1	identifier and chemistry
+RE2666G	MAR00925	1	identifier and chemistry
 RE2675C	MAR03238	1	identifier and chemistry
 RE2677C	MAR00919	1	identifier and chemistry
 RE2677E	MAR03248	1	identifier and chemistry
 RE2677G	MAR00920	1	identifier and chemistry
 RE2677N	MAR03249	1	identifier and chemistry
 RE2677R	MAR00921	1	identifier and chemistry
-RE2680C	MAR00926	1	metabolites
+RE2680C	MAR00926	1	identifier and chemistry
 RE2705C	MAR06459	-1	identifier and chemistry
 RE2717L	MAR00914	1	identifier and chemistry
 RE2718C	MAR00915	1	identifier and chemistry
 RE2718G	MAR03251	1	identifier and chemistry
-RE2722C	MAR00928	1	metabolites
+RE2722C	MAR00928	1	identifier and chemistry
 RE2722G	MAR03253	1	identifier and chemistry
 RE2759X	MAR03491	-1	identifier and chemistry
 RE2766C	MAR01973	-1	identifier and chemistry
@@ -4750,8 +4655,6 @@ RE2768M	MAR02000	1	identifier and chemistry
 RE2768R	MAR03257	1	identifier and chemistry
 RE2799C	MAR01326	1	identifier and chemistry
 RE2813C	MAR06609	1	identifier and chemistry
-RE2814M	MAR03259	1	identifier and chemistry
-RE2814R	MAR01787	1	identifier and chemistry
 RE2848C	MAR01406	-1	identifier and chemistry
 RE2849C	MAR01403	-1	identifier and chemistry
 RE2850C	MAR01407	-1	identifier and chemistry
@@ -4818,7 +4721,7 @@ RE2921M	MAR03297	1	identifier and chemistry
 RE2921X	MAR03299	1	identifier and chemistry
 RE2948C	MAR06460	-1	identifier and chemistry
 RE2954C	MAR06627	1	identifier and chemistry
-RE2958C	MAR01310	-1	identifier and chemistry
+RE2958C	MAR01310	1	identifier and chemistry
 RE2972G	MAR03300	1	identifier and chemistry
 RE2972M	MAR03303	1	identifier and chemistry
 RE2972R	MAR03308	1	identifier and chemistry
@@ -4827,7 +4730,6 @@ RE2973N	MAR03313	1	identifier and chemistry
 RE2974G	MAR03318	1	metabolites
 RE2974N	MAR03324	1	identifier and chemistry
 RE2974R	MAR03325	1	metabolites
-RE2975C	MAR02144	1	identifier and chemistry
 RE2975M	MAR02145	1	identifier and chemistry
 RE2985M	MAR03366	1	identifier and chemistry
 RE2985X	MAR03459	1	metabolites
@@ -4904,8 +4806,8 @@ RE3073X	MAR03386	1	metabolites
 RE3074X	MAR03387	1	metabolites
 RE3075C	MAR03388	1	metabolites
 RE3075X	MAR03389	1	metabolites
-RE3079C	MAR03390	1	identifier and chemistry
-RE3079X	MAR03493	1	identifier and chemistry
+RE3079C	MAR03390	1	metabolites
+RE3079X	MAR03493	1	metabolites
 RE3081X	MAR03501	1	identifier and chemistry
 RE3082X	MAR03503	1	identifier and chemistry
 RE3083X	MAR03511	-1	identifier and chemistry
@@ -4947,7 +4849,7 @@ RE3121R	MAR03405	1	identifier and chemistry
 RE3122C	MAR02491	1	identifier and chemistry
 RE3122R	MAR03410	1	identifier and chemistry
 RE3123C	MAR02503	1	metabolites
-RE3123R	MAR03412	1	identifier and chemistry
+RE3123R	MAR03412	1	metabolites
 RE3124C	MAR02497	1	identifier and chemistry
 RE3124R	MAR03415	1	identifier and chemistry
 RE3125C	MAR02499	1	identifier and chemistry
@@ -4956,7 +4858,7 @@ RE3126C	MAR02501	1	identifier and chemistry
 RE3126R	MAR03418	1	identifier and chemistry
 RE3129N	MAR03419	1	identifier and chemistry
 RE3132R	MAR02984	1	identifier and chemistry
-RE3134C	MAR03420	1	identifier and chemistry
+RE3134C	MAR01540	1	chemistry
 RE3134R	MAR03434	1	identifier and chemistry
 RE3136C	MAR01553	1	identifier and chemistry
 RE3139X	MAR02513	1	identifier and chemistry
@@ -5084,12 +4986,12 @@ RE3245C	MAR00264	1	metabolites
 RE3247X	MAR01638	1	metabolites
 RE3248M	MAR03756	1	metabolites, any compartment
 RE3248X	MAR03756	1	identifier and chemistry
-RE3250C	MAR03758	1	metabolites
+RE3250C	MAR03758	1	identifier and chemistry
 RE3250M	MAR03764	1	metabolites, any compartment
 RE3250X	MAR03764	1	identifier and chemistry
-RE3251C	MAR03766	1	identifier and chemistry
-RE3251M	MAR03768	1	identifier and chemistry
-RE3252C	MAR03774	1	metabolites
+RE3251C	MAR01804	1	chemistry
+RE3251M	MAR01805	1	chemistry
+RE3252C	MAR03774	1	identifier and chemistry
 RE3258C	MAR02465	1	identifier and chemistry
 RE3258R	MAR02466	1	identifier and chemistry
 RE3259C	MAR02459	1	identifier and chemistry
@@ -5164,14 +5066,13 @@ RE3345M	MAR01201	1	identifier and chemistry
 RE3345R	MAR01202	1	identifier and chemistry
 RE3345X	MAR01203	1	identifier and chemistry
 RE3346C	MAR01611	-1	chemistry
-RE3346M	MAR03817	1	metabolites
-RE3346R	MAR03821	1	metabolites
+RE3346M	MAR03817	1	identifier and chemistry
+RE3346R	MAR03821	1	identifier and chemistry
 RE3347C	MAR06510	1	identifier and chemistry
 RE3352C	MAR06610	1	identifier and chemistry
 RE3367C	MAR06947	1	metabolites
 RE3367E	MAR06948	1	metabolites
 RE3367X	MAR06949	1	metabolites
-RE3370C	MAR06428	1	identifier and chemistry
 RE3370R	MAR06429	1	identifier and chemistry
 RE3372C	MAR01532	1	identifier and chemistry
 RE3378C	MAR03824	1	metabolites
@@ -5213,23 +5114,22 @@ RE3417C	MAR02452	1	identifier and chemistry
 RE3420C	MAR02451	1	metabolites
 RE3421M	MAR03834	1	identifier and chemistry
 RE3421R	MAR03836	1	identifier and chemistry
-RE3422C	MAR01334	-1	chemistry
-RE3423C	MAR01376	-1	identifier and chemistry
+RE3422C	MAR01334	1	identifier and chemistry
+RE3423C	MAR01376	-1	metabolites
 RE3430C	MAR01228	1	identifier and chemistry
 RE3430M	MAR01229	1	identifier and chemistry
 RE3430X	MAR01230	1	identifier and chemistry
-RE3431C	MAR01285	-1	identifier and chemistry
+RE3431C	MAR01285	-1	metabolites
 RE3432C	MAR01231	1	identifier and chemistry
-RE3432M	MAR01281	-1	identifier and chemistry
-RE3432X	MAR01282	-1	identifier and chemistry
-RE3434C	MAR03840	1	identifier and chemistry
+RE3432M	MAR01281	-1	metabolites
+RE3432X	MAR01282	-1	metabolites
+RE3434C	MAR03840	1	metabolites
 RE3434R	MAR03842	1	identifier and chemistry
 RE3435C	MAR01238	1	identifier and chemistry
 RE3435R	MAR01239	1	identifier and chemistry
 RE3436C	MAR01236	1	identifier and chemistry
 RE3436R	MAR01237	1	identifier and chemistry
 RE3437C	MAR01241	1	identifier and chemistry
-RE3440C	MAR06443	1	identifier and chemistry
 RE3440R	MAR06444	1	identifier and chemistry
 RE3443M	MAR01276	1	identifier and chemistry
 RE3443X	MAR01277	1	identifier and chemistry
@@ -5239,9 +5139,9 @@ RE3444X	MAR01279	1	identifier and chemistry
 RE3445M	MAR01270	1	identifier and chemistry
 RE3445X	MAR01271	1	metabolites
 RE3446C	MAR01263	1	identifier and chemistry
-RE3446M	MAR03846	1	identifier and chemistry
+RE3446M	MAR03846	1	metabolites
 RE3446R	MAR03872	1	identifier and chemistry
-RE3446X	MAR03874	1	identifier and chemistry
+RE3446X	MAR03874	1	metabolites
 RE3447M	MAR01272	1	identifier and chemistry
 RE3447X	MAR01273	1	identifier and chemistry
 RE3448C	MAR03876	1	identifier and chemistry
@@ -5259,7 +5159,6 @@ RE3457C	MAR01356	1	identifier and chemistry
 RE3458C	MAR03884	1	identifier and chemistry
 RE3459C	MAR01363	-1	metabolites
 RE3460C	MAR01362	1	identifier and chemistry
-RE3464C	MAR06426	1	identifier and chemistry
 RE3464R	MAR06427	1	identifier and chemistry
 RE3469C	MAR00979	1	identifier and chemistry
 RE3470C	MAR03886	1	identifier and chemistry
@@ -5306,7 +5205,7 @@ RE3513N	MAR03906	1	identifier and chemistry
 RE3513R	MAR01077	1	identifier and chemistry
 RE3514C	MAR03909	1	identifier and chemistry
 RE3514R	MAR03913	1	identifier and chemistry
-RE3515C	MAR03914	1	metabolites
+RE3515C	MAR03914	1	identifier and chemistry
 RE3518C	MAR01059	1	identifier and chemistry
 RE3518R	MAR01061	1	identifier and chemistry
 RE3519C	MAR01055	1	identifier and chemistry
@@ -5322,7 +5221,7 @@ RE3521R	MAR01053	1	identifier and chemistry
 RE3521X	MAR01054	1	identifier and chemistry
 RE3522C	MAR01071	1	identifier and chemistry
 RE3522R	MAR01072	1	identifier and chemistry
-RE3524R	MAR01335	-1	identifier and chemistry
+RE3524R	MAR01335	1	identifier and chemistry
 RE3525C	MAR00961	1	identifier and chemistry
 RE3525M	MAR00964	1	identifier and chemistry
 RE3525N	MAR03927	1	identifier and chemistry
@@ -5398,7 +5297,7 @@ RE3597M	MAR01245	-1	identifier and chemistry
 RE3597X	MAR01246	-1	identifier and chemistry
 RE3624M	MAR03997	1	metabolites
 RE3624X	MAR04001	1	metabolites
-RE3626M	MAR04003	1	metabolites
+RE3626M	MAR04003	1	identifier and chemistry
 RE3629C	MAR05338	1	identifier and chemistry
 RE3630C	MAR05339	1	identifier and chemistry
 RE3631C	MAR05337	1	identifier and chemistry
@@ -5413,8 +5312,8 @@ RETI2	MAR06643	1	identifier and chemistry
 RETI3	MAR06645	1	identifier and chemistry
 RETNCOA	MAR08712	1	identifier and chemistry
 RETNGLCt	MAR08714	1	identifier and chemistry
-RETNGLCt2	MAR08718	1	identifier and chemistry
-RETNGLCt2r	MAR08719	1	identifier and chemistry
+RETNGLCt2	MAR08718	1	metabolites
+RETNGLCt2r	MAR08719	1	metabolites
 RETNGLCtr	MAR08715	1	identifier and chemistry
 RETNt	MAR08721	1	identifier and chemistry
 RETNtr	MAR08722	1	identifier and chemistry
@@ -5623,7 +5522,7 @@ R_3HPVSCOAhc	MAR12991	1	identifier and chemistry
 R_3HPVSCOAitm	MAR12895	1	identifier and chemistry
 R_3HPVSCOAitx	MAR12896	1	identifier and chemistry
 R_3HPVSTETCOAhcm	MAR12371	1	identifier and chemistry
-R_3HPVSTETCOAhcx	MAR12372	1	metabolites
+R_3HPVSTETCOAhcx	MAR12372	1	identifier and chemistry
 R_3HPVSTETCOAitm	MAR12897	1	identifier and chemistry
 R_3HPVSTETCOAitx	MAR12898	1	identifier and chemistry
 R_3HPVSTEThc	MAR12992	1	identifier and chemistry
@@ -5735,7 +5634,7 @@ R_5HOXINDACTO2OX	MAR04560	1	identifier and chemistry
 R_5HOXINDACTOXm	MAR00051	1	identifier and chemistry
 R_5HOXINOXDA	MAR04558	1	metabolites
 R_5HTRPDOX	MAR06716	1	identifier and chemistry
-R_5HTRPVESSEC	MAR00052	1	identifier and chemistry
+R_5HTRPVESSEC	MAR07634	1	chemistry
 R_5HXKYNDCL	MAR06718	1	identifier and chemistry
 R_5HXKYNOXDA	MAR06719	1	metabolites
 R_5MTAte	MAR09004	1	identifier and chemistry
@@ -5821,8 +5720,8 @@ R_7HPVSteb	MAR12458	1	identifier and chemistry
 R_7HPVStev	MAR12459	1	identifier and chemistry
 R_7THFtl	MAR08127	1	identifier and chemistry
 R_7THFtm	MAR08128	1	identifier and chemistry
-R_A4GALTc	MAR00801	1	metabolites
-R_A4GALTg	MAR08148	1	metabolites
+R_A4GALTc	MAR00801	1	identifier and chemistry
+R_A4GALTg	MAR08148	1	identifier and chemistry
 R_A4GNT1g	MAR08254	1	identifier and chemistry
 R_A4GNT2g	MAR08255	1	identifier and chemistry
 R_AACOAT	MAR01436	1	identifier and chemistry
@@ -5871,7 +5770,7 @@ R_ACCOAgt	MAR08225	1	identifier and chemistry
 R_ACCOAtn	MAR01090	1	identifier and chemistry
 R_ACCOAtr	MAR00057	1	identifier and chemistry
 R_ACETONEt2	MAR08364	1	identifier and chemistry
-R_ACETONEt2m	MAR08365	1	identifier and chemistry
+R_ACETONEt2m	MAR02222	-1	chemistry
 R_ACGAGBSIDEtg	MAR08199	1	identifier and chemistry
 R_ACGAGBSIDEtl	MAR08200	1	identifier and chemistry
 R_ACGALFUCGALACGALFUC12GAL14ACGLCGALGLUSIDEte	MAR08290	-1	identifier and chemistry
@@ -5880,19 +5779,16 @@ R_ACGALFUCGALACGALFUCGALACGLCGAL14ACGLCGALGLUSIDEte	MAR08297	-1	identifier and c
 R_ACGALFUCGALACGALFUCGALACGLCGAL14ACGLCGALGLUSIDEtg	MAR08296	-1	identifier and chemistry
 R_ACGALK	MAR08366	1	identifier and chemistry
 R_ACGALK2	MAR08367	1	identifier and chemistry
-R_ACGALtlg	MAR08193	-1	identifier and chemistry
 R_ACGALtly	MAR08370	1	identifier and chemistry
 R_ACGAM2E	MAR04527	-1	identifier and chemistry
 R_ACGAM6PSi	MAR04628	1	identifier and chemistry
 R_ACGAMK	MAR04524	1	identifier and chemistry
 R_ACGAMPM	MAR04631	1	identifier and chemistry
 R_ACGAMtly	MAR04962	1	identifier and chemistry
-R_ACGBGBSIDEtg	MAR08195	1	identifier and chemistry
-R_ACGBGBSIDEtl	MAR08196	1	identifier and chemistry
 R_ACGPID	MAR08380	1	identifier and chemistry
 R_ACGSm	MAR08416	1	identifier and chemistry
 R_ACHEe	MAR08421	1	identifier and chemistry
-R_ACHVESSEC	MAR00058	1	identifier and chemistry
+R_ACHVESSEC	MAR07681	1	chemistry
 R_ACHtn	MAR08363	-1	identifier and chemistry
 R_ACITL	MAR04149	1	identifier and chemistry
 R_ACMPGLUChr	MAR12462	1	identifier and chemistry
@@ -5987,7 +5883,7 @@ R_ADRNCOAtx	MAR00063	1	identifier and chemistry
 R_ADRNCPT1	MAR02759	1	identifier and chemistry
 R_ADRNCPT2	MAR02761	-1	identifier and chemistry
 R_ADRNCRNt	MAR00064	1	identifier and chemistry
-R_ADRNLPVESSEC	MAR00065	1	identifier and chemistry
+R_ADRNLPVESSEC	MAR07635	1	chemistry
 R_ADRNt	MAR00412	1	identifier and chemistry
 R_ADSELK	MAR07129	1	identifier and chemistry
 R_ADSK	MAR04186	1	identifier and chemistry
@@ -6276,10 +6172,9 @@ R_B3GNT32g	MAR08250	1	identifier and chemistry
 R_B3GNT33g	MAR08251	1	identifier and chemistry
 R_B3GNT34g	MAR08151	1	identifier and chemistry
 R_B3GNT35g	MAR08152	1	identifier and chemistry
-R_B3GNT36g	MAR08194	1	identifier and chemistry
 R_B3GNT37g	MAR08173	1	identifier and chemistry
-R_B3GNT39g	MAR08147	1	metabolites
-R_B3GNT51g	MAR08275	1	metabolites
+R_B3GNT39g	MAR08147	1	identifier and chemistry
+R_B3GNT51g	MAR08275	1	identifier and chemistry
 R_BAAT1x	MAR00083	1	identifier and chemistry
 R_BAAT2x	MAR01667	1	identifier and chemistry
 R_BAAT4x	MAR00085	1	identifier and chemistry
@@ -6288,7 +6183,7 @@ R_BACCL	MAR07668	1	identifier and chemistry
 R_BACCLm	MAR00086	1	identifier and chemistry
 R_BALABETAtc	MAR09601	1	identifier and chemistry
 R_BALAPAT1tc	MAR06866	1	identifier and chemistry
-R_BALAVECSEC	MAR00087	1	identifier and chemistry
+R_BALAVECSEC	MAR07736	1	chemistry
 R_BALAtmr	MAR04953	1	identifier and chemistry
 R_BAMPPALDOX	MAR07993	1	identifier and chemistry
 R_BAMPPALDOXm	MAR00088	1	identifier and chemistry
@@ -6329,7 +6224,6 @@ R_BTNPLm	MAR00092	1	identifier and chemistry
 R_BTNTe	MAR06870	1	identifier and chemistry
 R_BTNt2	MAR07666	1	identifier and chemistry
 R_BTNt2m	MAR00093	1	identifier and chemistry
-R_BTNt3i	MAR00094	1	identifier and chemistry
 R_BTNt4i	MAR00095	1	identifier and chemistry
 R_BTNtn	MAR07665	1	identifier and chemistry
 R_BUP2	MAR04819	1	metabolites
@@ -6413,8 +6307,6 @@ R_C4DCCACT	MAR04661	1	identifier and chemistry
 R_C4DCe	MAR11258	-1	identifier and chemistry
 R_C4OHc	MAR04671	1	identifier and chemistry
 R_C4STMO1r	MAR00116	1	identifier and chemistry
-R_C4STMO2Pr	MAR00117	1	identifier and chemistry
-R_C4STMO2r	MAR00118	1	identifier and chemistry
 R_C4tcx	MAR04674	1	identifier and chemistry
 R_C4tmc	MAR04677	1	identifier and chemistry
 R_C4x	MAR04678	1	identifier and chemistry
@@ -6484,7 +6376,7 @@ R_CHLtm	MAR08657	1	identifier and chemistry
 R_CHOLATEt	MAR08659	1	identifier and chemistry
 R_CHOLATEt2	MAR08660	1	identifier and chemistry
 R_CHOLATEt3	MAR08658	1	identifier and chemistry
-R_CHOLD2m	MAR08441	1	identifier and chemistry
+R_CHOLD2m	MAR08441	1	metabolites
 R_CHOLESTTDe	MAR00018	1	identifier and chemistry
 R_CHOLK	MAR00636	1	identifier and chemistry
 R_CHOLPtg	MAR08243	1	identifier and chemistry
@@ -6585,11 +6477,11 @@ R_CRVS1tev	MAR12534	1	identifier and chemistry
 R_CRVS23M24hc	MAR12535	1	identifier and chemistry
 R_CRVSATPthc	MAR12536	1	identifier and chemistry
 R_CRVSATPtu	MAR12537	1	identifier and chemistry
-R_CRVSM1SPhc	MAR12538	1	identifier and chemistry
+R_CRVSM1SPhc	MAR12538	1	metabolites
 R_CRVSM1hc	MAR12539	1	identifier and chemistry
 R_CRVSM1hr	MAR12540	1	identifier and chemistry
 R_CRVSM1teb	MAR12541	1	identifier and chemistry
-R_CRVSM22hc	MAR12542	1	identifier and chemistry
+R_CRVSM22hc	MAR12542	1	metabolites
 R_CRVSM22itr	MAR12940	1	identifier and chemistry
 R_CRVSM23hc	MAR12543	1	identifier and chemistry
 R_CRVSM23hr	MAR12544	1	identifier and chemistry
@@ -6598,7 +6490,7 @@ R_CRVSM23tev	MAR12546	1	identifier and chemistry
 R_CRVSM24itr	MAR12941	1	identifier and chemistry
 R_CRVSM24teb	MAR12547	1	identifier and chemistry
 R_CRVSM24tev	MAR12548	1	identifier and chemistry
-R_CRVSM31hc	MAR12549	1	identifier and chemistry
+R_CRVSM31hc	MAR12549	1	metabolites
 R_CRVSM31itr	MAR12942	1	identifier and chemistry
 R_CRVSitr	MAR12939	1	identifier and chemistry
 R_CRVSthc	MAR12551	1	identifier and chemistry
@@ -6760,7 +6652,7 @@ R_DECDPtm	MAR06902	1	identifier and chemistry
 R_DEDOLP1_U	MAR07258	1	metabolites
 R_DEDOLP2_U	MAR07259	1	metabolites
 R_DEDOLR_U	MAR07260	1	metabolites
-R_DELACCRVSM23hc	MAR12561	1	identifier and chemistry
+R_DELACCRVSM23hc	MAR12561	1	metabolites
 R_DEOXFVShc	MAR12562	1	metabolites
 R_DEOXFVSitx	MAR12944	1	identifier and chemistry
 R_DEOXFVStev	MAR12563	1	identifier and chemistry
@@ -6791,7 +6683,6 @@ R_DGSNtm	MAR04997	1	identifier and chemistry
 R_DGTPtn	MAR07862	1	identifier and chemistry
 R_DGULND	MAR08353	1	identifier and chemistry
 R_DHAAt1r	MAR08846	-1	identifier and chemistry
-R_DHAPtc	MAR08111	1	identifier and chemistry
 R_DHCHOLESTANATEtm	MAR00221	1	identifier and chemistry
 R_DHCR243r	MAR00222	1	identifier and chemistry
 R_DHCR71r	MAR00227	1	identifier and chemistry
@@ -6819,8 +6710,8 @@ R_DHPR2	MAR08740	1	identifier and chemistry
 R_DIDPtn	MAR07877	1	identifier and chemistry
 R_DIGALSGALSIDEte	MAR08214	1	chemistry
 R_DIGALSGALSIDEtg	MAR08213	1	identifier and chemistry
-R_DIGALSIDEtg	MAR08215	1	metabolites
-R_DIGALSIDEtl	MAR08216	1	metabolites
+R_DIGALSIDEtg	MAR08215	1	identifier and chemistry
+R_DIGALSIDEtl	MAR08216	1	identifier and chemistry
 R_DINt	MAR06369	-1	identifier and chemistry
 R_DITPtn	MAR07855	1	identifier and chemistry
 R_DKMPPD	MAR00251	1	identifier and chemistry
@@ -6844,59 +6735,6 @@ R_DM_atp_c_	MAR03964	1	identifier and chemistry
 R_DNADtn	MAR04274	1	identifier and chemistry
 R_DNAMTSEn	MAR08640	1	identifier and chemistry
 R_DNAMTn	MAR08641	1	identifier and chemistry
-R_DNDPt12m	MAR06335	1	identifier and chemistry
-R_DNDPt13m	MAR06332	1	identifier and chemistry
-R_DNDPt18m	MAR06337	1	identifier and chemistry
-R_DNDPt19m	MAR06334	1	identifier and chemistry
-R_DNDPt1m	MAR06341	1	identifier and chemistry
-R_DNDPt20m	MAR07815	1	identifier and chemistry
-R_DNDPt21m	MAR07816	1	identifier and chemistry
-R_DNDPt22m	MAR07808	1	identifier and chemistry
-R_DNDPt26m	MAR07814	1	identifier and chemistry
-R_DNDPt27m	MAR07822	1	identifier and chemistry
-R_DNDPt29m	MAR07804	1	identifier and chemistry
-R_DNDPt2m	MAR06338	1	identifier and chemistry
-R_DNDPt30m	MAR07825	1	identifier and chemistry
-R_DNDPt31m	MAR07826	1	identifier and chemistry
-R_DNDPt32m	MAR06333	1	identifier and chemistry
-R_DNDPt33m	MAR07810	1	identifier and chemistry
-R_DNDPt34m	MAR07818	1	identifier and chemistry
-R_DNDPt35m	MAR07806	1	identifier and chemistry
-R_DNDPt36m	MAR07824	1	identifier and chemistry
-R_DNDPt37m	MAR07827	1	identifier and chemistry
-R_DNDPt38m	MAR07828	1	identifier and chemistry
-R_DNDPt39m	MAR07829	1	identifier and chemistry
-R_DNDPt3m	MAR07830	1	identifier and chemistry
-R_DNDPt40m	MAR07831	1	identifier and chemistry
-R_DNDPt41m	MAR07832	1	identifier and chemistry
-R_DNDPt42m	MAR06343	1	identifier and chemistry
-R_DNDPt43m	MAR06340	1	identifier and chemistry
-R_DNDPt44m	MAR07833	1	identifier and chemistry
-R_DNDPt45m	MAR07834	1	identifier and chemistry
-R_DNDPt46m	MAR07835	1	identifier and chemistry
-R_DNDPt47m	MAR07836	1	identifier and chemistry
-R_DNDPt48m	MAR07837	1	identifier and chemistry
-R_DNDPt49m	MAR07838	1	identifier and chemistry
-R_DNDPt4m	MAR07839	1	identifier and chemistry
-R_DNDPt50m	MAR07840	1	identifier and chemistry
-R_DNDPt51m	MAR07841	1	identifier and chemistry
-R_DNDPt52m	MAR07842	1	identifier and chemistry
-R_DNDPt53m	MAR07843	1	identifier and chemistry
-R_DNDPt54m	MAR07844	1	identifier and chemistry
-R_DNDPt55m	MAR07845	1	identifier and chemistry
-R_DNDPt56m	MAR07846	1	identifier and chemistry
-R_DNDPt57m	MAR06339	1	identifier and chemistry
-R_DNDPt58m	MAR06342	1	identifier and chemistry
-R_DNDPt59m	MAR07847	1	identifier and chemistry
-R_DNDPt5m	MAR07848	1	identifier and chemistry
-R_DNDPt60m	MAR07849	1	identifier and chemistry
-R_DNDPt61m	MAR07850	1	identifier and chemistry
-R_DNDPt62m	MAR07851	1	identifier and chemistry
-R_DNDPt63m	MAR07852	1	identifier and chemistry
-R_DNDPt6m	MAR07853	1	identifier and chemistry
-R_DNDPt7m	MAR07854	1	identifier and chemistry
-R_DNDPt8m	MAR07812	1	identifier and chemistry
-R_DNDPt9m	MAR07820	1	identifier and chemistry
 R_DOCO13ECOAtxc	MAR04803	1	identifier and chemistry
 R_DOCO13EFATP	MAR04805	1	identifier and chemistry
 R_DOCOSACT	MAR00313	1	identifier and chemistry
@@ -6936,7 +6774,7 @@ R_DOPAMT	MAR06763	1	identifier and chemistry
 R_DOPAQNISO1	MAR06875	-1	identifier and chemistry
 R_DOPASFt	MAR08723	1	identifier and chemistry
 R_DOPASULT	MAR07689	1	identifier and chemistry
-R_DOPAVESSEC	MAR00334	1	identifier and chemistry
+R_DOPAVESSEC	MAR07636	1	chemistry
 R_DOPAt4_2_r	MAR06733	1	identifier and chemistry
 R_DOPAtu	MAR06732	-1	identifier and chemistry
 R_DORNOp	MAR08690	1	metabolites
@@ -6987,7 +6825,6 @@ R_EBP2r	MAR02339	-1	identifier and chemistry
 R_ECGISOr	MAR00447	1	identifier and chemistry
 R_ECOAH12m	MAR03753	1	identifier and chemistry
 R_ECOAH1m	MAR03164	-1	identifier and chemistry
-R_ECOAH1x	MAR03103	-1	identifier and chemistry
 R_ECOAH9m	MAR03785	1	identifier and chemistry
 R_EGMESTr	MAR08648	1	identifier and chemistry
 R_EHGLAT	MAR11399	1	identifier and chemistry
@@ -7163,7 +7000,7 @@ R_EX_CE4881_LPAREN_e_RPAREN_	MAR04376	1	identifier and chemistry
 R_EX_CE5797_LPAREN_e_RPAREN_	MAR04357	1	identifier and chemistry
 R_EX_CE5798_LPAREN_e_RPAREN_	MAR04359	1	identifier and chemistry
 R_EX_CLPND_LPAREN_e_RPAREN_	MAR00571	1	chemistry
-R_EX_HC00229_LPAREN_e_RPAREN_	MAR01954	1	one metabolite
+R_EX_HC00229_LPAREN_e_RPAREN_	MAR01954	1	identifier and chemistry
 R_EX_HC00250_LPAREN_e_RPAREN_	MAR09103	1	identifier and chemistry
 R_EX_HC00342_LPAREN_e_RPAREN_	MAR11350	1	identifier and chemistry
 R_EX_HC00822_LPAREN_e_RPAREN_	MAR04142	1	identifier and chemistry
@@ -7182,7 +7019,7 @@ R_EX_HC01787_LPAREN_e_RPAREN_	MAR09162	1	identifier and chemistry
 R_EX_HC02154_LPAREN_e_RPAREN_	MAR04154	1	identifier and chemistry
 R_EX_HC02160_LPAREN_e_RPAREN_	MAR01972	1	identifier and chemistry
 R_EX_HC02161_LPAREN_e_RPAREN_	MAR01975	1	identifier and chemistry
-R_EX_HC02172_LPAREN_e_RPAREN_	MAR09080	1	one metabolite
+R_EX_HC02172_LPAREN_e_RPAREN_	MAR09080	1	identifier and chemistry
 R_EX_HC02179_LPAREN_e_RPAREN_	MAR10348	1	chemistry
 R_EX_HC02180_LPAREN_e_RPAREN_	MAR10346	1	identifier and chemistry
 R_EX_HC02187_LPAREN_e_RPAREN_	MAR04195	1	identifier and chemistry
@@ -7405,7 +7242,6 @@ R_EX_fol_LPAREN_e_RPAREN_	MAR09146	1	identifier and chemistry
 R_EX_for_LPAREN_e_RPAREN_	MAR09318	1	identifier and chemistry
 R_EX_fru_LPAREN_e_RPAREN_	MAR09139	1	identifier and chemistry
 R_EX_fuc13galacglcgal14acglcgalgluside_hs_LPAREN_e_RPAREN_	MAR09319	1	identifier and chemistry
-R_EX_fuc14galacglcgalgluside_hs_LPAREN_e_RPAREN_	MAR09320	1	identifier and chemistry
 R_EX_fuc_L_LPAREN_e_RPAREN_	MAR09330	1	identifier and chemistry
 R_EX_fucacgalfucgalacglcgalgluside_hs_LPAREN_e_RPAREN_	MAR09321	1	identifier and chemistry
 R_EX_fucacngal14acglcgalgluside_hs_LPAREN_e_RPAREN_	MAR09322	1	identifier and chemistry
@@ -7413,7 +7249,7 @@ R_EX_fucfuc12gal14acglcgalgluside_hs_LPAREN_e_RPAREN_	MAR00585	1	identifier and 
 R_EX_fucfuc132galacglcgal14acglcgalgluside_hs_LPAREN_e_RPAREN_	MAR09324	1	identifier and chemistry
 R_EX_fucfucfucgalacglc13galacglcgal14acglcgalgluside_hs_LPAREN_e_RPAREN_	MAR09325	1	one metabolite
 R_EX_fucfucfucgalacglcgal14acglcgalgluside_hs_LPAREN_e_RPAREN_	MAR09326	1	one metabolite
-R_EX_fucfucgalacglcgalgluside_hs_LPAREN_e_RPAREN_	MAR00595	1	identifier and chemistry
+R_EX_fucfucgalacglcgalgluside_hs_LPAREN_e_RPAREN_	MAR09320	1	identifier and chemistry
 R_EX_fucgal14acglcgalgluside_hs_LPAREN_e_RPAREN_	MAR09327	1	identifier and chemistry
 R_EX_fucgalfucgalacglcgalgluside_hs_LPAREN_e_RPAREN_	MAR09328	1	one metabolite
 R_EX_fucgalgbside_hs_LPAREN_e_RPAREN_	MAR09329	1	identifier and chemistry
@@ -7425,7 +7261,7 @@ R_EX_g1p_LPAREN_e_RPAREN_	MAR01947	1	identifier and chemistry
 R_EX_gal_LPAREN_e_RPAREN_	MAR09140	1	identifier and chemistry
 R_EX_galacglcgalgbside_hs_LPAREN_e_RPAREN_	MAR09331	1	identifier and chemistry
 R_EX_galfuc12gal14acglcgalgluside_hs_LPAREN_e_RPAREN_	MAR09332	1	identifier and chemistry
-R_EX_galfucgalacglcgal14acglcgalgluside_hs_LPAREN_e_RPAREN_	MAR09698	1	one metabolite
+R_EX_galfucgalacglcgal14acglcgalgluside_hs_LPAREN_e_RPAREN_	MAR09698	1	identifier and chemistry
 R_EX_galgalfucfucgalacglcgalacglcgal14acglcgalgluside_hs_LPAREN_e_RPAREN_	MAR09334	1	identifier and chemistry
 R_EX_galgalgalthcrm_hs_LPAREN_e_RPAREN_	MAR09335	1	identifier and chemistry
 R_EX_galside_hs_LPAREN_e_RPAREN_	MAR04389	1	identifier and chemistry
@@ -7741,7 +7577,7 @@ R_FA180ACPH	MAR00725	1	identifier and chemistry
 R_FA181ACPH	MAR00726	1	identifier and chemistry
 R_FA1821ACPH	MAR00727	1	identifier and chemistry
 R_FA1822ACPH	MAR00728	1	identifier and chemistry
-R_FA182ACPH	MAR00729	1	identifier and chemistry
+R_FA182ACPH	MAR00729	1	metabolites
 R_FACOAL100i	MAR00180	1	chemistry
 R_FACOAL120i	MAR00188	1	chemistry
 R_FACOAL140i	MAR00196	1	identifier and chemistry
@@ -7794,14 +7630,14 @@ R_FAH3	MAR08038	1	identifier and chemistry
 R_FALDH	MAR08530	1	identifier and chemistry
 R_FALDtly	MAR08531	-1	identifier and chemistry
 R_FALDtm	MAR08532	-1	identifier and chemistry
-R_FAOXC101C102m	MAR03294	1	metabolites
+R_FAOXC101C102m	MAR03294	1	identifier and chemistry
 R_FAOXC101C102x	MAR02818	1	metabolites
 R_FAOXC101C8m	MAR03146	1	metabolites
 R_FAOXC101C8x	MAR04968	1	identifier and chemistry
 R_FAOXC101m	MAR03298	-1	identifier and chemistry
 R_FAOXC101x	MAR03323	-1	identifier and chemistry
-R_FAOXC102C101m	MAR04970	1	metabolites
-R_FAOXC102C101x	MAR04974	1	metabolites
+R_FAOXC102C101m	MAR04970	1	identifier and chemistry
+R_FAOXC102C101x	MAR04974	1	identifier and chemistry
 R_FAOXC102C103m	MAR04978	1	identifier and chemistry
 R_FAOXC102C103x	MAR04981	1	metabolites
 R_FAOXC102C81m	MAR04984	1	identifier and chemistry
@@ -7852,16 +7688,16 @@ R_FAOXC161C141x	MAR05189	1	metabolites
 R_FAOXC161C161OHm	MAR05190	1	identifier and chemistry
 R_FAOXC162C142m	MAR03283	1	metabolites
 R_FAOXC162C162OHm	MAR05192	1	identifier and chemistry
-R_FAOXC163C142x	MAR05193	1	identifier and chemistry
+R_FAOXC163C142x	MAR05193	1	metabolites
 R_FAOXC163C143m	MAR05194	1	identifier and chemistry
 R_FAOXC163C164Gm	MAR03456	1	metabolites
 R_FAOXC163C164x	MAR05196	1	metabolites
 R_FAOXC163GC142m	MAR03283	1	metabolites
 R_FAOXC163Gm	MAR03458	1	identifier and chemistry
-R_FAOXC163x	MAR05235	1	identifier and chemistry
+R_FAOXC163x	MAR05235	1	metabolites
 R_FAOXC164C143m	MAR05242	1	identifier and chemistry
 R_FAOXC164C143x	MAR05256	1	identifier and chemistry
-R_FAOXC164C163x	MAR05293	1	identifier and chemistry
+R_FAOXC164C163x	MAR05293	1	metabolites
 R_FAOXC164C165m	MAR05298	1	metabolites
 R_FAOXC164C165x	MAR05300	1	metabolites
 R_FAOXC164GC163m	MAR03457	1	identifier and chemistry
@@ -7875,9 +7711,9 @@ R_FAOXC16DCC14DCx	MAR05331	1	metabolites
 R_FAOXC16DCr	MAR05334	1	identifier and chemistry
 R_FAOXC16OHC16r	MAR05341	1	identifier and chemistry
 R_FAOXC170150m	MAR05343	1	chemistry
-R_FAOXC180	MAR00776	1	identifier and chemistry
+R_FAOXC180	MAR03118	1	metabolites
 R_FAOXC180x	MAR00777	1	metabolites
-R_FAOXC1811601m	MAR00778	1	identifier and chemistry
+R_FAOXC1811601m	MAR03146	1	metabolites
 R_FAOXC181C161m	MAR05345	1	identifier and chemistry
 R_FAOXC181C161x	MAR05350	1	metabolites
 R_FAOXC181C181OHm	MAR05355	1	identifier and chemistry
@@ -7889,7 +7725,7 @@ R_FAOXC183806x	MAR00800	1	metabolites
 R_FAOXC183C163Gm	MAR03455	-1	metabolites
 R_FAOXC183C163m	MAR05359	1	identifier and chemistry
 R_FAOXC184C163m	MAR05360	1	identifier and chemistry
-R_FAOXC184C163x	MAR05364	1	identifier and chemistry
+R_FAOXC184C163x	MAR05364	1	metabolites
 R_FAOXC184C164m	MAR05365	1	identifier and chemistry
 R_FAOXC184C164x	MAR05366	1	metabolites
 R_FAOXC184m	MAR05367	1	identifier and chemistry
@@ -7902,25 +7738,25 @@ R_FAOXC200180x	MAR00872	1	metabolites
 R_FAOXC201C181x	MAR05372	1	metabolites
 R_FAOXC2031836m	MAR00874	1	identifier and chemistry
 R_FAOXC204184m2	MAR00922	1	chemistry
-R_FAOXC204C184m	MAR05373	1	identifier and chemistry
+R_FAOXC204C184m	MAR05373	1	metabolites
 R_FAOXC204C205x	MAR05374	1	metabolites
 R_FAOXC2051843m	MAR00923	1	identifier and chemistry
 R_FAOXC2051843x	MAR00927	1	identifier and chemistry
 R_FAOXC205C184x	MAR05375	1	identifier and chemistry
-R_FAOXC205C185m	MAR05376	1	metabolites
+R_FAOXC205C185m	MAR05376	1	identifier and chemistry
 R_FAOXC221C201x	MAR05377	1	metabolites
 R_FAOXC2242046m	MAR00930	1	identifier and chemistry
 R_FAOXC2242046x	MAR00952	1	metabolites
 R_FAOXC2252053x	MAR00968	1	metabolites
-R_FAOXC225C204m	MAR05378	1	identifier and chemistry
-R_FAOXC225C204x	MAR05379	1	identifier and chemistry
+R_FAOXC225C204m	MAR05378	1	metabolites
+R_FAOXC225C204x	MAR05379	1	metabolites
 R_FAOXC225C226m	MAR05380	1	identifier and chemistry
 R_FAOXC225C226x	MAR05382	1	metabolites
 R_FAOXC225m	MAR05383	1	identifier and chemistry
 R_FAOXC225x	MAR05402	1	identifier and chemistry
 R_FAOXC226205m	MAR00970	1	metabolites
 R_FAOXC226205x	MAR00972	1	metabolites
-R_FAOXC226C205m	MAR05403	1	metabolites
+R_FAOXC226C205m	MAR05403	1	identifier and chemistry
 R_FAOXC226C225m	MAR05404	1	identifier and chemistry
 R_FAOXC226C225x	MAR05405	1	identifier and chemistry
 R_FAOXC226C227m	MAR05408	1	identifier and chemistry
@@ -8000,7 +7836,7 @@ R_FK	MAR04402	1	identifier and chemistry
 R_FKYNH	MAR04216	1	identifier and chemistry
 R_FMNALKPle	MAR08969	1	identifier and chemistry
 R_FMNAT	MAR06508	1	identifier and chemistry
-R_FOAXC122C101x	MAR06483	1	identifier and chemistry
+R_FOAXC122C101x	MAR06483	1	metabolites
 R_FOLABCCte	MAR09882	1	identifier and chemistry
 R_FOLOAT1tc	MAR09883	1	identifier and chemistry
 R_FOLOAT2tc	MAR09884	1	identifier and chemistry
@@ -8044,8 +7880,6 @@ R_FTHFL	MAR04338	1	identifier and chemistry
 R_FTHFLm	MAR04340	1	identifier and chemistry
 R_FUC13GALACGLCGAL14ACGLCGALGLUSIDEte	MAR08336	-1	identifier and chemistry
 R_FUC13GALACGLCGAL14ACGLCGALGLUSIDEtg	MAR08335	-1	identifier and chemistry
-R_FUC14GALACGLCGALGLUSIDEte	MAR08273	-1	identifier and chemistry
-R_FUC14GALACGLCGALGLUSIDEtg	MAR08272	-1	identifier and chemistry
 R_FUCACGALFUCGALACGLCGALGLUSIDEte	MAR08266	-1	identifier and chemistry
 R_FUCACGALFUCGALACGLCGALGLUSIDEtg	MAR08265	-1	identifier and chemistry
 R_FUCACNGAL14ACGLCGALGLUSIDEte	MAR08873	-1	identifier and chemistry
@@ -8064,8 +7898,8 @@ R_FUCFUCFUCGALACGLC13GALACGLCGAL14ACGLCGALGLUSIDEte	MAR08311	-1	metabolites
 R_FUCFUCFUCGALACGLC13GALACGLCGAL14ACGLCGALGLUSIDEtg	MAR08310	-1	metabolites
 R_FUCFUCFUCGALACGLCGAL14ACGLCGALGLUSIDEte	MAR08315	-1	metabolites
 R_FUCFUCFUCGALACGLCGAL14ACGLCGALGLUSIDEtg	MAR08314	-1	metabolites
-R_FUCFUCGALACGLCGALGLUSIDEte	MAR01076	1	identifier and chemistry
-R_FUCFUCGALACGLCGALGLUSIDEtg	MAR01078	1	identifier and chemistry
+R_FUCFUCGALACGLCGALGLUSIDEte	MAR08273	-1	identifier and chemistry
+R_FUCFUCGALACGLCGALGLUSIDEtg	MAR08272	-1	identifier and chemistry
 R_FUCGAL14ACGLCGALGLUSIDEte	MAR08324	-1	identifier and chemistry
 R_FUCGAL14ACGLCGALGLUSIDEtg	MAR08323	-1	identifier and chemistry
 R_FUCGALFUCGALACGLCGALGLUSIDEte	MAR08270	-1	metabolites
@@ -8089,13 +7923,13 @@ R_FUT17g	MAR08294	1	identifier and chemistry
 R_FUT18g	MAR01083	1	identifier and chemistry
 R_FUT32g	MAR08319	1	identifier and chemistry
 R_FUT33g	MAR08264	1	identifier and chemistry
-R_FUT34g	MAR01118	1	identifier and chemistry
+R_FUT34g	MAR08271	1	identifier and chemistry
 R_FUT35g	MAR08268	1	identifier and chemistry
 R_FUT910g	MAR08308	1	identifier and chemistry
 R_FUT911g	MAR08309	1	identifier and chemistry
 R_FUT91g	MAR08322	1	identifier and chemistry
 R_FUT92g	MAR08326	1	identifier and chemistry
-R_FUT93g	MAR01141	1	identifier and chemistry
+R_FUT93g	MAR08287	1	identifier and chemistry
 R_FUT94g	MAR08330	1	identifier and chemistry
 R_FUT95g	MAR08331	1	identifier and chemistry
 R_FUT96g	MAR08332	1	identifier and chemistry
@@ -8149,7 +7983,6 @@ R_G1PTT	MAR07696	1	identifier and chemistry
 R_G2M8MASNterg	MAR07296	1	identifier and chemistry
 R_G3M8MASNterg	MAR07295	1	identifier and chemistry
 R_G3PD1	MAR00479	-1	identifier and chemistry
-R_G3PD2m	MAR01169	1	identifier and chemistry
 R_G5SADrm	MAR03820	-1	identifier and chemistry
 R_G5SDym	MAR03897	1	identifier and chemistry
 R_G6PDA	MAR04299	1	metabolites
@@ -8159,11 +7992,11 @@ R_G6PDH2rer	MAR04304	1	identifier and chemistry
 R_G6PPer	MAR04521	1	identifier and chemistry
 R_G6Pter	MAR04856	1	identifier and chemistry
 R_GABABGTtc	MAR09886	1	identifier and chemistry
-R_GABAVESSEC	MAR01314	1	identifier and chemistry
+R_GABAVESSEC	MAR07738	1	chemistry
 R_GACMTRc	MAR04583	-1	identifier and chemistry
 R_GACPAILter	MAR08382	1	identifier and chemistry
 R_GAL3ST11	MAR08206	1	identifier and chemistry
-R_GAL3ST12	MAR08212	1	metabolites
+R_GAL3ST12	MAR08212	1	identifier and chemistry
 R_GALACGLCGALGBSIDEte	MAR08154	1	identifier and chemistry
 R_GALACGLCGALGBSIDEtg	MAR08153	1	identifier and chemistry
 R_GALASE10ly	MAR07408	1	identifier and chemistry
@@ -8188,19 +8021,19 @@ R_GALASE9ly	MAR07404	1	identifier and chemistry
 R_GALC	MAR08210	1	identifier and chemistry
 R_GALFUC12GAL14ACGLCGALGLUSIDEte	MAR08283	-1	identifier and chemistry
 R_GALFUC12GAL14ACGLCGALGLUSIDEtg	MAR08282	-1	identifier and chemistry
-R_GALFUCGALACGLCGAL14ACGLCGALGLUSIDEte	MAR09646	-1	metabolites
-R_GALFUCGALACGLCGAL14ACGLCGALGLUSIDEtg	MAR01340	1	metabolites
+R_GALFUCGALACGLCGAL14ACGLCGALGLUSIDEte	MAR09646	-1	identifier and chemistry
+R_GALFUCGALACGLCGAL14ACGLCGALGLUSIDEtg	MAR08299	-1	identifier and chemistry
 R_GALGALFUCFUCGALACGLCGALACGLCGAL14ACGLCGALGLUSIDEte	MAR08304	-1	identifier and chemistry
 R_GALGALFUCFUCGALACGLCGALACGLCGAL14ACGLCGALGLUSIDEtg	MAR08303	-1	identifier and chemistry
 R_GALGALGALTHCRMte	MAR08253	1	identifier and chemistry
 R_GALGALGALTHCRMtg	MAR08252	1	identifier and chemistry
-R_GALGLUSIDEtg	MAR01348	1	identifier and chemistry
-R_GALGLUSIDEtl	MAR01349	1	identifier and chemistry
-R_GALGT1	MAR01351	1	identifier and chemistry
+R_GALGLUSIDEtg	MAR08145	1	identifier and chemistry
+R_GALGLUSIDEtl	MAR08202	1	identifier and chemistry
+R_GALGT1	MAR08165	1	identifier and chemistry
 R_GALGT2	MAR08190	1	identifier and chemistry
 R_GALGT3	MAR08191	1	identifier and chemistry
 R_GALGT4	MAR08192	1	identifier and chemistry
-R_GALK	MAR04130	1	chemistry
+R_GALK	MAR04130	1	identifier and chemistry
 R_GALNACT1g	MAR07206	1	identifier and chemistry
 R_GALNACT2g	MAR07496	1	identifier and chemistry
 R_GALNACT3g	MAR07521	1	identifier and chemistry
@@ -8235,9 +8068,9 @@ R_GBSIDEte	MAR08878	1	identifier and chemistry
 R_GBSIDEtl	MAR08203	1	identifier and chemistry
 R_GCALDD	MAR08775	1	identifier and chemistry
 R_GCALDDm	MAR08778	1	identifier and chemistry
-R_GCC2am	MAR08433	1	metabolites
-R_GCC2bim	MAR08434	1	metabolites
 R_GCC2cm	MAR06409	-1	identifier and chemistry
+R_GCCam	MAR08433	1	metabolites
+R_GCCbim	MAR08434	1	metabolites
 R_GCHOLAt	MAR08879	1	identifier and chemistry
 R_GCHOLAt2	MAR01863	1	identifier and chemistry
 R_GCHOLAt3	MAR01868	1	identifier and chemistry
@@ -8271,7 +8104,7 @@ R_GGH_7DHFl	MAR08140	1	identifier and chemistry
 R_GGH_7THFe	MAR08141	1	identifier and chemistry
 R_GGH_7THFl	MAR08142	1	identifier and chemistry
 R_GGLUCT	MAR08770	1	identifier and chemistry
-R_GGNG	MAR05395	1	read by hand
+R_GGNG	MAR05395	1	metabolites
 R_GGT5r	MAR08548	1	identifier and chemistry
 R_GGT6	MAR08549	-1	identifier and chemistry
 R_GGT_U	MAR07254	1	metabolites
@@ -8284,8 +8117,8 @@ R_GK1m	MAR04135	-1	identifier and chemistry
 R_GLACO	MAR08349	1	identifier and chemistry
 R_GLACOm	MAR01372	1	identifier and chemistry
 R_GLACter	MAR08350	1	identifier and chemistry
-R_GLAl	MAR08217	1	metabolites
-R_GLB1	MAR00786	1	metabolites
+R_GLAl	MAR08217	1	identifier and chemistry
+R_GLB1	MAR00786	1	identifier and chemistry
 R_GLBRAN	MAR05397	1	identifier and chemistry
 R_GLC3MEACPhr	MAR12728	1	identifier and chemistry
 R_GLC3MEACPitr	MAR12952	1	identifier and chemistry
@@ -8338,7 +8171,7 @@ R_GLNATB0tc	MAR06896	1	identifier and chemistry
 R_GLNB0AT3tc	MAR06896	1	identifier and chemistry
 R_GLNCYSNaEx	MAR05624	1	identifier and chemistry
 R_GLNLASEer	MAR08346	-1	identifier and chemistry
-R_GLNS	MAR03890	1	metabolites
+R_GLNS	MAR20191	1	metabolites, any compartment
 R_GLNSERNaEx	MAR05619	1	identifier and chemistry
 R_GLNTHRNaEx	MAR05629	1	identifier and chemistry
 R_GLNt4	MAR05308	1	identifier and chemistry
@@ -8373,7 +8206,6 @@ R_GLYATm	MAR03847	-1	identifier and chemistry
 R_GLYB0AT3tc	MAR09616	1	identifier and chemistry
 R_GLYBt4_2_r	MAR08889	1	identifier and chemistry
 R_GLYBtm	MAR08890	-1	identifier and chemistry
-R_GLYC3PFADm	MAR00449	1	identifier and chemistry
 R_GLYC3Ptmc	MAR08891	-1	identifier and chemistry
 R_GLYCK2	MAR08781	1	identifier and chemistry
 R_GLYCLTDy	MAR07702	1	identifier and chemistry
@@ -8399,7 +8231,7 @@ R_GLYPROPRO1c	MAR11414	1	identifier and chemistry
 R_GLYSARCNc	MAR06915	1	identifier and chemistry
 R_GLYSARPEPT1tc	MAR06917	1	identifier and chemistry
 R_GLYSNAT5tc	MAR09606	1	identifier and chemistry
-R_GLYVESSEC	MAR01396	1	identifier and chemistry
+R_GLYVESSEC	MAR07737	1	chemistry
 R_GLYitr	MAR13004	1	identifier and chemistry
 R_GLYt2r	MAR06371	1	identifier and chemistry
 R_GLYt2rL	MAR01386	1	identifier and chemistry
@@ -8547,7 +8379,7 @@ R_HIBDm	MAR03757	1	identifier and chemistry
 R_HISD	MAR04437	1	metabolites
 R_HISDC	MAR04428	1	identifier and chemistry
 R_HISTASE	MAR08783	1	metabolites
-R_HISTAVESSEC	MAR01442	1	identifier and chemistry
+R_HISTAVESSEC	MAR07633	1	chemistry
 R_HISTAtu	MAR04999	-1	identifier and chemistry
 R_HIShPTtc	MAR07101	1	identifier and chemistry
 R_HISt4	MAR05333	1	identifier and chemistry
@@ -8572,7 +8404,6 @@ R_HOCDACBP	MAR06528	1	identifier and chemistry
 R_HOCTDACBP	MAR06538	1	identifier and chemistry
 R_HOCTDEC2CRNe	MAR11243	-1	identifier and chemistry
 R_HOCTDECCRNe	MAR11244	-1	identifier and chemistry
-R_HOMt4	MAR06379	1	identifier and chemistry
 R_HOXG	MAR01450	1	identifier and chemistry
 R_HPACtr	MAR08907	1	identifier and chemistry
 R_HPCLx	MAR03486	1	metabolites
@@ -8638,10 +8469,10 @@ R_ICDHxm	MAR03957	1	identifier and chemistry
 R_ICDHy	MAR00710	1	identifier and chemistry
 R_ICDHyp	MAR00712	1	identifier and chemistry
 R_ICDHyrm	MAR03958	1	identifier and chemistry
-R_IDHPOXOX2b	MAR08543	1	identifier and chemistry
+R_IDHPOXOX2b	MAR06794	1	chemistry
 R_IDHPOXOX3	MAR06796	1	identifier and chemistry
 R_IDHPOXOX4	MAR06795	1	identifier and chemistry
-R_IDHPOXOXb	MAR08544	1	identifier and chemistry
+R_IDHPOXOXb	MAR06793	1	chemistry
 R_IDOAASE1ly	MAR07230	1	identifier and chemistry
 R_IDOAASE2ly	MAR07242	1	identifier and chemistry
 R_IDOAASE3ly	MAR07248	1	identifier and chemistry
@@ -8719,7 +8550,6 @@ R_LCTStl	MAR08763	1	identifier and chemistry
 R_LCYSTAT	MAR08066	-1	identifier and chemistry
 R_LCYSTATm	MAR08067	-1	identifier and chemistry
 R_LCYSTCBOXL	MAR08065	1	identifier and chemistry
-R_LDH_D	MAR08512	1	identifier and chemistry
 R_LDH_L	MAR04388	-1	identifier and chemistry
 R_LDH_Lm	MAR04280	-1	identifier and chemistry
 R_LEUATB0tc	MAR09595	1	identifier and chemistry
@@ -8842,7 +8672,6 @@ R_LYStiDF	MAR05071	1	identifier and chemistry
 R_LYStip	MAR08016	1	identifier and chemistry
 R_LYStm	MAR06321	-1	identifier and chemistry
 R_LYStn	MAR08918	1	identifier and chemistry
-R_L_LACDcm	MAR08514	1	identifier and chemistry
 R_L_LACt2r	MAR05998	1	identifier and chemistry
 R_L_LACt4r	MAR08515	1	identifier and chemistry
 R_L_LACtcm	MAR01485	1	identifier and chemistry
@@ -8917,7 +8746,6 @@ R_MELATNOX	MAR08566	1	identifier and chemistry
 R_MEOHt2	MAR05296	-1	identifier and chemistry
 R_MEOHtly	MAR08753	1	identifier and chemistry
 R_MEOHtr	MAR08921	1	identifier and chemistry
-R_MEPIVESSte	MAR01518	1	identifier and chemistry
 R_MERACMPtep	MAR12787	1	identifier and chemistry
 R_MERACMPthc	MAR12788	1	identifier and chemistry
 R_MERCPLACCYSt	MAR08686	1	identifier and chemistry
@@ -9086,8 +8914,7 @@ R_NADtm	MAR08982	1	identifier and chemistry
 R_NADtn	MAR07773	-1	identifier and chemistry
 R_NADtru	MAR07772	1	identifier and chemistry
 R_NAGA2ly	MAR01524	1	identifier and chemistry
-R_NAGAlby	MAR08197	1	identifier and chemistry
-R_NAGAly	MAR08201	1	identifier and chemistry
+R_NAGAly	MAR08201	1	metabolites
 R_NAGLCAly	MAR07468	1	identifier and chemistry
 R_NAHCO3_HCLt	MAR01525	1	identifier and chemistry
 R_NAIt	MAR08924	1	identifier and chemistry
@@ -9102,7 +8929,7 @@ R_NCAMDe	MAR04969	1	identifier and chemistry
 R_NCCt	MAR06524	1	identifier and chemistry
 R_NCKt	MAR07631	-1	identifier and chemistry
 R_NCNt	MAR01529	1	identifier and chemistry
-R_NDERSVhc	MAR12792	1	identifier and chemistry
+R_NDERSVhc	MAR12792	1	metabolites
 R_NDERSVitr	MAR12970	1	identifier and chemistry
 R_NDERSVteb	MAR12793	1	identifier and chemistry
 R_NDP10ex	MAR04342	1	identifier and chemistry
@@ -9170,7 +8997,7 @@ R_NP1	MAR04662	-1	identifier and chemistry
 R_NPTHLte	MAR07111	1	identifier and chemistry
 R_NRPPHRSFt	MAR08095	1	identifier and chemistry
 R_NRPPHRSULT	MAR08094	1	identifier and chemistry
-R_NRPPHRVESSEC	MAR01555	1	identifier and chemistry
+R_NRPPHRVESSEC	MAR07637	1	chemistry
 R_NRPPHRt4_2_r	MAR06242	1	identifier and chemistry
 R_NRPPHRtu	MAR06241	-1	identifier and chemistry
 R_NRVNCCOAtx	MAR03020	1	identifier and chemistry
@@ -9214,6 +9041,7 @@ R_NTP3e	MAR04136	1	identifier and chemistry
 R_NTPP10	MAR07879	1	identifier and chemistry
 R_NTPP11	MAR08488	1	identifier and chemistry
 R_NTPP9	MAR08489	1	identifier and chemistry
+R_NaKt	MAR05429	1	chemistry
 R_O16G1e	MAR01560	1	identifier and chemistry
 R_O16G2e	MAR08584	1	identifier and chemistry
 R_O2St	MAR03959	1	identifier and chemistry
@@ -9260,8 +9088,6 @@ R_OMHPALTD	MAR06773	1	identifier and chemistry
 R_OMPDC	MAR04036	1	identifier and chemistry
 R_ONPTHLte	MAR08927	-1	identifier and chemistry
 R_OPAHir	MAR03889	1	identifier and chemistry
-R_ORETNF	MAR08703	1	identifier and chemistry
-R_ORETNF2	MAR08706	1	identifier and chemistry
 R_ORETNtn	MAR01563	1	identifier and chemistry
 R_ORETNtn2	MAR01564	1	identifier and chemistry
 R_ORNALArBATtc	MAR05940	1	identifier and chemistry
@@ -9295,12 +9121,12 @@ R_P4501B1r	MAR02047	1	identifier and chemistry
 R_P45021A1r	MAR07932	1	identifier and chemistry
 R_P45021A2r	MAR07928	1	identifier and chemistry
 R_P45027A11m	MAR01605	1	identifier and chemistry
-R_P45027A12m	MAR01610	1	identifier and chemistry
+R_P45027A12m	MAR01610	1	read by hand
 R_P45027A13m	MAR01614	1	identifier and chemistry
 R_P45027A14m	MAR01682	1	identifier and chemistry
-R_P45027A15m	MAR01567	1	identifier and chemistry
-R_P45027A16m	MAR01693	1	identifier and chemistry
-R_P45027A1m	MAR01784	1	identifier and chemistry
+R_P45027A15m	MAR01567	1	metabolites
+R_P45027A16m	MAR01693	1	metabolites
+R_P45027A1m	MAR01762	1	chemistry
 R_P4502A6	MAR08040	1	identifier and chemistry
 R_P4502C18	MAR08043	1	identifier and chemistry
 R_P4502C19	MAR08046	1	identifier and chemistry
@@ -9322,13 +9148,12 @@ R_P4504F121r	MAR08556	1	identifier and chemistry
 R_P4504F122r	MAR01128	1	identifier and chemistry
 R_P4504F123r	MAR08059	1	identifier and chemistry
 R_P4504F81r	MAR08555	1	identifier and chemistry
-R_P4507A1r	MAR01781	1	chemistry
+R_P4507A1r	MAR01581	1	metabolites
 R_P4507B11r	MAR01777	1	identifier and chemistry
 R_P4507B12r	MAR01574	1	identifier and chemistry
 R_P4508B11r	MAR01589	1	identifier and chemistry
 R_P4508B13r	MAR01590	1	identifier and chemistry
 R_P450LTB4r	MAR01575	1	identifier and chemistry
-R_P450SCC1m	MAR01578	1	identifier and chemistry
 R_P5CDm	MAR03822	1	identifier and chemistry
 R_P5CR	MAR03833	1	identifier and chemistry
 R_P5CRm	MAR08609	1	identifier and chemistry
@@ -9359,7 +9184,7 @@ R_PCHOLPr_hs	MAR08525	1	metabolites
 R_PCHOL_HSter	MAR00461	1	identifier and chemistry
 R_PCHOL_HStg	MAR00734	1	identifier and chemistry
 R_PCLAD	MAR04231	1	identifier and chemistry
-R_PCLYSOX	MAR09553	1	metabolites
+R_PCLYSOX	MAR06983	1	metabolites
 R_PCREATtmdiffir	MAR08430	1	identifier and chemistry
 R_PCRNtc	MAR01587	1	identifier and chemistry
 R_PCRNtm	MAR01588	1	identifier and chemistry
@@ -9380,7 +9205,6 @@ R_PEFLIP	MAR01594	1	identifier and chemistry
 R_PEFLIPm	MAR01596	1	identifier and chemistry
 R_PEPCK	MAR04101	1	identifier and chemistry
 R_PEPCKm	MAR04103	1	identifier and chemistry
-R_PEPLYStn	MAR01597	1	identifier and chemistry
 R_PERILLYLte	MAR08599	-1	identifier and chemistry
 R_PETHCT	MAR00651	1	identifier and chemistry
 R_PETOHMm_hs	MAR01603	1	identifier and chemistry
@@ -9492,7 +9316,6 @@ R_PNTEHe	MAR08986	1	identifier and chemistry
 R_PNTK	MAR04718	1	identifier and chemistry
 R_PNTKm	MAR01634	1	identifier and chemistry
 R_PNTORDe	MAR09057	-1	identifier and chemistry
-R_PNTOt5	MAR01636	1	identifier and chemistry
 R_PPA	MAR03977	1	identifier and chemistry
 R_PPA2	MAR05363	1	identifier and chemistry
 R_PPA2m	MAR08617	1	identifier and chemistry
@@ -9535,8 +9358,6 @@ R_PRISTtx	MAR01648	1	identifier and chemistry
 R_PRO1x	MAR03835	-1	identifier and chemistry
 R_PRO1xm	MAR03837	-1	identifier and chemistry
 R_PROAKGOX1r	MAR01649	1	identifier and chemistry
-R_PROD2	MAR08610	1	identifier and chemistry
-R_PROD2m	MAR08611	1	identifier and chemistry
 R_PRODt2r	MAR08929	1	identifier and chemistry
 R_PRODt2rL	MAR08928	-1	identifier and chemistry
 R_PROFVSCOAitx	MAR12973	1	identifier and chemistry
@@ -9597,11 +9418,11 @@ R_PTVSTGLUChc	MAR12812	1	identifier and chemistry
 R_PTVSTLAChc	MAR12813	1	identifier and chemistry
 R_PTVSTLACitr	MAR12974	1	identifier and chemistry
 R_PTVSTLACtev	MAR12814	1	identifier and chemistry
-R_PTVSTM13hr	MAR12815	1	identifier and chemistry
+R_PTVSTM13hr	MAR12815	1	metabolites
 R_PTVSTM13itr	MAR12975	1	identifier and chemistry
 R_PTVSTM13te	MAR12976	1	identifier and chemistry
 R_PTVSTM3eb	MAR12816	1	identifier and chemistry
-R_PTVSTM3hc	MAR12817	1	identifier and chemistry
+R_PTVSTM3hc	MAR12817	1	metabolites
 R_PTVSTM3itr	MAR12978	1	identifier and chemistry
 R_PTVSThc	MAR12818	1	identifier and chemistry
 R_PTVSTitr	MAR13021	1	identifier and chemistry
@@ -9649,7 +9470,7 @@ R_RADH	MAR06646	1	identifier and chemistry
 R_RADH2	MAR08698	-1	identifier and chemistry
 R_RADH3	MAR06675	1	identifier and chemistry
 R_RADH4	MAR08699	1	identifier and chemistry
-R_RAHY	MAR08700	1	identifier and chemistry
+R_RAHY	MAR06700	1	chemistry
 R_RAI1	MAR06651	1	identifier and chemistry
 R_RAI2	MAR08702	-1	identifier and chemistry
 R_RAI3	MAR06661	-1	identifier and chemistry
@@ -9690,8 +9511,8 @@ R_RE0567C	MAR02203	1	identifier and chemistry
 R_RE0568C	MAR02204	1	identifier and chemistry
 R_RE0569C	MAR02205	1	identifier and chemistry
 R_RE0569E	MAR02494	1	identifier and chemistry
-R_RE0570C	MAR02208	1	identifier and chemistry
-R_RE0571C	MAR02209	1	identifier and chemistry
+R_RE0570C	MAR02208	1	metabolites
+R_RE0571C	MAR02209	1	metabolites
 R_RE0572N	MAR02496	1	identifier and chemistry
 R_RE0573N	MAR02498	1	identifier and chemistry
 R_RE0574C	MAR02212	1	identifier and chemistry
@@ -9774,7 +9595,7 @@ R_RE0937C	MAR09479	1	identifier and chemistry
 R_RE0937E	MAR02641	1	identifier and chemistry
 R_RE0938C	MAR09480	1	identifier and chemistry
 R_RE0938E	MAR02643	1	identifier and chemistry
-R_RE0944C	MAR08572	1	identifier and chemistry
+R_RE0944C	MAR08572	1	metabolites
 R_RE0944E	MAR08573	1	identifier and chemistry
 R_RE0958C	MAR08568	1	identifier and chemistry
 R_RE0958E	MAR08569	1	identifier and chemistry
@@ -9813,16 +9634,12 @@ R_RE1236C	MAR06960	-1	identifier and chemistry
 R_RE1238X	MAR06930	-1	identifier and chemistry
 R_RE1240C	MAR06956	-1	identifier and chemistry
 R_RE1254C	MAR04740	1	identifier and chemistry
-R_RE1266C	MAR06924	1	identifier and chemistry
+R_RE1266C	MAR06924	1	metabolites
 R_RE1303C	MAR02115	1	identifier and chemistry
-R_RE1308C	MAR02129	1	identifier and chemistry
-R_RE1308M	MAR02130	-1	identifier and chemistry
-R_RE1309C	MAR02131	1	identifier and chemistry
+R_RE1308M	MAR02130	1	identifier and chemistry
 R_RE1309M	MAR02767	1	identifier and chemistry
-R_RE1310C	MAR02133	1	identifier and chemistry
-R_RE1310M	MAR02134	1	identifier and chemistry
-R_RE1311C	MAR02135	1	identifier and chemistry
-R_RE1311M	MAR02136	1	identifier and chemistry
+R_RE1310M	MAR02134	1	metabolites
+R_RE1311M	MAR02136	1	metabolites
 R_RE1317C	MAR09470	-1	identifier and chemistry
 R_RE1441G	MAR06580	1	identifier and chemistry
 R_RE1441R	MAR06581	1	identifier and chemistry
@@ -9840,7 +9657,7 @@ R_RE1517M	MAR03280	1	identifier and chemistry
 R_RE1517X	MAR02808	1	identifier and chemistry
 R_RE1518M	MAR03284	1	identifier and chemistry
 R_RE1518X	MAR02810	1	identifier and chemistry
-R_RE1519X	MAR02818	1	metabolites
+R_RE1519X	MAR02818	1	identifier and chemistry
 R_RE1520M	MAR03290	1	metabolites
 R_RE1520X	MAR03317	1	metabolites
 R_RE1521M	MAR03285	1	identifier and chemistry
@@ -9868,11 +9685,11 @@ R_RE1533M	MAR03287	1	identifier and chemistry
 R_RE1533X	MAR03315	1	identifier and chemistry
 R_RE1534M	MAR03293	1	identifier and chemistry
 R_RE1534X	MAR03320	1	identifier and chemistry
-R_RE1537C	MAR06961	1	metabolites
+R_RE1537C	MAR06961	1	identifier and chemistry
 R_RE1537X	MAR06962	1	metabolites
-R_RE1538C	MAR06963	1	metabolites
+R_RE1538C	MAR06963	1	identifier and chemistry
 R_RE1538X	MAR06964	1	metabolites
-R_RE1539C	MAR06958	1	metabolites
+R_RE1539C	MAR06958	1	identifier and chemistry
 R_RE1539X	MAR06959	1	metabolites
 R_RE1573M	MAR03288	1	metabolites
 R_RE1573X	MAR03316	1	metabolites
@@ -9893,7 +9710,7 @@ R_RE1635C	MAR02106	1	identifier and chemistry
 R_RE1635M	MAR02107	1	identifier and chemistry
 R_RE1635R	MAR02108	1	identifier and chemistry
 R_RE1635X	MAR02109	1	identifier and chemistry
-R_RE1651C	MAR06814	-1	identifier and chemistry
+R_RE1651C	MAR06814	-1	metabolites
 R_RE1653C	MAR06885	1	identifier and chemistry
 R_RE1691M	MAR06520	1	identifier and chemistry
 R_RE1699C	MAR02064	1	identifier and chemistry
@@ -9905,19 +9722,17 @@ R_RE1709N	MAR04540	1	identifier and chemistry
 R_RE1711C	MAR04561	-1	identifier and chemistry
 R_RE1711M	MAR02858	1	identifier and chemistry
 R_RE1796C	MAR02860	1	metabolites
-R_RE1796M	MAR02881	1	identifier and chemistry
-R_RE1796R	MAR01783	1	chemistry
-R_RE1803C	MAR01797	1	identifier and chemistry
+R_RE1796R	MAR01584	1	metabolites
+R_RE1803C	MAR01765	1	chemistry
 R_RE1804C	MAR02883	1	identifier and chemistry
-R_RE1804M	MAR02885	1	identifier and chemistry
+R_RE1804M	MAR02885	1	metabolites
 R_RE1806C	MAR02887	1	identifier and chemistry
 R_RE1806R	MAR01810	1	identifier and chemistry
 R_RE1807C	MAR02889	1	identifier and chemistry
-R_RE1807M	MAR02891	1	identifier and chemistry
+R_RE1807M	MAR02891	1	metabolites
 R_RE1808R	MAR01811	1	identifier and chemistry
 R_RE1809C	MAR02893	1	identifier and chemistry
 R_RE1809R	MAR01815	1	identifier and chemistry
-R_RE1810M	MAR02895	-1	identifier and chemistry
 R_RE1811C	MAR02933	1	identifier and chemistry
 R_RE1811R	MAR01817	1	identifier and chemistry
 R_RE1812C	MAR02934	1	identifier and chemistry
@@ -9954,9 +9769,9 @@ R_RE1830M	MAR01792	1	identifier and chemistry
 R_RE1834C	MAR01660	1	identifier and chemistry
 R_RE1834M	MAR01663	1	metabolites, any compartment
 R_RE1834X	MAR01663	1	identifier and chemistry
-R_RE1835C	MAR01718	1	metabolites
-R_RE1835M	MAR02940	1	metabolites
-R_RE1835X	MAR01716	1	metabolites
+R_RE1835C	MAR01718	1	identifier and chemistry
+R_RE1835M	MAR02940	1	identifier and chemistry
+R_RE1835X	MAR01716	1	identifier and chemistry
 R_RE1836C	MAR02941	1	identifier and chemistry
 R_RE1836M	MAR02950	1	identifier and chemistry
 R_RE1845C	MAR01723	1	identifier and chemistry
@@ -9976,7 +9791,7 @@ R_RE1905R	MAR06654	1	identifier and chemistry
 R_RE1906C	MAR02993	1	identifier and chemistry
 R_RE1906R	MAR06649	1	identifier and chemistry
 R_RE1907C	MAR06663	-1	identifier and chemistry
-R_RE1915C	MAR06877	-1	identifier and chemistry
+R_RE1915C	MAR06877	1	identifier and chemistry
 R_RE1916C	MAR06883	-1	identifier and chemistry
 R_RE1916X	MAR02995	1	identifier and chemistry
 R_RE1917C	MAR06878	-1	identifier and chemistry
@@ -9990,10 +9805,10 @@ R_RE1927C	MAR06759	1	identifier and chemistry
 R_RE1933C	MAR03920	1	identifier and chemistry
 R_RE1938C	MAR06641	1	identifier and chemistry
 R_RE1938R	MAR06642	1	identifier and chemistry
-R_RE1941C	MAR06664	1	identifier and chemistry
-R_RE1941R	MAR06665	1	identifier and chemistry
-R_RE1942C	MAR06681	1	identifier and chemistry
-R_RE1942R	MAR06682	1	identifier and chemistry
+R_RE1941C	MAR06664	1	metabolites
+R_RE1941R	MAR06665	1	metabolites
+R_RE1942C	MAR06681	1	metabolites
+R_RE1942R	MAR06682	1	metabolites
 R_RE1943C	MAR06657	1	identifier and chemistry
 R_RE1943R	MAR06658	1	identifier and chemistry
 R_RE1952C	MAR01002	1	identifier and chemistry
@@ -10027,8 +9842,8 @@ R_RE2067C	MAR01342	1	identifier and chemistry
 R_RE2068C	MAR01343	1	identifier and chemistry
 R_RE2069C	MAR01324	-1	identifier and chemistry
 R_RE2078M	MAR03016	1	identifier and chemistry
-R_RE2079R	MAR01333	-1	identifier and chemistry
-R_RE2080C	MAR01375	-1	identifier and chemistry
+R_RE2079R	MAR01333	1	identifier and chemistry
+R_RE2080C	MAR01375	-1	metabolites
 R_RE2081C	MAR04426	-1	identifier and chemistry
 R_RE2111M	MAR03772	-1	identifier and chemistry
 R_RE2112C	MAR01830	1	identifier and chemistry
@@ -10037,15 +9852,15 @@ R_RE2117M	MAR03743	-1	identifier and chemistry
 R_RE2122C	MAR06730	1	identifier and chemistry
 R_RE2124C	MAR06788	1	identifier and chemistry
 R_RE2127C	MAR09474	1	identifier and chemistry
-R_RE2128C	MAR06712	-1	identifier and chemistry
-R_RE2129C	MAR04554	-1	identifier and chemistry
-R_RE2130C	MAR06807	-1	identifier and chemistry
-R_RE2131C	MAR06744	-1	identifier and chemistry
-R_RE2132C	MAR06742	-1	identifier and chemistry
+R_RE2128C	MAR06712	1	identifier and chemistry
+R_RE2129C	MAR04554	1	identifier and chemistry
+R_RE2130C	MAR06807	1	identifier and chemistry
+R_RE2131C	MAR06744	1	identifier and chemistry
+R_RE2132C	MAR06742	1	identifier and chemistry
 R_RE2133C	MAR06715	1	identifier and chemistry
-R_RE2146C	MAR03031	1	identifier and chemistry
-R_RE2146R	MAR06686	1	metabolites
-R_RE2147C	MAR06679	1	identifier and chemistry
+R_RE2146C	MAR03031	1	metabolites
+R_RE2146R	MAR06686	1	identifier and chemistry
+R_RE2147C	MAR06679	1	metabolites
 R_RE2149C	MAR09573	1	identifier and chemistry
 R_RE2149R	MAR09574	1	identifier and chemistry
 R_RE2150C	MAR06666	1	identifier and chemistry
@@ -10063,7 +9878,6 @@ R_RE2221M	MAR03040	1	identifier and chemistry
 R_RE2223M	MAR05419	-1	identifier and chemistry
 R_RE2235C	MAR02053	1	identifier and chemistry
 R_RE2235R	MAR02054	1	identifier and chemistry
-R_RE2240C	MAR02137	1	identifier and chemistry
 R_RE2248C	MAR06683	1	chemistry
 R_RE2249C	MAR06687	1	identifier and chemistry
 R_RE2250C	MAR03041	1	identifier and chemistry
@@ -10091,26 +9905,22 @@ R_RE2319C	MAR02072	-1	identifier and chemistry
 R_RE2319M	MAR02073	-1	identifier and chemistry
 R_RE2319R	MAR02074	-1	identifier and chemistry
 R_RE2319X	MAR02075	-1	identifier and chemistry
-R_RE2327C	MAR03047	1	identifier and chemistry
+R_RE2327C	MAR03047	-1	metabolites
 R_RE2333C	MAR06953	1	identifier and chemistry
 R_RE2334C	MAR06954	1	identifier and chemistry
 R_RE2335C	MAR06973	-1	identifier and chemistry
 R_RE2346C	MAR02453	1	identifier and chemistry
-R_RE2349C	MAR04246	1	identifier and chemistry
+R_RE2349C	MAR04246	1	metabolites
 R_RE2349M	MAR03048	1	identifier and chemistry
 R_RE2360C	MAR01088	-1	identifier and chemistry
 R_RE2360N	MAR01091	-1	identifier and chemistry
 R_RE2373C	MAR06501	1	identifier and chemistry
 R_RE2375C	MAR03049	1	identifier and chemistry
 R_RE2377C	MAR03050	1	identifier and chemistry
-R_RE2382C	MAR06464	1	identifier and chemistry
 R_RE2382R	MAR06465	1	identifier and chemistry
-R_RE2383C	MAR06478	1	identifier and chemistry
 R_RE2383R	MAR06479	1	identifier and chemistry
 R_RE2386C	MAR02045	1	metabolites
-R_RE2387C	MAR06476	1	identifier and chemistry
 R_RE2387R	MAR06477	1	identifier and chemistry
-R_RE2398C	MAR06466	1	identifier and chemistry
 R_RE2398R	MAR06467	1	identifier and chemistry
 R_RE2404C	MAR06495	1	identifier and chemistry
 R_RE2404R	MAR03051	1	identifier and chemistry
@@ -10154,25 +9964,19 @@ R_RE2523C	MAR06824	-1	identifier and chemistry
 R_RE2523X	MAR03155	1	identifier and chemistry
 R_RE2524C	MAR06886	-1	identifier and chemistry
 R_RE2524X	MAR03159	1	identifier and chemistry
-R_RE2525C	MAR06815	-1	identifier and chemistry
-R_RE2525X	MAR03161	1	identifier and chemistry
-R_RE2526C	MAR06817	1	identifier and chemistry
 R_RE2533C	MAR06461	-1	identifier and chemistry
 R_RE2541C	MAR06492	1	identifier and chemistry
 R_RE2541E	MAR03162	1	identifier and chemistry
 R_RE2541L	MAR03165	1	identifier and chemistry
 R_RE2562C	MAR04563	1	identifier and chemistry
 R_RE2563C	MAR01347	1	identifier and chemistry
-R_RE2594C	MAR04248	-1	identifier and chemistry
+R_RE2594C	MAR04248	-1	metabolites
 R_RE2596C	MAR06722	1	identifier and chemistry
 R_RE2605C	MAR06606	1	identifier and chemistry
 R_RE2622C	MAR03169	1	identifier and chemistry
 R_RE2622R	MAR03207	1	identifier and chemistry
 R_RE2624X	MAR01632	-1	identifier and chemistry
 R_RE2625C	MAR01608	1	identifier and chemistry
-R_RE2625M	MAR01609	1	chemistry
-R_RE2626C	MAR03210	1	metabolites
-R_RE2626M	MAR03214	1	metabolites
 R_RE2632C	MAR03216	1	identifier and chemistry
 R_RE2632M	MAR01800	1	identifier and chemistry
 R_RE2633C	MAR03217	1	identifier and chemistry
@@ -10198,20 +10002,20 @@ R_RE2658R	MAR06660	-1	identifier and chemistry
 R_RE2659R	MAR06662	-1	identifier and chemistry
 R_RE2660C	MAR04541	1	identifier and chemistry
 R_RE2660N	MAR04542	1	identifier and chemistry
-R_RE2666C	MAR00924	1	metabolites
-R_RE2666G	MAR00925	1	metabolites
+R_RE2666C	MAR00924	1	identifier and chemistry
+R_RE2666G	MAR00925	1	identifier and chemistry
 R_RE2675C	MAR03238	1	identifier and chemistry
 R_RE2677C	MAR00919	1	identifier and chemistry
 R_RE2677E	MAR03248	1	identifier and chemistry
 R_RE2677G	MAR00920	1	identifier and chemistry
 R_RE2677N	MAR03249	1	identifier and chemistry
 R_RE2677R	MAR00921	1	identifier and chemistry
-R_RE2680C	MAR00926	1	metabolites
+R_RE2680C	MAR00926	1	identifier and chemistry
 R_RE2705C	MAR06459	-1	identifier and chemistry
 R_RE2717L	MAR00914	1	identifier and chemistry
 R_RE2718C	MAR00915	1	identifier and chemistry
 R_RE2718G	MAR03251	1	identifier and chemistry
-R_RE2722C	MAR00928	1	metabolites
+R_RE2722C	MAR00928	1	identifier and chemistry
 R_RE2722G	MAR03253	1	identifier and chemistry
 R_RE2759X	MAR03491	-1	identifier and chemistry
 R_RE2766C	MAR01973	-1	identifier and chemistry
@@ -10220,8 +10024,6 @@ R_RE2768M	MAR02000	1	identifier and chemistry
 R_RE2768R	MAR03257	1	identifier and chemistry
 R_RE2799C	MAR01326	1	identifier and chemistry
 R_RE2813C	MAR06609	1	identifier and chemistry
-R_RE2814M	MAR03259	1	identifier and chemistry
-R_RE2814R	MAR01787	1	identifier and chemistry
 R_RE2848C	MAR01406	-1	identifier and chemistry
 R_RE2849C	MAR01403	-1	identifier and chemistry
 R_RE2850C	MAR01407	-1	identifier and chemistry
@@ -10288,7 +10090,7 @@ R_RE2921M	MAR03297	1	identifier and chemistry
 R_RE2921X	MAR03299	1	identifier and chemistry
 R_RE2948C	MAR06460	-1	identifier and chemistry
 R_RE2954C	MAR06627	1	identifier and chemistry
-R_RE2958C	MAR01310	-1	identifier and chemistry
+R_RE2958C	MAR01310	1	identifier and chemistry
 R_RE2972G	MAR03300	1	identifier and chemistry
 R_RE2972M	MAR03303	1	identifier and chemistry
 R_RE2972R	MAR03308	1	identifier and chemistry
@@ -10297,7 +10099,6 @@ R_RE2973N	MAR03313	1	identifier and chemistry
 R_RE2974G	MAR03318	1	metabolites
 R_RE2974N	MAR03324	1	identifier and chemistry
 R_RE2974R	MAR03325	1	metabolites
-R_RE2975C	MAR02144	1	identifier and chemistry
 R_RE2975M	MAR02145	1	identifier and chemistry
 R_RE2985M	MAR03366	1	identifier and chemistry
 R_RE2985X	MAR03459	1	metabolites
@@ -10374,8 +10175,8 @@ R_RE3073X	MAR03386	1	metabolites
 R_RE3074X	MAR03387	1	metabolites
 R_RE3075C	MAR03388	1	metabolites
 R_RE3075X	MAR03389	1	metabolites
-R_RE3079C	MAR03390	1	identifier and chemistry
-R_RE3079X	MAR03493	1	identifier and chemistry
+R_RE3079C	MAR03390	1	metabolites
+R_RE3079X	MAR03493	1	metabolites
 R_RE3081X	MAR03501	1	identifier and chemistry
 R_RE3082X	MAR03503	1	identifier and chemistry
 R_RE3083X	MAR03511	-1	identifier and chemistry
@@ -10417,7 +10218,7 @@ R_RE3121R	MAR03405	1	identifier and chemistry
 R_RE3122C	MAR02491	1	identifier and chemistry
 R_RE3122R	MAR03410	1	identifier and chemistry
 R_RE3123C	MAR02503	1	metabolites
-R_RE3123R	MAR03412	1	identifier and chemistry
+R_RE3123R	MAR03412	1	metabolites
 R_RE3124C	MAR02497	1	identifier and chemistry
 R_RE3124R	MAR03415	1	identifier and chemistry
 R_RE3125C	MAR02499	1	identifier and chemistry
@@ -10426,7 +10227,7 @@ R_RE3126C	MAR02501	1	identifier and chemistry
 R_RE3126R	MAR03418	1	identifier and chemistry
 R_RE3129N	MAR03419	1	identifier and chemistry
 R_RE3132R	MAR02984	1	identifier and chemistry
-R_RE3134C	MAR03420	1	identifier and chemistry
+R_RE3134C	MAR01540	1	chemistry
 R_RE3134R	MAR03434	1	identifier and chemistry
 R_RE3136C	MAR01553	1	identifier and chemistry
 R_RE3139X	MAR02513	1	identifier and chemistry
@@ -10554,12 +10355,12 @@ R_RE3245C	MAR00264	1	metabolites
 R_RE3247X	MAR01638	1	metabolites
 R_RE3248M	MAR03756	1	metabolites, any compartment
 R_RE3248X	MAR03756	1	identifier and chemistry
-R_RE3250C	MAR03758	1	metabolites
+R_RE3250C	MAR03758	1	identifier and chemistry
 R_RE3250M	MAR03764	1	metabolites, any compartment
 R_RE3250X	MAR03764	1	identifier and chemistry
-R_RE3251C	MAR03766	1	identifier and chemistry
-R_RE3251M	MAR03768	1	identifier and chemistry
-R_RE3252C	MAR03774	1	metabolites
+R_RE3251C	MAR01804	1	chemistry
+R_RE3251M	MAR01805	1	chemistry
+R_RE3252C	MAR03774	1	identifier and chemistry
 R_RE3258C	MAR02465	1	identifier and chemistry
 R_RE3258R	MAR02466	1	identifier and chemistry
 R_RE3259C	MAR02459	1	identifier and chemistry
@@ -10634,14 +10435,13 @@ R_RE3345M	MAR01201	1	identifier and chemistry
 R_RE3345R	MAR01202	1	identifier and chemistry
 R_RE3345X	MAR01203	1	identifier and chemistry
 R_RE3346C	MAR01611	-1	chemistry
-R_RE3346M	MAR03817	1	metabolites
-R_RE3346R	MAR03821	1	metabolites
+R_RE3346M	MAR03817	1	identifier and chemistry
+R_RE3346R	MAR03821	1	identifier and chemistry
 R_RE3347C	MAR06510	1	identifier and chemistry
 R_RE3352C	MAR06610	1	identifier and chemistry
 R_RE3367C	MAR06947	1	metabolites
 R_RE3367E	MAR06948	1	metabolites
 R_RE3367X	MAR06949	1	metabolites
-R_RE3370C	MAR06428	1	identifier and chemistry
 R_RE3370R	MAR06429	1	identifier and chemistry
 R_RE3372C	MAR01532	1	identifier and chemistry
 R_RE3378C	MAR03824	1	metabolites
@@ -10683,23 +10483,22 @@ R_RE3417C	MAR02452	1	identifier and chemistry
 R_RE3420C	MAR02451	1	metabolites
 R_RE3421M	MAR03834	1	identifier and chemistry
 R_RE3421R	MAR03836	1	identifier and chemistry
-R_RE3422C	MAR01334	-1	chemistry
-R_RE3423C	MAR01376	-1	identifier and chemistry
+R_RE3422C	MAR01334	1	identifier and chemistry
+R_RE3423C	MAR01376	-1	metabolites
 R_RE3430C	MAR01228	1	identifier and chemistry
 R_RE3430M	MAR01229	1	identifier and chemistry
 R_RE3430X	MAR01230	1	identifier and chemistry
-R_RE3431C	MAR01285	-1	identifier and chemistry
+R_RE3431C	MAR01285	-1	metabolites
 R_RE3432C	MAR01231	1	identifier and chemistry
-R_RE3432M	MAR01281	-1	identifier and chemistry
-R_RE3432X	MAR01282	-1	identifier and chemistry
-R_RE3434C	MAR03840	1	identifier and chemistry
+R_RE3432M	MAR01281	-1	metabolites
+R_RE3432X	MAR01282	-1	metabolites
+R_RE3434C	MAR03840	1	metabolites
 R_RE3434R	MAR03842	1	identifier and chemistry
 R_RE3435C	MAR01238	1	identifier and chemistry
 R_RE3435R	MAR01239	1	identifier and chemistry
 R_RE3436C	MAR01236	1	identifier and chemistry
 R_RE3436R	MAR01237	1	identifier and chemistry
 R_RE3437C	MAR01241	1	identifier and chemistry
-R_RE3440C	MAR06443	1	identifier and chemistry
 R_RE3440R	MAR06444	1	identifier and chemistry
 R_RE3443M	MAR01276	1	identifier and chemistry
 R_RE3443X	MAR01277	1	identifier and chemistry
@@ -10709,9 +10508,9 @@ R_RE3444X	MAR01279	1	identifier and chemistry
 R_RE3445M	MAR01270	1	identifier and chemistry
 R_RE3445X	MAR01271	1	metabolites
 R_RE3446C	MAR01263	1	identifier and chemistry
-R_RE3446M	MAR03846	1	identifier and chemistry
+R_RE3446M	MAR03846	1	metabolites
 R_RE3446R	MAR03872	1	identifier and chemistry
-R_RE3446X	MAR03874	1	identifier and chemistry
+R_RE3446X	MAR03874	1	metabolites
 R_RE3447M	MAR01272	1	identifier and chemistry
 R_RE3447X	MAR01273	1	identifier and chemistry
 R_RE3448C	MAR03876	1	identifier and chemistry
@@ -10729,7 +10528,6 @@ R_RE3457C	MAR01356	1	identifier and chemistry
 R_RE3458C	MAR03884	1	identifier and chemistry
 R_RE3459C	MAR01363	-1	metabolites
 R_RE3460C	MAR01362	1	identifier and chemistry
-R_RE3464C	MAR06426	1	identifier and chemistry
 R_RE3464R	MAR06427	1	identifier and chemistry
 R_RE3469C	MAR00979	1	identifier and chemistry
 R_RE3470C	MAR03886	1	identifier and chemistry
@@ -10776,7 +10574,7 @@ R_RE3513N	MAR03906	1	identifier and chemistry
 R_RE3513R	MAR01077	1	identifier and chemistry
 R_RE3514C	MAR03909	1	identifier and chemistry
 R_RE3514R	MAR03913	1	identifier and chemistry
-R_RE3515C	MAR03914	1	metabolites
+R_RE3515C	MAR03914	1	identifier and chemistry
 R_RE3518C	MAR01059	1	identifier and chemistry
 R_RE3518R	MAR01061	1	identifier and chemistry
 R_RE3519C	MAR01055	1	identifier and chemistry
@@ -10792,7 +10590,7 @@ R_RE3521R	MAR01053	1	identifier and chemistry
 R_RE3521X	MAR01054	1	identifier and chemistry
 R_RE3522C	MAR01071	1	identifier and chemistry
 R_RE3522R	MAR01072	1	identifier and chemistry
-R_RE3524R	MAR01335	-1	identifier and chemistry
+R_RE3524R	MAR01335	1	identifier and chemistry
 R_RE3525C	MAR00961	1	identifier and chemistry
 R_RE3525M	MAR00964	1	identifier and chemistry
 R_RE3525N	MAR03927	1	identifier and chemistry
@@ -10868,7 +10666,7 @@ R_RE3597M	MAR01245	-1	identifier and chemistry
 R_RE3597X	MAR01246	-1	identifier and chemistry
 R_RE3624M	MAR03997	1	metabolites
 R_RE3624X	MAR04001	1	metabolites
-R_RE3626M	MAR04003	1	metabolites
+R_RE3626M	MAR04003	1	identifier and chemistry
 R_RE3629C	MAR05338	1	identifier and chemistry
 R_RE3630C	MAR05339	1	identifier and chemistry
 R_RE3631C	MAR05337	1	identifier and chemistry
@@ -10883,8 +10681,8 @@ R_RETI2	MAR06643	1	identifier and chemistry
 R_RETI3	MAR06645	1	identifier and chemistry
 R_RETNCOA	MAR08712	1	identifier and chemistry
 R_RETNGLCt	MAR08714	1	identifier and chemistry
-R_RETNGLCt2	MAR08718	1	identifier and chemistry
-R_RETNGLCt2r	MAR08719	1	identifier and chemistry
+R_RETNGLCt2	MAR08718	1	metabolites
+R_RETNGLCt2r	MAR08719	1	metabolites
 R_RETNGLCtr	MAR08715	1	identifier and chemistry
 R_RETNt	MAR08721	1	identifier and chemistry
 R_RETNtr	MAR08722	1	identifier and chemistry
@@ -11085,7 +10883,7 @@ R_SERTHRNaEx	MAR05644	1	identifier and chemistry
 R_SERt4	MAR06375	1	identifier and chemistry
 R_SERtN1	MAR08735	1	identifier and chemistry
 R_SERtp	MAR04468	1	identifier and chemistry
-R_SFCYSc	MAR08993	1	metabolites
+R_SFCYSc	MAR08993	1	read by hand
 R_SFCYSe	MAR08994	1	identifier and chemistry
 R_SFGTH	MAR03937	1	identifier and chemistry
 R_SGALSIDEtg	MAR08207	1	identifier and chemistry
@@ -11098,7 +10896,7 @@ R_SIAASE3ly	MAR07455	1	identifier and chemistry
 R_SIAASE4ly	MAR07484	1	identifier and chemistry
 R_SIAASEly	MAR07576	1	identifier and chemistry
 R_SIAT4Bg	MAR08155	1	identifier and chemistry
-R_SIAT9g	MAR08184	1	metabolites
+R_SIAT9g	MAR08184	1	identifier and chemistry
 R_SLCBK1	MAR00744	1	identifier and chemistry
 R_SLDt	MAR08071	1	identifier and chemistry
 R_SLDx	MAR08068	1	identifier and chemistry
@@ -11425,14 +11223,14 @@ R_UGALNACter	MAR08369	1	identifier and chemistry
 R_UGALNACtg	MAR07433	1	identifier and chemistry
 R_UGCG	MAR08248	1	identifier and chemistry
 R_UGLCNACtg	MAR07434	1	identifier and chemistry
-R_UGLT	MAR04131	-1	chemistry
+R_UGLT	MAR04131	-1	identifier and chemistry
 R_UGT1A10r	MAR01820	1	identifier and chemistry
 R_UGT1A1r	MAR07962	1	identifier and chemistry
 R_UGT1A2r	MAR04766	1	identifier and chemistry
 R_UGT1A3r	MAR07965	1	identifier and chemistry
 R_UGT1A4r	MAR07959	1	identifier and chemistry
 R_UGT1A5r	MAR08713	1	identifier and chemistry
-R_UGT1A5r2	MAR08717	1	identifier and chemistry
+R_UGT1A5r2	MAR08717	1	metabolites
 R_UGT1A6r	MAR07648	1	identifier and chemistry
 R_UGT1A7r	MAR07980	1	identifier and chemistry
 R_UGT1A8r	MAR07984	1	identifier and chemistry
@@ -11453,7 +11251,7 @@ R_UMPK7n	MAR07874	-1	identifier and chemistry
 R_UMPKm	MAR07875	-1	identifier and chemistry
 R_UMPKn	MAR07876	-1	identifier and chemistry
 R_UMPtr	MAR08859	1	identifier and chemistry
-R_UNK2	MAR08607	1	metabolites
+R_UNK2	MAR08607	1	chemistry
 R_UNK3	MAR05391	1	chemistry
 R_UPP3S	MAR04748	1	identifier and chemistry
 R_UPPDC1	MAR04750	1	identifier and chemistry
@@ -11476,6 +11274,9 @@ R_UTPtn	MAR07796	1	identifier and chemistry
 R_Uritl	MAR07718	-1	identifier and chemistry
 R_Uritm	MAR07719	1	identifier and chemistry
 R_Uritn	MAR08862	1	identifier and chemistry
+R_VACCCPT1	MAR06598	1	chemistry
+R_VACCCPT2	MAR06600	1	chemistry
+R_VACCCRNt	MAR06599	1	chemistry
 R_VACCt	MAR00258	1	identifier and chemistry
 R_VALATB0tc	MAR09598	1	identifier and chemistry
 R_VALB0AT2tc	MAR05314	1	chemistry
@@ -11588,7 +11389,7 @@ R_r0191	MAR04301	1	identifier and chemistry
 R_r0193	MAR04302	1	metabolites
 R_r0196	MAR03939	-1	identifier and chemistry
 R_r0202	MAR00481	-1	identifier and chemistry
-R_r0205	MAR01169	1	metabolites, any compartment
+R_r0205	MAR00483	1	metabolites
 R_r0208	MAR04387	1	identifier and chemistry
 R_r0210	MAR04323	1	identifier and chemistry
 R_r0220	MAR04331	-1	identifier and chemistry
@@ -11637,7 +11438,7 @@ R_r0385	MAR06416	1	metabolites
 R_r0386	MAR06421	1	metabolites
 R_r0388	MAR04070	1	metabolites
 R_r0389	MAR04071	-1	identifier and chemistry
-R_r0390	MAR09465	1	metabolites
+R_r0390	MAR09465	1	identifier and chemistry
 R_r0391	MAR04254	-1	identifier and chemistry
 R_r0392	MAR00456	1	identifier and chemistry
 R_r0393	MAR00459	1	identifier and chemistry
@@ -11699,8 +11500,6 @@ R_r0546	MAR04685	1	identifier and chemistry
 R_r0547	MAR04686	-1	identifier and chemistry
 R_r0548	MAR04687	-1	identifier and chemistry
 R_r0549	MAR04688	1	identifier and chemistry
-R_r0552	MAR04697	1	identifier and chemistry
-R_r0553	MAR04698	1	identifier and chemistry
 R_r0555	MAR06412	1	identifier and chemistry
 R_r0556	MAR06414	-1	identifier and chemistry
 R_r0557	MAR06415	1	identifier and chemistry
@@ -11720,7 +11519,6 @@ R_r0587	MAR09569	1	identifier and chemistry
 R_r0590	MAR04734	1	identifier and chemistry
 R_r0591	MAR04732	1	identifier and chemistry
 R_r0594	MAR04737	1	identifier and chemistry
-R_r0595	MAR03928	1	identifier and chemistry
 R_r0596	MAR04741	1	identifier and chemistry
 R_r0598	MAR04403	1	identifier and chemistry
 R_r0603	MAR03784	1	metabolites
@@ -11745,11 +11543,11 @@ R_r0642	MAR04797	1	identifier and chemistry
 R_r0643	MAR03759	1	identifier and chemistry
 R_r0644	MAR03790	1	identifier and chemistry
 R_r0645	MAR04233	1	identifier and chemistry
-R_r0647	MAR04245	-1	identifier and chemistry
+R_r0647	MAR04245	-1	metabolites
 R_r0648	MAR09571	-1	identifier and chemistry
 R_r0649	MAR09572	1	identifier and chemistry
-R_r0650	MAR01727	1	metabolites
-R_r0651	MAR01726	1	metabolites
+R_r0650	MAR01727	1	identifier and chemistry
+R_r0651	MAR01726	1	identifier and chemistry
 R_r0652	MAR02183	-1	metabolites
 R_r0653	MAR03125	1	identifier and chemistry
 R_r0655	MAR03770	-1	metabolites
@@ -11761,7 +11559,6 @@ R_r0668	MAR04532	1	identifier and chemistry
 R_r0669	MAR03753	1	identifier and chemistry
 R_r0670	MAR06419	1	metabolites
 R_r0671	MAR04723	1	identifier and chemistry
-R_r0672	MAR02184	1	identifier and chemistry
 R_r0673	MAR04166	1	identifier and chemistry
 R_r0678	MAR02152	1	identifier and chemistry
 R_r0679	MAR04730	-1	identifier and chemistry
@@ -11807,7 +11604,6 @@ R_r0734	MAR03157	1	identifier and chemistry
 R_r0735	MAR02187	-1	identifier and chemistry
 R_r0737	MAR04832	-1	identifier and chemistry
 R_r0739	MAR01684	-1	identifier and chemistry
-R_r0741	MAR01604	1	identifier and chemistry
 R_r0743	MAR01646	1	identifier and chemistry
 R_r0744	MAR01642	1	identifier and chemistry
 R_r0747	MAR01676	-1	identifier and chemistry
@@ -11848,7 +11644,6 @@ R_r0788	MAR04838	1	identifier and chemistry
 R_r0789	MAR04839	1	identifier and chemistry
 R_r0791	MAR02207	1	identifier and chemistry
 R_r0792	MAR04448	-1	identifier and chemistry
-R_r0795	MAR04840	1	identifier and chemistry
 R_r0796	MAR04841	1	identifier and chemistry
 R_r0797	MAR01722	1	identifier and chemistry
 R_r0800	MAR04842	1	metabolites
@@ -11878,7 +11673,7 @@ R_r0859	MAR04907	1	identifier and chemistry
 R_r0860	MAR04908	1	identifier and chemistry
 R_r0870	MAR06512	-1	identifier and chemistry
 R_r0871	MAR04063	-1	identifier and chemistry
-R_r0879	MAR04933	1	identifier and chemistry
+R_r0879	MAR05992	1	identifier and chemistry
 R_r0885	MAR08771	1	metabolites
 R_r0886	MAR04941	1	identifier and chemistry
 R_r0892	MAR04947	1	identifier and chemistry
@@ -11894,7 +11689,7 @@ R_r0921	MAR04979	1	identifier and chemistry
 R_r0924	MAR02221	1	identifier and chemistry
 R_r0925	MAR05066	1	identifier and chemistry
 R_r0926	MAR04367	-1	identifier and chemistry
-R_r0927	MAR02222	1	identifier and chemistry
+R_r0927	MAR02222	1	read by hand
 R_r0931	MAR02223	1	identifier and chemistry
 R_r0932	MAR09762	1	identifier and chemistry
 R_r0934	MAR04986	1	identifier and chemistry
@@ -11923,8 +11718,8 @@ R_r0987	MAR09779	1	identifier and chemistry
 R_r0988	MAR02274	1	identifier and chemistry
 R_r0989	MAR02275	1	identifier and chemistry
 R_r0992	MAR01852	-1	identifier and chemistry
-R_r0993	MAR01853	1	metabolites
-R_r0994	MAR01854	1	transport compartments
+R_r0993	MAR01853	1	identifier and chemistry
+R_r0994	MAR01854	1	identifier and chemistry
 R_r0995	MAR02778	1	identifier and chemistry
 R_r0997	MAR03033	1	identifier and chemistry
 R_r0998	MAR02801	1	identifier and chemistry
@@ -11939,10 +11734,9 @@ R_r1007	MAR02892	1	identifier and chemistry
 R_r1008	MAR02280	1	identifier and chemistry
 R_r1010	MAR04729	1	identifier and chemistry
 R_r1011	MAR01695	1	identifier and chemistry
-R_r1012	MAR02283	1	identifier and chemistry
+R_r1012	MAR01702	1	chemistry
 R_r1013	MAR01619	1	identifier and chemistry
 R_r1014	MAR02285	1	identifier and chemistry
-R_r1017	MAR02290	1	identifier and chemistry
 R_r1018	MAR01725	-1	identifier and chemistry
 R_r1019	MAR01717	-1	identifier and chemistry
 R_r1020	MAR01774	-1	identifier and chemistry
@@ -11952,8 +11746,7 @@ R_r1025	MAR01592	1	identifier and chemistry
 R_r1026	MAR01874	1	identifier and chemistry
 R_r1027	MAR01859	-1	identifier and chemistry
 R_r1028	MAR01872	1	identifier and chemistry
-R_r1029	MAR02298	1	identifier and chemistry
-R_r1030	MAR04249	1	identifier and chemistry
+R_r1030	MAR04249	1	metabolites
 R_r1043	MAR05039	1	identifier and chemistry
 R_r1044	MAR05040	1	identifier and chemistry
 R_r1045	MAR05041	1	identifier and chemistry
@@ -11977,11 +11770,10 @@ R_r1088	MAR05993	1	identifier and chemistry
 R_r1106	MAR06505	-1	identifier and chemistry
 R_r1116	MAR05303	1	identifier and chemistry
 R_r1117	MAR05304	1	identifier and chemistry
-R_r1135	MAR02301	1	read by hand
+R_r1135	MAR02301	1	identifier and chemistry
 R_r1140	MAR05063	1	identifier and chemistry
 R_r1143	MAR05328	1	identifier and chemistry
 R_r1144	MAR05330	1	identifier and chemistry
-R_r1146	MAR02302	1	metabolites
 R_r1147	MAR02303	1	identifier and chemistry
 R_r1148	MAR00713	1	identifier and chemistry
 R_r1150	MAR05047	1	identifier and chemistry
@@ -12039,8 +11831,8 @@ R_r1375	MAR03987	1	identifier and chemistry
 R_r1377	MAR03935	1	identifier and chemistry
 R_r1378	MAR03933	-1	identifier and chemistry
 R_r1380	MAR02337	1	identifier and chemistry
-R_r1382	MAR05392	1	metabolites
-R_r1383	MAR05393	1	metabolites
+R_r1382	MAR05392	1	identifier and chemistry
+R_r1383	MAR05393	1	identifier and chemistry
 R_r1384	MAR05394	1	metabolites
 R_r1391	MAR05399	1	identifier and chemistry
 R_r1392	MAR05400	1	identifier and chemistry
@@ -12081,7 +11873,7 @@ R_r1481	MAR02381	1	metabolites
 R_r1487	MAR02952	1	metabolites
 R_r1492	MAR05433	1	identifier and chemistry
 R_r1493	MAR02382	1	identifier and chemistry
-R_r1495	MAR01864	1	metabolites
+R_r1495	MAR01864	1	identifier and chemistry
 R_r1497	MAR01866	1	identifier and chemistry
 R_r1498	MAR01867	1	identifier and chemistry
 R_r1499	MAR05435	1	identifier and chemistry
@@ -12117,7 +11909,6 @@ R_r1547	MAR05462	-1	identifier and chemistry
 R_r1548	MAR05463	-1	identifier and chemistry
 R_r1549	MAR05464	-1	identifier and chemistry
 R_r1551	MAR05466	-1	identifier and chemistry
-R_r1552	MAR05467	-1	identifier and chemistry
 R_r1553	MAR05468	1	identifier and chemistry
 R_r1554	MAR05469	-1	identifier and chemistry
 R_r1556	MAR05471	-1	identifier and chemistry
@@ -12352,39 +12143,22 @@ R_r1819	MAR05734	1	identifier and chemistry
 R_r1820	MAR05735	1	identifier and chemistry
 R_r1821	MAR05736	1	identifier and chemistry
 R_r1822	MAR05737	1	identifier and chemistry
-R_r1823	MAR05738	1	identifier and chemistry
 R_r1824	MAR05739	1	identifier and chemistry
 R_r1825	MAR05740	1	identifier and chemistry
-R_r1826	MAR05741	1	identifier and chemistry
 R_r1827	MAR05742	1	identifier and chemistry
-R_r1828	MAR05743	1	identifier and chemistry
-R_r1829	MAR05744	1	identifier and chemistry
-R_r1830	MAR05745	1	identifier and chemistry
-R_r1831	MAR05746	1	identifier and chemistry
 R_r1832	MAR05747	1	identifier and chemistry
 R_r1833	MAR05748	1	identifier and chemistry
 R_r1834	MAR05749	1	identifier and chemistry
 R_r1835	MAR05750	1	identifier and chemistry
 R_r1836	MAR05751	1	identifier and chemistry
 R_r1837	MAR05752	1	identifier and chemistry
-R_r1841	MAR05756	1	identifier and chemistry
-R_r1842	MAR05757	1	identifier and chemistry
-R_r1843	MAR05758	1	identifier and chemistry
-R_r1844	MAR05759	1	identifier and chemistry
-R_r1846	MAR05761	1	identifier and chemistry
 R_r1847	MAR05762	1	identifier and chemistry
 R_r1848	MAR05763	1	identifier and chemistry
 R_r1850	MAR05765	1	identifier and chemistry
 R_r1851	MAR05766	1	identifier and chemistry
 R_r1852	MAR05767	1	identifier and chemistry
 R_r1853	MAR05768	1	identifier and chemistry
-R_r1854	MAR05769	1	identifier and chemistry
-R_r1855	MAR05770	1	identifier and chemistry
-R_r1856	MAR05771	1	identifier and chemistry
 R_r1857	MAR05772	1	identifier and chemistry
-R_r1858	MAR05773	1	identifier and chemistry
-R_r1859	MAR05774	1	identifier and chemistry
-R_r1860	MAR05775	1	identifier and chemistry
 R_r1861	MAR05776	1	identifier and chemistry
 R_r1862	MAR05777	1	identifier and chemistry
 R_r1863	MAR05778	1	identifier and chemistry
@@ -12392,40 +12166,23 @@ R_r1864	MAR05779	1	identifier and chemistry
 R_r1865	MAR05780	1	identifier and chemistry
 R_r1866	MAR05781	1	identifier and chemistry
 R_r1867	MAR05782	1	identifier and chemistry
-R_r1871	MAR05786	1	identifier and chemistry
 R_r1872	MAR05787	1	identifier and chemistry
 R_r1873	MAR05788	1	identifier and chemistry
-R_r1874	MAR05789	1	identifier and chemistry
 R_r1876	MAR05791	1	identifier and chemistry
 R_r1877	MAR05792	1	identifier and chemistry
-R_r1879	MAR05794	1	identifier and chemistry
 R_r1880	MAR05795	1	identifier and chemistry
 R_r1881	MAR05796	1	identifier and chemistry
 R_r1882	MAR05797	1	identifier and chemistry
-R_r1883	MAR05798	1	identifier and chemistry
-R_r1884	MAR05799	1	identifier and chemistry
 R_r1885	MAR05800	1	identifier and chemistry
-R_r1886	MAR05801	1	identifier and chemistry
-R_r1887	MAR05802	1	identifier and chemistry
-R_r1888	MAR05803	1	identifier and chemistry
-R_r1889	MAR05804	1	identifier and chemistry
-R_r1890	MAR05805	1	identifier and chemistry
-R_r1891	MAR05806	1	identifier and chemistry
 R_r1892	MAR05807	1	identifier and chemistry
 R_r1893	MAR05808	1	identifier and chemistry
-R_r1894	MAR05809	1	identifier and chemistry
 R_r1895	MAR05810	1	identifier and chemistry
-R_r1896	MAR05811	1	identifier and chemistry
 R_r1897	MAR05812	1	identifier and chemistry
-R_r1898	MAR05813	1	identifier and chemistry
 R_r1899	MAR05814	1	identifier and chemistry
 R_r1900	MAR05815	1	identifier and chemistry
-R_r1901	MAR05816	1	identifier and chemistry
 R_r1902	MAR05817	1	identifier and chemistry
-R_r1903	MAR05818	1	identifier and chemistry
 R_r1904	MAR05819	1	identifier and chemistry
 R_r1905	MAR05820	1	identifier and chemistry
-R_r1906	MAR05821	1	identifier and chemistry
 R_r1907	MAR05822	1	identifier and chemistry
 R_r1908	MAR05823	1	identifier and chemistry
 R_r1909	MAR05824	1	identifier and chemistry
@@ -12435,7 +12192,6 @@ R_r1912	MAR05827	1	identifier and chemistry
 R_r1913	MAR05828	1	identifier and chemistry
 R_r1914	MAR05829	1	identifier and chemistry
 R_r1915	MAR05830	1	identifier and chemistry
-R_r1916	MAR05831	1	identifier and chemistry
 R_r1917	MAR05832	1	identifier and chemistry
 R_r1918	MAR05833	1	identifier and chemistry
 R_r1919	MAR05834	1	identifier and chemistry
@@ -12459,7 +12215,6 @@ R_r1937	MAR05852	1	identifier and chemistry
 R_r1938	MAR05853	1	identifier and chemistry
 R_r1939	MAR05854	1	identifier and chemistry
 R_r1940	MAR05855	1	identifier and chemistry
-R_r1941	MAR05856	1	identifier and chemistry
 R_r1942	MAR05857	1	identifier and chemistry
 R_r1943	MAR05858	1	identifier and chemistry
 R_r1944	MAR05859	1	identifier and chemistry
@@ -12489,12 +12244,10 @@ R_r1967	MAR05882	1	identifier and chemistry
 R_r1968	MAR05883	1	identifier and chemistry
 R_r1969	MAR05884	1	identifier and chemistry
 R_r1970	MAR05885	1	identifier and chemistry
-R_r1971	MAR05886	1	identifier and chemistry
 R_r1972	MAR05887	1	identifier and chemistry
 R_r1973	MAR05888	1	identifier and chemistry
 R_r1974	MAR05889	1	identifier and chemistry
 R_r1975	MAR05890	1	identifier and chemistry
-R_r1976	MAR05891	1	identifier and chemistry
 R_r1977	MAR05892	1	identifier and chemistry
 R_r1978	MAR05893	1	identifier and chemistry
 R_r1979	MAR05894	1	identifier and chemistry
@@ -12504,7 +12257,6 @@ R_r1982	MAR05897	1	identifier and chemistry
 R_r1983	MAR05898	1	identifier and chemistry
 R_r1984	MAR05899	1	identifier and chemistry
 R_r1985	MAR05900	1	identifier and chemistry
-R_r1986	MAR05901	1	identifier and chemistry
 R_r1987	MAR05902	1	identifier and chemistry
 R_r1988	MAR05903	1	identifier and chemistry
 R_r1989	MAR05904	1	identifier and chemistry
@@ -12588,7 +12340,7 @@ R_r2068	MAR05983	1	identifier and chemistry
 R_r2069	MAR05984	1	identifier and chemistry
 R_r2070	MAR05985	1	identifier and chemistry
 R_r2071	MAR05986	1	identifier and chemistry
-R_r2073	MAR05989	1	transport compartments
+R_r2073	MAR05989	1	identifier and chemistry
 R_r2079	MAR06000	1	identifier and chemistry
 R_r2080	MAR06001	-1	identifier and chemistry
 R_r2081	MAR06002	1	identifier and chemistry
@@ -12663,9 +12415,9 @@ R_r2153	MAR01882	1	identifier and chemistry
 R_r2154	MAR01883	1	identifier and chemistry
 R_r2155	MAR01884	1	identifier and chemistry
 R_r2156	MAR01885	1	identifier and chemistry
-R_r2157	MAR01886	1	metabolites
-R_r2158	MAR01887	1	metabolites
-R_r2159	MAR01888	1	metabolites
+R_r2157	MAR01886	1	identifier and chemistry
+R_r2158	MAR01887	1	identifier and chemistry
+R_r2159	MAR01888	1	identifier and chemistry
 R_r2160	MAR01889	1	identifier and chemistry
 R_r2161	MAR01890	1	identifier and chemistry
 R_r2162	MAR01891	1	identifier and chemistry
@@ -12912,7 +12664,6 @@ R_r2413	MAR06316	1	identifier and chemistry
 R_r2416	MAR06326	1	identifier and chemistry
 R_r2419	MAR06330	1	identifier and chemistry
 R_r2420	MAR06331	1	identifier and chemistry
-R_r2425	MAR06336	1	identifier and chemistry
 R_r2433	MAR02592	1	identifier and chemistry
 R_r2434	MAR00162	1	identifier and chemistry
 R_r2436	MAR02661	-1	chemistry
@@ -12921,7 +12672,7 @@ R_r2438	MAR00160	-1	identifier and chemistry
 R_r2444	MAR00187	1	chemistry
 R_r2447	MAR06352	1	identifier and chemistry
 R_r2449	MAR06354	1	identifier and chemistry
-R_r2465	MAR06370	1	transport compartments
+R_r2465	MAR06370	1	identifier and chemistry
 R_r2471	MAR06374	1	identifier and chemistry
 R_r2472	MAR06389	1	identifier and chemistry
 R_r2473	MAR06386	1	identifier and chemistry
@@ -13113,7 +12864,7 @@ SERTHRNaEx	MAR05644	1	identifier and chemistry
 SERt4	MAR06375	1	identifier and chemistry
 SERtN1	MAR08735	1	identifier and chemistry
 SERtp	MAR04468	1	identifier and chemistry
-SFCYSc	MAR08993	1	metabolites
+SFCYSc	MAR08993	1	read by hand
 SFCYSe	MAR08994	1	identifier and chemistry
 SFGTH	MAR03937	1	identifier and chemistry
 SGALSIDEtg	MAR08207	1	identifier and chemistry
@@ -13126,7 +12877,7 @@ SIAASE3ly	MAR07455	1	identifier and chemistry
 SIAASE4ly	MAR07484	1	identifier and chemistry
 SIAASEly	MAR07576	1	identifier and chemistry
 SIAT4Bg	MAR08155	1	identifier and chemistry
-SIAT9g	MAR08184	1	metabolites
+SIAT9g	MAR08184	1	identifier and chemistry
 SLCBK1	MAR00744	1	identifier and chemistry
 SLDt	MAR08071	1	identifier and chemistry
 SLDx	MAR08068	1	identifier and chemistry
@@ -13453,14 +13204,14 @@ UGALNACter	MAR08369	1	identifier and chemistry
 UGALNACtg	MAR07433	1	identifier and chemistry
 UGCG	MAR08248	1	identifier and chemistry
 UGLCNACtg	MAR07434	1	identifier and chemistry
-UGLT	MAR04131	-1	chemistry
+UGLT	MAR04131	-1	identifier and chemistry
 UGT1A10r	MAR01820	1	identifier and chemistry
 UGT1A1r	MAR07962	1	identifier and chemistry
 UGT1A2r	MAR04766	1	identifier and chemistry
 UGT1A3r	MAR07965	1	identifier and chemistry
 UGT1A4r	MAR07959	1	identifier and chemistry
 UGT1A5r	MAR08713	1	identifier and chemistry
-UGT1A5r2	MAR08717	1	identifier and chemistry
+UGT1A5r2	MAR08717	1	metabolites
 UGT1A6r	MAR07648	1	identifier and chemistry
 UGT1A7r	MAR07980	1	identifier and chemistry
 UGT1A8r	MAR07984	1	identifier and chemistry
@@ -13481,7 +13232,7 @@ UMPK7n	MAR07874	-1	identifier and chemistry
 UMPKm	MAR07875	-1	identifier and chemistry
 UMPKn	MAR07876	-1	identifier and chemistry
 UMPtr	MAR08859	1	identifier and chemistry
-UNK2	MAR08607	1	metabolites
+UNK2	MAR08607	1	chemistry
 UNK3	MAR05391	1	chemistry
 UPP3S	MAR04748	1	identifier and chemistry
 UPPDC1	MAR04750	1	identifier and chemistry
@@ -13504,6 +13255,9 @@ UTPtn	MAR07796	1	identifier and chemistry
 Uritl	MAR07718	-1	identifier and chemistry
 Uritm	MAR07719	1	identifier and chemistry
 Uritn	MAR08862	1	identifier and chemistry
+VACCCPT1	MAR06598	1	chemistry
+VACCCPT2	MAR06600	1	chemistry
+VACCCRNt	MAR06599	1	chemistry
 VACCt	MAR00258	1	identifier and chemistry
 VALATB0tc	MAR09598	1	identifier and chemistry
 VALB0AT2tc	MAR05314	1	chemistry
@@ -13616,7 +13370,7 @@ r0191	MAR04301	1	identifier and chemistry
 r0193	MAR04302	1	metabolites
 r0196	MAR03939	-1	identifier and chemistry
 r0202	MAR00481	-1	identifier and chemistry
-r0205	MAR01169	1	metabolites, any compartment
+r0205	MAR00483	1	metabolites
 r0208	MAR04387	1	identifier and chemistry
 r0210	MAR04323	1	identifier and chemistry
 r0220	MAR04331	-1	identifier and chemistry
@@ -13665,7 +13419,7 @@ r0385	MAR06416	1	metabolites
 r0386	MAR06421	1	metabolites
 r0388	MAR04070	1	metabolites
 r0389	MAR04071	-1	identifier and chemistry
-r0390	MAR09465	1	metabolites
+r0390	MAR09465	1	identifier and chemistry
 r0391	MAR04254	-1	identifier and chemistry
 r0392	MAR00456	1	identifier and chemistry
 r0393	MAR00459	1	identifier and chemistry
@@ -13727,8 +13481,6 @@ r0546	MAR04685	1	identifier and chemistry
 r0547	MAR04686	-1	identifier and chemistry
 r0548	MAR04687	-1	identifier and chemistry
 r0549	MAR04688	1	identifier and chemistry
-r0552	MAR04697	1	identifier and chemistry
-r0553	MAR04698	1	identifier and chemistry
 r0555	MAR06412	1	identifier and chemistry
 r0556	MAR06414	-1	identifier and chemistry
 r0557	MAR06415	1	identifier and chemistry
@@ -13748,7 +13500,6 @@ r0587	MAR09569	1	identifier and chemistry
 r0590	MAR04734	1	identifier and chemistry
 r0591	MAR04732	1	identifier and chemistry
 r0594	MAR04737	1	identifier and chemistry
-r0595	MAR03928	1	identifier and chemistry
 r0596	MAR04741	1	identifier and chemistry
 r0598	MAR04403	1	identifier and chemistry
 r0603	MAR03784	1	metabolites
@@ -13773,11 +13524,11 @@ r0642	MAR04797	1	identifier and chemistry
 r0643	MAR03759	1	identifier and chemistry
 r0644	MAR03790	1	identifier and chemistry
 r0645	MAR04233	1	identifier and chemistry
-r0647	MAR04245	-1	identifier and chemistry
+r0647	MAR04245	-1	metabolites
 r0648	MAR09571	-1	identifier and chemistry
 r0649	MAR09572	1	identifier and chemistry
-r0650	MAR01727	1	metabolites
-r0651	MAR01726	1	metabolites
+r0650	MAR01727	1	identifier and chemistry
+r0651	MAR01726	1	identifier and chemistry
 r0652	MAR02183	-1	metabolites
 r0653	MAR03125	1	identifier and chemistry
 r0655	MAR03770	-1	metabolites
@@ -13789,7 +13540,6 @@ r0668	MAR04532	1	identifier and chemistry
 r0669	MAR03753	1	identifier and chemistry
 r0670	MAR06419	1	metabolites
 r0671	MAR04723	1	identifier and chemistry
-r0672	MAR02184	1	identifier and chemistry
 r0673	MAR04166	1	identifier and chemistry
 r0678	MAR02152	1	identifier and chemistry
 r0679	MAR04730	-1	identifier and chemistry
@@ -13835,7 +13585,6 @@ r0734	MAR03157	1	identifier and chemistry
 r0735	MAR02187	-1	identifier and chemistry
 r0737	MAR04832	-1	identifier and chemistry
 r0739	MAR01684	-1	identifier and chemistry
-r0741	MAR01604	1	identifier and chemistry
 r0743	MAR01646	1	identifier and chemistry
 r0744	MAR01642	1	identifier and chemistry
 r0747	MAR01676	-1	identifier and chemistry
@@ -13876,7 +13625,6 @@ r0788	MAR04838	1	identifier and chemistry
 r0789	MAR04839	1	identifier and chemistry
 r0791	MAR02207	1	identifier and chemistry
 r0792	MAR04448	-1	identifier and chemistry
-r0795	MAR04840	1	identifier and chemistry
 r0796	MAR04841	1	identifier and chemistry
 r0797	MAR01722	1	identifier and chemistry
 r0800	MAR04842	1	metabolites
@@ -13906,7 +13654,7 @@ r0859	MAR04907	1	identifier and chemistry
 r0860	MAR04908	1	identifier and chemistry
 r0870	MAR06512	-1	identifier and chemistry
 r0871	MAR04063	-1	identifier and chemistry
-r0879	MAR04933	1	identifier and chemistry
+r0879	MAR05992	1	identifier and chemistry
 r0885	MAR08771	1	metabolites
 r0886	MAR04941	1	identifier and chemistry
 r0892	MAR04947	1	identifier and chemistry
@@ -13922,7 +13670,7 @@ r0921	MAR04979	1	identifier and chemistry
 r0924	MAR02221	1	identifier and chemistry
 r0925	MAR05066	1	identifier and chemistry
 r0926	MAR04367	-1	identifier and chemistry
-r0927	MAR02222	1	identifier and chemistry
+r0927	MAR02222	1	read by hand
 r0931	MAR02223	1	identifier and chemistry
 r0932	MAR09762	1	identifier and chemistry
 r0934	MAR04986	1	identifier and chemistry
@@ -13951,8 +13699,8 @@ r0987	MAR09779	1	identifier and chemistry
 r0988	MAR02274	1	identifier and chemistry
 r0989	MAR02275	1	identifier and chemistry
 r0992	MAR01852	-1	identifier and chemistry
-r0993	MAR01853	1	metabolites
-r0994	MAR01854	1	transport compartments
+r0993	MAR01853	1	identifier and chemistry
+r0994	MAR01854	1	identifier and chemistry
 r0995	MAR02778	1	identifier and chemistry
 r0997	MAR03033	1	identifier and chemistry
 r0998	MAR02801	1	identifier and chemistry
@@ -13967,10 +13715,9 @@ r1007	MAR02892	1	identifier and chemistry
 r1008	MAR02280	1	identifier and chemistry
 r1010	MAR04729	1	identifier and chemistry
 r1011	MAR01695	1	identifier and chemistry
-r1012	MAR02283	1	identifier and chemistry
+r1012	MAR01702	1	chemistry
 r1013	MAR01619	1	identifier and chemistry
 r1014	MAR02285	1	identifier and chemistry
-r1017	MAR02290	1	identifier and chemistry
 r1018	MAR01725	-1	identifier and chemistry
 r1019	MAR01717	-1	identifier and chemistry
 r1020	MAR01774	-1	identifier and chemistry
@@ -13980,8 +13727,7 @@ r1025	MAR01592	1	identifier and chemistry
 r1026	MAR01874	1	identifier and chemistry
 r1027	MAR01859	-1	identifier and chemistry
 r1028	MAR01872	1	identifier and chemistry
-r1029	MAR02298	1	identifier and chemistry
-r1030	MAR04249	1	identifier and chemistry
+r1030	MAR04249	1	metabolites
 r1043	MAR05039	1	identifier and chemistry
 r1044	MAR05040	1	identifier and chemistry
 r1045	MAR05041	1	identifier and chemistry
@@ -14005,11 +13751,10 @@ r1088	MAR05993	1	identifier and chemistry
 r1106	MAR06505	-1	identifier and chemistry
 r1116	MAR05303	1	identifier and chemistry
 r1117	MAR05304	1	identifier and chemistry
-r1135	MAR02301	1	read by hand
+r1135	MAR02301	1	identifier and chemistry
 r1140	MAR05063	1	identifier and chemistry
 r1143	MAR05328	1	identifier and chemistry
 r1144	MAR05330	1	identifier and chemistry
-r1146	MAR02302	1	metabolites
 r1147	MAR02303	1	identifier and chemistry
 r1148	MAR00713	1	identifier and chemistry
 r1150	MAR05047	1	identifier and chemistry
@@ -14067,8 +13812,8 @@ r1375	MAR03987	1	identifier and chemistry
 r1377	MAR03935	1	identifier and chemistry
 r1378	MAR03933	-1	identifier and chemistry
 r1380	MAR02337	1	identifier and chemistry
-r1382	MAR05392	1	metabolites
-r1383	MAR05393	1	metabolites
+r1382	MAR05392	1	identifier and chemistry
+r1383	MAR05393	1	identifier and chemistry
 r1384	MAR05394	1	metabolites
 r1391	MAR05399	1	identifier and chemistry
 r1392	MAR05400	1	identifier and chemistry
@@ -14109,7 +13854,7 @@ r1481	MAR02381	1	metabolites
 r1487	MAR02952	1	metabolites
 r1492	MAR05433	1	identifier and chemistry
 r1493	MAR02382	1	identifier and chemistry
-r1495	MAR01864	1	metabolites
+r1495	MAR01864	1	identifier and chemistry
 r1497	MAR01866	1	identifier and chemistry
 r1498	MAR01867	1	identifier and chemistry
 r1499	MAR05435	1	identifier and chemistry
@@ -14145,7 +13890,6 @@ r1547	MAR05462	-1	identifier and chemistry
 r1548	MAR05463	-1	identifier and chemistry
 r1549	MAR05464	-1	identifier and chemistry
 r1551	MAR05466	-1	identifier and chemistry
-r1552	MAR05467	-1	identifier and chemistry
 r1553	MAR05468	1	identifier and chemistry
 r1554	MAR05469	-1	identifier and chemistry
 r1556	MAR05471	-1	identifier and chemistry
@@ -14380,39 +14124,22 @@ r1819	MAR05734	1	identifier and chemistry
 r1820	MAR05735	1	identifier and chemistry
 r1821	MAR05736	1	identifier and chemistry
 r1822	MAR05737	1	identifier and chemistry
-r1823	MAR05738	1	identifier and chemistry
 r1824	MAR05739	1	identifier and chemistry
 r1825	MAR05740	1	identifier and chemistry
-r1826	MAR05741	1	identifier and chemistry
 r1827	MAR05742	1	identifier and chemistry
-r1828	MAR05743	1	identifier and chemistry
-r1829	MAR05744	1	identifier and chemistry
-r1830	MAR05745	1	identifier and chemistry
-r1831	MAR05746	1	identifier and chemistry
 r1832	MAR05747	1	identifier and chemistry
 r1833	MAR05748	1	identifier and chemistry
 r1834	MAR05749	1	identifier and chemistry
 r1835	MAR05750	1	identifier and chemistry
 r1836	MAR05751	1	identifier and chemistry
 r1837	MAR05752	1	identifier and chemistry
-r1841	MAR05756	1	identifier and chemistry
-r1842	MAR05757	1	identifier and chemistry
-r1843	MAR05758	1	identifier and chemistry
-r1844	MAR05759	1	identifier and chemistry
-r1846	MAR05761	1	identifier and chemistry
 r1847	MAR05762	1	identifier and chemistry
 r1848	MAR05763	1	identifier and chemistry
 r1850	MAR05765	1	identifier and chemistry
 r1851	MAR05766	1	identifier and chemistry
 r1852	MAR05767	1	identifier and chemistry
 r1853	MAR05768	1	identifier and chemistry
-r1854	MAR05769	1	identifier and chemistry
-r1855	MAR05770	1	identifier and chemistry
-r1856	MAR05771	1	identifier and chemistry
 r1857	MAR05772	1	identifier and chemistry
-r1858	MAR05773	1	identifier and chemistry
-r1859	MAR05774	1	identifier and chemistry
-r1860	MAR05775	1	identifier and chemistry
 r1861	MAR05776	1	identifier and chemistry
 r1862	MAR05777	1	identifier and chemistry
 r1863	MAR05778	1	identifier and chemistry
@@ -14420,40 +14147,23 @@ r1864	MAR05779	1	identifier and chemistry
 r1865	MAR05780	1	identifier and chemistry
 r1866	MAR05781	1	identifier and chemistry
 r1867	MAR05782	1	identifier and chemistry
-r1871	MAR05786	1	identifier and chemistry
 r1872	MAR05787	1	identifier and chemistry
 r1873	MAR05788	1	identifier and chemistry
-r1874	MAR05789	1	identifier and chemistry
 r1876	MAR05791	1	identifier and chemistry
 r1877	MAR05792	1	identifier and chemistry
-r1879	MAR05794	1	identifier and chemistry
 r1880	MAR05795	1	identifier and chemistry
 r1881	MAR05796	1	identifier and chemistry
 r1882	MAR05797	1	identifier and chemistry
-r1883	MAR05798	1	identifier and chemistry
-r1884	MAR05799	1	identifier and chemistry
 r1885	MAR05800	1	identifier and chemistry
-r1886	MAR05801	1	identifier and chemistry
-r1887	MAR05802	1	identifier and chemistry
-r1888	MAR05803	1	identifier and chemistry
-r1889	MAR05804	1	identifier and chemistry
-r1890	MAR05805	1	identifier and chemistry
-r1891	MAR05806	1	identifier and chemistry
 r1892	MAR05807	1	identifier and chemistry
 r1893	MAR05808	1	identifier and chemistry
-r1894	MAR05809	1	identifier and chemistry
 r1895	MAR05810	1	identifier and chemistry
-r1896	MAR05811	1	identifier and chemistry
 r1897	MAR05812	1	identifier and chemistry
-r1898	MAR05813	1	identifier and chemistry
 r1899	MAR05814	1	identifier and chemistry
 r1900	MAR05815	1	identifier and chemistry
-r1901	MAR05816	1	identifier and chemistry
 r1902	MAR05817	1	identifier and chemistry
-r1903	MAR05818	1	identifier and chemistry
 r1904	MAR05819	1	identifier and chemistry
 r1905	MAR05820	1	identifier and chemistry
-r1906	MAR05821	1	identifier and chemistry
 r1907	MAR05822	1	identifier and chemistry
 r1908	MAR05823	1	identifier and chemistry
 r1909	MAR05824	1	identifier and chemistry
@@ -14463,7 +14173,6 @@ r1912	MAR05827	1	identifier and chemistry
 r1913	MAR05828	1	identifier and chemistry
 r1914	MAR05829	1	identifier and chemistry
 r1915	MAR05830	1	identifier and chemistry
-r1916	MAR05831	1	identifier and chemistry
 r1917	MAR05832	1	identifier and chemistry
 r1918	MAR05833	1	identifier and chemistry
 r1919	MAR05834	1	identifier and chemistry
@@ -14487,7 +14196,6 @@ r1937	MAR05852	1	identifier and chemistry
 r1938	MAR05853	1	identifier and chemistry
 r1939	MAR05854	1	identifier and chemistry
 r1940	MAR05855	1	identifier and chemistry
-r1941	MAR05856	1	identifier and chemistry
 r1942	MAR05857	1	identifier and chemistry
 r1943	MAR05858	1	identifier and chemistry
 r1944	MAR05859	1	identifier and chemistry
@@ -14517,12 +14225,10 @@ r1967	MAR05882	1	identifier and chemistry
 r1968	MAR05883	1	identifier and chemistry
 r1969	MAR05884	1	identifier and chemistry
 r1970	MAR05885	1	identifier and chemistry
-r1971	MAR05886	1	identifier and chemistry
 r1972	MAR05887	1	identifier and chemistry
 r1973	MAR05888	1	identifier and chemistry
 r1974	MAR05889	1	identifier and chemistry
 r1975	MAR05890	1	identifier and chemistry
-r1976	MAR05891	1	identifier and chemistry
 r1977	MAR05892	1	identifier and chemistry
 r1978	MAR05893	1	identifier and chemistry
 r1979	MAR05894	1	identifier and chemistry
@@ -14532,7 +14238,6 @@ r1982	MAR05897	1	identifier and chemistry
 r1983	MAR05898	1	identifier and chemistry
 r1984	MAR05899	1	identifier and chemistry
 r1985	MAR05900	1	identifier and chemistry
-r1986	MAR05901	1	identifier and chemistry
 r1987	MAR05902	1	identifier and chemistry
 r1988	MAR05903	1	identifier and chemistry
 r1989	MAR05904	1	identifier and chemistry
@@ -14616,7 +14321,7 @@ r2068	MAR05983	1	identifier and chemistry
 r2069	MAR05984	1	identifier and chemistry
 r2070	MAR05985	1	identifier and chemistry
 r2071	MAR05986	1	identifier and chemistry
-r2073	MAR05989	1	transport compartments
+r2073	MAR05989	1	identifier and chemistry
 r2079	MAR06000	1	identifier and chemistry
 r2080	MAR06001	-1	identifier and chemistry
 r2081	MAR06002	1	identifier and chemistry
@@ -14691,9 +14396,9 @@ r2153	MAR01882	1	identifier and chemistry
 r2154	MAR01883	1	identifier and chemistry
 r2155	MAR01884	1	identifier and chemistry
 r2156	MAR01885	1	identifier and chemistry
-r2157	MAR01886	1	metabolites
-r2158	MAR01887	1	metabolites
-r2159	MAR01888	1	metabolites
+r2157	MAR01886	1	identifier and chemistry
+r2158	MAR01887	1	identifier and chemistry
+r2159	MAR01888	1	identifier and chemistry
 r2160	MAR01889	1	identifier and chemistry
 r2161	MAR01890	1	identifier and chemistry
 r2162	MAR01891	1	identifier and chemistry
@@ -14940,7 +14645,6 @@ r2413	MAR06316	1	identifier and chemistry
 r2416	MAR06326	1	identifier and chemistry
 r2419	MAR06330	1	identifier and chemistry
 r2420	MAR06331	1	identifier and chemistry
-r2425	MAR06336	1	identifier and chemistry
 r2433	MAR02592	1	identifier and chemistry
 r2434	MAR00162	1	identifier and chemistry
 r2436	MAR02661	-1	chemistry
@@ -14949,7 +14653,7 @@ r2438	MAR00160	-1	identifier and chemistry
 r2444	MAR00187	1	chemistry
 r2447	MAR06352	1	identifier and chemistry
 r2449	MAR06354	1	identifier and chemistry
-r2465	MAR06370	1	transport compartments
+r2465	MAR06370	1	identifier and chemistry
 r2471	MAR06374	1	identifier and chemistry
 r2472	MAR06389	1	identifier and chemistry
 r2473	MAR06386	1	identifier and chemistry

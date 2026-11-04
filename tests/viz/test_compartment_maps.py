@@ -68,10 +68,9 @@ def test_a_maps_reactions_resolve_to_the_models_own(model):
 
     assert len(drawn) > 1000
     assert set(resolved.values()) <= own
-    # Each carries Human-GEM's identifier. The maps are fitted to Human-GEM 2.1.1,
-    # so the few reactions it added since the model's release are not the model's.
-    assert len(resolved) == sum(identifier in own for identifier in drawn)
-    assert 0 < len(drawn) - len(resolved) < 20
+    # Each carries Human-GEM's identifier, and the maps are fitted to the model's
+    # release, Human-GEM 2.1.1: every reaction they draw is the model's.
+    assert len(resolved) == len(drawn)
 
 
 def test_a_subsystem_leads_to_the_maps_of_its_compartments(model):

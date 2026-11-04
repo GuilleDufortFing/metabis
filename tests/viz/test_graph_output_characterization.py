@@ -54,8 +54,9 @@ HUMAN1_STRUCTURE = "48696110a11ae97f44a5419b0fdf053e0869c459f0f79a425df563326d19
 # STANDARD_STRUCTURE is a coordinate digest of the packaged automatic layout, so
 # it is re-recorded whenever that resource is regenerated — 2026-07-25 for the
 # connectivity-preserving split, which redraws glycolysis as 10 components with
-# 124 nodes in the largest instead of 23 components with 34.
-STANDARD_STRUCTURE = "4233e408abb355939b0372d16f2a7f32657abedf48860333edb0158054894725"
+# 124 nodes in the largest instead of 23 components with 34, and 2026-11-04 for
+# the model's move to Human-GEM 2.1.1 (scripts/regenerate_subsystem_graphs.py).
+STANDARD_STRUCTURE = "7d4f04f3f7f3d4be90e9e0648b79b0624badbe9d891ae7ce91c417f74616e20a"
 # OVERVIEW_STRUCTURE is re-recorded on 2026-10-21 for the spaced overview: the
 # packaged positions now seed a layout per category (spaced_network), so every
 # node moved, while the nodes, edges and their order stayed. Re-recorded on
@@ -63,8 +64,10 @@ STANDARD_STRUCTURE = "4233e408abb355939b0372d16f2a7f32657abedf48860333edb0158054
 # them every node. Re-recorded the same day for transport divided by compartment:
 # nine transport subsystems replace one (165 nodes become 173), joined to each
 # other and to Exchange/demand where they share main metabolites (374 edges
-# become 407).
-OVERVIEW_STRUCTURE = "fe48a564da800ab2135ac9f93f26ff75278098dd54814115f64ff3b782211630"
+# become 407). Re-recorded on 2026-11-04 for Human-GEM 2.1.1: its transport
+# subsystems changed size, so the 22 nodes of their category moved; the nodes,
+# edges and their order stayed.
+OVERVIEW_STRUCTURE = "301553ea028765369a776cb4cc2fbef87d50e4305d69d2b33137cfad8d4b41b2"
 
 
 def prepare_graph(

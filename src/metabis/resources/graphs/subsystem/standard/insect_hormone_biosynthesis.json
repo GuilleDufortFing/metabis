@@ -75,14 +75,14 @@
       "subtype": "intermediate"
     },
     {
-      "id": "m_cytosol_MAM20057c",
+      "id": "m_cytosol_MAM20056c",
       "glyph_class": "metabolite",
-      "label": "MAM20057c",
+      "label": "MAM20056c",
       "x": 268.0,
       "y": 20.0,
       "width": 60.0,
       "height": 40.0,
-      "original_id": "MAM20057c",
+      "original_id": "MAM20056c",
       "subtype": "main"
     },
     {
@@ -123,9 +123,9 @@
       "glyph_class": "compartment",
       "label": "Endoplasmic reticulum",
       "x": 797.0,
-      "y": 86.0,
+      "y": 91.0,
       "width": 498.0,
-      "height": 522.0
+      "height": 532.0
     },
     {
       "id": "r_MAR20064",
@@ -138,11 +138,22 @@
       "original_id": "MAR20064"
     },
     {
+      "id": "m_endoplasmic_reticulum_MAM00677r",
+      "glyph_class": "metabolite",
+      "label": "MAM00677r",
+      "x": 678.0,
+      "y": 162.0,
+      "width": 60.0,
+      "height": 40.0,
+      "original_id": "MAM00677r",
+      "subtype": "main"
+    },
+    {
       "id": "m_MAR20064_MAM02040r",
       "glyph_class": "metabolite",
       "label": "MAM02040r",
       "x": 678.0,
-      "y": 157.0,
+      "y": 91.0,
       "width": 40.0,
       "height": 30.0,
       "original_id": "MAM02040r",
@@ -153,22 +164,11 @@
       "glyph_class": "metabolite",
       "label": "MAM02552r",
       "x": 678.0,
-      "y": 91.0,
+      "y": 25.0,
       "width": 40.0,
       "height": 30.0,
       "original_id": "MAM02552r",
       "subtype": "intermediate"
-    },
-    {
-      "id": "m_endoplasmic_reticulum_MAM00677r",
-      "glyph_class": "metabolite",
-      "label": "MAM00677r",
-      "x": 678.0,
-      "y": 20.0,
-      "width": 60.0,
-      "height": 40.0,
-      "original_id": "MAM00677r",
-      "subtype": "main"
     },
     {
       "id": "m_MAR20064_MAM02039r",
@@ -274,10 +274,10 @@
       "stoichiometry": null
     },
     {
-      "id": "conn_r_MAR20065_to_m_cytosol_MAM20057c",
+      "id": "conn_r_MAR20065_to_m_cytosol_MAM20056c",
       "connection_class": "metabolic",
       "source": "r_MAR20065",
-      "target": "m_cytosol_MAM20057c",
+      "target": "m_cytosol_MAM20056c",
       "stoichiometry": null
     },
     {
@@ -285,6 +285,13 @@
       "connection_class": "regulatory",
       "source": "eg_r_MAR20065",
       "target": "r_MAR20065",
+      "stoichiometry": null
+    },
+    {
+      "id": "conn_m_endoplasmic_reticulum_MAM00677r_to_r_MAR20064",
+      "connection_class": "metabolic",
+      "source": "m_endoplasmic_reticulum_MAM00677r",
+      "target": "r_MAR20064",
       "stoichiometry": null
     },
     {
@@ -298,13 +305,6 @@
       "id": "conn_m_MAR20064_MAM02552r_to_r_MAR20064",
       "connection_class": "metabolic",
       "source": "m_MAR20064_MAM02552r",
-      "target": "r_MAR20064",
-      "stoichiometry": null
-    },
-    {
-      "id": "conn_m_endoplasmic_reticulum_MAM00677r_to_r_MAR20064",
-      "connection_class": "metabolic",
-      "source": "m_endoplasmic_reticulum_MAM00677r",
       "target": "r_MAR20064",
       "stoichiometry": null
     },

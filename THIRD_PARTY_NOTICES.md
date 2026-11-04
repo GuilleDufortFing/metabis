@@ -24,11 +24,14 @@ adapted from the following upstream repositories:
 ### Human-GEM
 
 - Upstream project: Human-GEM
-- Source: https://github.com/SysBioChalmers/Human-GEM
+- Source: https://github.com/SysBioChalmers/Human-GEM, at release v2.1.1
+  (of 2026-10-07)
 - Upstream license: Creative Commons Attribution 4.0 International
   (`THIRD_PARTY_LICENSES/CC-BY-4.0.txt`)
 - Metabis use: packaged Human1 reference-model tables and related exported
-  runtime resources adapted from Human-GEM materials.
+  runtime resources adapted from Human-GEM materials. The reference-model
+  tables are written from the release's `model` folder by
+  `scripts/import_human_gem.py`.
 - Change notice: filenames, packaging layout, table exports, identifier
   crosswalks, and related preprocessing may differ from the upstream release.
 

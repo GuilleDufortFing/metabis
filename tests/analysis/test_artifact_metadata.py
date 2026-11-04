@@ -58,7 +58,7 @@ def _metadata(**overrides) -> AnalysisArtifactMetadata:
         "source_fingerprints": {
             "dataset": "sha256:dataset-17",
             "metadata": "sha256:metadata-4",
-            "model": "human1:1.19.0",
+            "model": "human1:2.1.1",
             "preprocessing": "compass-negative-log:v1",
         },
         "method": "welch_t_test",
@@ -197,7 +197,7 @@ def test_source_fingerprints_not_workspace_uuid_supply_portable_input_identity()
         source_fingerprints={
             "dataset": "sha256:different-dataset",
             "metadata": "sha256:metadata-4",
-            "model": "human1:1.19.0",
+            "model": "human1:2.1.1",
             "preprocessing": "compass-negative-log:v1",
         }
     )

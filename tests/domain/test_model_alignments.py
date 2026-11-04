@@ -173,10 +173,13 @@ def test_the_tables_pair_by_chemistry_where_identifiers_mislead(model):
     recon22 = model.get_source_reactions("RECON2.2")
 
     assert recon2["G3PD1"] == ("MAR00479", -1)
-    # Human1 and the legacy aliases file glucose exchange's ID under GD1beta's.
+    # RE2870C's ID names the reduction to 10-hydroxy-D4-neuroprostane; its
+    # chemistry is the reduction to the E4 form.
+    assert recon2["RE2870C"][0] == "MAR01422"
+    # Glucose exchange, whose ID Human1 1.x filed under GD1beta's.
     assert recon2["EX_glc(e)"] == ("MAR09034", 1)
-    # CITL is citrate lyase; its aliases name chitobiose hydrolysis.
-    assert recon2["CITL"] == ("", 0)
+    # r1446 is butyryl-CoA dehydrogenation; its ID names dodecenoyl-CoA hydration.
+    assert recon2["r1446"] == ("", 0)
     # Recon1 means a dolichyl-phosphate transport by DOLP_Lter, Recon2 a glucosyl
     # transfer, and Human1 has both.
     assert recon1["DOLP_Lter"][0] == "MAR07257"
