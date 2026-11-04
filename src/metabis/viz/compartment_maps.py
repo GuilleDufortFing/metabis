@@ -17,16 +17,20 @@ graph and the maps of its compartments:
   ``window``, for the page to outline that subsystem's band, offer its graph and
   show the reaction's details; on a gene or a metabolite, :data:`MAP_ELEMENT_EVENT`,
   for its details.
-* **Find.** :func:`add_map_find` rings the reactions, genes and metabolites whose
+* **Find.** :func:`add_map_find` marks the reactions, genes and metabolites whose
   name holds the query the page writes into its source, or is it, and centres the
-  view on one, dispatching :data:`MAP_FIND_EVENT` with what it found.
-* **Scale.** :func:`keep_map_scale` keeps a map at one scale across and down
-  whatever its plot's size: a narrower map shows less of itself, never squeezed.
-* **Subsystems.** :func:`add_map_bands` outlines Metabolic Atlas's band under one
-  subsystem's links at a time, in the logo's gradient: the subsystem the map was
+  view on one, dispatching :data:`MAP_FIND_EVENT` with what it found; or, for an
+  element clicked, marks every place it is drawn where the view is. A subsystem's
+  graph takes the same find.
+* **Scale.** :func:`keep_map_scale` fits a map, or a subsystem's graph, to its plot
+  at one scale across and down, and keeps that scale whatever its plot's size: a
+  narrower map shows less of itself, never squeezed.
+* **Subsystems.** :func:`add_map_bands` lays Metabolic Atlas's band under one
+  subsystem's links at a time, as a soft yellow glow: the subsystem the map was
   opened from, or one the page names: one chosen, or a tapped reaction's.
 
-A map draws its links along Metabolic Atlas's own paths (:mod:`.atlas_paths`).
+A map draws its links along Metabolic Atlas's own paths (:mod:`.atlas_paths`),
+and its names as Metabolic Atlas sets them, in map units (rendering.map_labels).
 """
 
 from __future__ import annotations
@@ -40,10 +44,10 @@ from typing import Dict, Iterable, List, Mapping, Optional, Tuple
 
 from bokeh.models import ColumnDataSource, CustomJS, TapTool
 
-from ..visual_config import theme
 from .atlas_paths import atlas_paths
-from .brand import OUTLINE_WIDTH, gradient_segments
+from .brand import GRADIENT_JS
 from .click_behavior import OWN_TAP_TAG
+from .metabolic_visualization.rendering.map_labels import MAP_NAMES_SHOWN_FROM
 from .subsystem_link import attach
 
 MAPS_DIRECTORY = Path(__file__).resolve().parent.parent / "resources/graphs/compartment/human1"
@@ -54,11 +58,18 @@ MAP_FIND_EVENT = "metabis:map-find"
 MAP_FIND_SOURCE = "metabis-map-find"
 # The subsystem whose band a map shows, which the page writes.
 MAP_BAND_SOURCE = "metabis-map-band"
-FIND_RING_COLOR = theme.SELECTED  # the logo's blue, as the overview's ring
-# Metabolic Atlas's bands are 80 map units wide, under the links.
+# The find's ring round each match, a fixed size on screen, drawn in the logo's
+# gradient as short arcs; and the border it gives a match's own shape.
+FIND_RING_RADIUS = 17  # pixels: the ring the find drew before
+FIND_RING_PIECES = 48
+FIND_RING_WIDTH = 3
+FIND_BORDER_WIDTH = 4
+# Metabolic Atlas's bands are 80 map units wide, under the links. A highlighted
+# subsystem's glows there in GitHub Primer's attention yellows: along it, halfway
+# from its yellow-0 (#fff8c5) to its yellow-1 (#fae17d); then yellow-0; then
+# halfway from yellow-0 to white at its edge, wider than the band.
 BAND_WIDTH = 80.0
-# Map units per segment of a band's outline, short enough for its gradient.
-BAND_PIECE = 120.0
+BAND_GLOW = ((BAND_WIDTH + 40.0, "#fffbe2"), (BAND_WIDTH + 20.0, "#fff8c5"), (BAND_WIDTH, "#fceca1"))
 # The formats, besides Human1's own, that the maps' reaction identifiers use.
 MAP_REACTION_FORMATS = ("rxnRecon3DID", "rxnBiGGID", "rxnHMR2ID")
 
@@ -100,6 +111,20 @@ def map_reaction_ids(map_id: str) -> Tuple[str, ...]:
     )
 
 
+@lru_cache(maxsize=None)
+def map_metabolite_ids(map_id: str) -> frozenset:
+    """The identifiers of the metabolites a packaged map draws, those its layout classes as reactions included."""
+    data = json.loads((MAPS_DIRECTORY / f"{map_id}.json").read_text())
+    glyphs = data["glyphs"] if isinstance(data, dict) else data
+    atlas = atlas_paths(str(MAPS_DIRECTORY / f"{map_id}.json")) or {}
+    reclassed = set(atlas.get("metabolites") or ())
+    return frozenset(
+        str(glyph.get("label") or glyph["id"])
+        for glyph in glyphs
+        if glyph.get("glyph_class") == "metabolite" or str(glyph.get("id")) in reclassed
+    )
+
+
 _MODEL_REACTIONS: "weakref.WeakKeyDictionary" = weakref.WeakKeyDictionary()
 
 
@@ -121,6 +146,52 @@ def _model_reactions(model) -> Tuple[frozenset, Dict[str, str]]:
                     back.setdefault(part.strip(), reaction)
     _MODEL_REACTIONS[model] = (own, back)
     return own, back
+
+
+_MODEL_METABOLITES: "weakref.WeakKeyDictionary" = weakref.WeakKeyDictionary()
+
+
+def model_metabolite_id(model, metabolite: str) -> str:
+    """The model's own identifier of a metabolite a layout names in another format (a map's
+    BiGG-style ``12dgr120_m``), or the name as given when the model knows it by no format."""
+    known = _MODEL_METABOLITES.setdefault(model, {})
+    metabolite = str(metabolite)
+    if metabolite not in known:
+        registry = model.metabolites
+        entity = registry.get(metabolite, "primary")
+        for name in registry.get_available_formats():
+            if entity is not None:
+                break
+            if name != "primary":
+                entity = registry.get(metabolite, name)
+        known[metabolite] = str(entity.id) if entity is not None else metabolite
+    return known[metabolite]
+
+
+def map_metabolites(model, map_id: str) -> frozenset:
+    """The model's identifiers of the metabolites a packaged map draws."""
+    return frozenset(model_metabolite_id(model, metabolite) for metabolite in map_metabolite_ids(map_id))
+
+
+def use_model_identifiers(plot, model) -> None:
+    """Name what a graph draws by the model's own identifiers, in its ``model_id`` column.
+
+    A Human1 layout names a few reactions by Recon3D's or BiGG's identifiers, a
+    map its metabolites by BiGG's, and a reaction's other direction with
+    ``_back``: the details a tap opens, the places they count and the find they
+    start all ask by the model's identifier, which the column then holds.
+    """
+    own, back = _model_reactions(model)
+    for _renderer, source in _sources(plot):
+        data = source.data
+        kind = _element_kind(data)
+        if "model_id" not in data or kind not in ("reaction", "metabolite"):
+            continue
+        if kind == "reaction":
+            bare = [str(identifier).removesuffix("_back") for identifier in data["model_id"]]
+            data["model_id"] = [identifier if identifier in own else back.get(identifier, identifier) for identifier in bare]
+        else:
+            data["model_id"] = [model_metabolite_id(model, identifier) for identifier in data["model_id"]]
 
 
 def resolve_map_reactions(model, map_id: str) -> Dict[str, str]:
@@ -210,11 +281,13 @@ def _element_kind(data: Mapping) -> Optional[str]:
     return None
 
 
-def _tap_dispatches(plot, renderer, source, kind: str) -> None:
+def tap_dispatches(plot, renderer, source, kind: str) -> None:
     """A tap on one of ``source``'s elements dispatches :data:`MAP_ELEMENT_EVENT`, and opens no page."""
     if OWN_TAP_TAG not in source.tags:
         source.tags = [*source.tags, OWN_TAP_TAG]
-    plot.add_tools(TapTool(renderers=[renderer]))
+    # One tap tool a renderer: the click behaviour's may already take its taps.
+    if not any(tool.renderers == "auto" or renderer in tool.renderers for tool in plot.select(type=TapTool)):
+        plot.add_tools(TapTool(renderers=[renderer]))
     source.selected.js_on_change(
         "indices",
         CustomJS(
@@ -293,7 +366,7 @@ def add_map_links(
         data = source.data
         kind = _element_kind(data)
         if kind in ("gene", "metabolite"):
-            _tap_dispatches(plot, renderer, source, kind)
+            tap_dispatches(plot, renderer, source, kind)
         if not _is_reactions(data):
             continue
         pairs = [
@@ -333,13 +406,19 @@ def add_map_links(
 
 
 def keep_map_scale(plot) -> None:
-    """A map shows less of itself as it narrows, never squeezed: across as down, one scale.
+    """A map shows its view whole at one scale, then less of itself as its frame narrows, never squeezed.
 
-    A map is drawn at its own proportions. When its frame changes size, as when the
-    page sets a sidebar beside it at the same height, its horizontal span follows its
-    vertical one, so a map unit takes as many pixels across as down. The right edge
-    stays where it was, so nothing on screen moves: what the sidebar takes is cut from
-    the map's left.
+    The view it was drawn with, the whole map or a subsystem's part of it, is
+    fitted to its plot whole, centred, at one scale across and down: the plot
+    takes the page's shape, not the map's. It is fitted again whenever its frame
+    changes height until the reader moves it, so a plot laid out before its box
+    took the screen's height is not left small at its top. When only its width
+    changes, as when the page sets a sidebar beside it at the same height, or
+    once the reader has panned or zoomed it, the map keeps its scale, a map unit
+    as many pixels as before across and down, and its top right corner stays
+    where it was, so nothing on screen moves: what the sidebar takes is cut from
+    the map's left, and a lower frame cuts its bottom. A subsystem's graph keeps
+    its scale the same way.
     """
     keep = CustomJS(
         args=dict(plot=plot),
@@ -349,60 +428,158 @@ def keep_map_scale(plot) -> None:
         const xr = plot.x_range
         const yr = plot.y_range
         const along = xr.end - xr.start
-        const down = Math.abs(yr.end - yr.start)
+        const upwards = yr.end - yr.start
+        const down = Math.abs(upwards)
         // Before the first layout, or before a data range has its span, nothing to keep.
         if (!(width > 0 && height > 0 && down > 0 && Number.isFinite(along) && along !== 0)) return
-        const span = down * width / height
-        if (Math.abs(Math.abs(along) - span) <= 1e-9 * span) return
+        const before = plot.metabis_frame
+        plot.metabis_frame = [width, height]
         // As a zoom tool does, so a data range keeps the view rather than fitting it again.
         xr.have_updated_interactively = true
-        xr.start = xr.end - Math.sign(along) * span
+        yr.have_updated_interactively = true
+        const now = [xr.start, xr.end, yr.start, yr.end]
+        // The view drawn, to fit again; and the view last set here, which a pan,
+        // a zoom or a find changes.
+        plot.metabis_view ??= now
+        const set = plot.metabis_set
+        const untouched = set !== undefined && set.every((end, i) => Math.abs(end - now[i]) <= 1e-9 * Math.abs(set[i % 2 === 0 ? i + 1 : i - 1] - set[i]))
+        if (!before || (untouched && height !== before[1])) {
+          const [x0, x1, y0, y1] = plot.metabis_view
+          const scale = Math.min(width / Math.abs(x1 - x0), height / Math.abs(y1 - y0))
+          const x = (x0 + x1) / 2
+          const y = (y0 + y1) / 2
+          const across = Math.sign(x1 - x0) * width / scale / 2
+          const up = Math.sign(y1 - y0) * height / scale / 2
+          xr.setv({start: x - across, end: x + across})
+          yr.setv({start: y - up, end: y + up})
+          plot.metabis_set = [xr.start, xr.end, yr.start, yr.end]
+          return
+        }
+        // Pixels a map unit took in the frame before; the ranges' ends at the top and right stay.
+        const scale = before[1] / down
+        const span = width / scale
+        if (Math.abs(Math.abs(along) - span) > 1e-9 * span) xr.start = xr.end - Math.sign(along) * span
+        const rise = height / scale
+        if (Math.abs(down - rise) > 1e-9 * rise) yr.start = yr.end - Math.sign(upwards) * rise
+        if (untouched) plot.metabis_set = [xr.start, xr.end, yr.start, yr.end]
         """,
     )
     plot.js_on_change("inner_width", keep)
     plot.js_on_change("inner_height", keep)
 
 
-def add_map_find(plot) -> Optional[ColumnDataSource]:
-    """A find for a map: the page writes a query; the map rings what matches and centres on one.
+def _shape(renderer) -> Optional[dict]:
+    """The shape a renderer draws its elements in, in map units, for the find's border round one."""
+    glyph = renderer.glyph
+    kind = type(glyph).__name__
+    if kind == "Rect":
+        return {"kind": "rect"}
+    if kind == "Ellipse" and isinstance(glyph.width, (int, float)) and isinstance(glyph.height, (int, float)):
+        return {"kind": "ellipse", "width": float(glyph.width), "height": float(glyph.height)}
+    if kind == "Circle" and isinstance(glyph.radius, (int, float)):
+        return {"kind": "circle", "width": 2.0 * glyph.radius, "height": 2.0 * glyph.radius}
+    if kind == "Patches":
+        return {"kind": "patch"}
+    return None
+
+
+def add_map_find(plot, *, zoom: bool = True) -> Optional[ColumnDataSource]:
+    """A find for a map: the page writes a query; the map marks what matches and centres on one.
 
     Reactions, genes and metabolites are found by their name or identifiers,
     ignoring case: any that holds the query, or, when the page writes ``exact``,
-    only those named exactly so (a gene "HADH" without "HADHA"). The view moves to
-    the match the page's ``index`` names, the first by default and counting round,
-    zoomed in at least to a fifth of the map's width, as Metabolic Atlas's map
-    search steps through its matches. :data:`MAP_FIND_EVENT` reports how many
-    matched, which is shown and its label.
+    only those named exactly so (a gene "HADH" without "HADHA"). Each match takes
+    a thick border round its own shape, and a ring a fixed size on screen round it
+    while the map is too far for its elements to be seen, until its names are
+    drawn (map_labels.MAP_NAMES_SHOWN_FROM); both in the logo's gradient, from
+    its top left. The view moves to the match the page's ``index`` names, the
+    first by default and counting round, zoomed in at least to a fifth of the
+    map's width, as Metabolic Atlas's map search steps through its matches.
+    Without ``zoom``, as a subsystem's graph is found, the view keeps its zoom and
+    moves only for a match outside its middle. When the page writes ``still``, as
+    a click marks every place the element it selects is drawn, the view stays
+    where it is. :data:`MAP_FIND_EVENT` reports how many matched, which is shown
+    and its label.
     """
-    searched = [source for _renderer, source in _sources(plot) if "display_label" in source.data and "x" in source.data]
+    searched = [
+        (source, _shape(renderer))
+        for renderer, source in _sources(plot)
+        if "display_label" in source.data and "x" in source.data
+    ]
     if not searched:
         return None
     find = ColumnDataSource({"query": []}, name=MAP_FIND_SOURCE)
-    ring = ColumnDataSource({"x": [], "y": []})
-    plot.scatter(
-        x="x",
-        y="y",
-        source=ring,
-        marker="circle",
-        size=34,
-        fill_alpha=0,
-        line_color=FIND_RING_COLOR,
-        line_width=3,
-        level="overlay",
+    ring = ColumnDataSource({"x": [], "y": [], "start": [], "end": [], "color": []})
+    border = ColumnDataSource({"x0": [], "y0": [], "x1": [], "y1": [], "color": []})
+    # Over the map's shapes, on the glyph level, which the frame clips: on the
+    # overlay level a ring beyond the frame was drawn over the key.
+    plot.segment(
+        x0="x0", y0="y0", x1="x1", y1="y1", line_color="color", line_width=FIND_BORDER_WIDTH,
+        line_cap="round", source=border, level="glyph",
     )
-    xs = [x for source in searched for x in source.data["x"]]
+    rings = plot.arc(
+        x="x", y="y", radius=FIND_RING_RADIUS, radius_units="screen", start_angle="start", end_angle="end",
+        line_color="color", line_width=FIND_RING_WIDTH, source=ring, level="glyph",
+    )
+    xs = [x for source, _shape_of in searched for x in source.data["x"]]
     full_width = (max(xs) - min(xs)) if xs else 1.0
     find.js_on_change(
         "data",
         CustomJS(
-            args=dict(find=find, sources=searched, ring=ring, plot=plot, full_width=full_width, event=MAP_FIND_EVENT),
-            code="""
+            args=dict(
+                find=find,
+                sources=[source for source, _shape_of in searched],
+                shapes=[shape or {"kind": "none"} for _source, shape in searched],
+                ring=ring,
+                border=border,
+                plot=plot,
+                closest=full_width / 5 if zoom else 0.0,
+                event=MAP_FIND_EVENT,
+                pieces=FIND_RING_PIECES,
+            ),
+            code=GRADIENT_JS
+            + """
             const query = String(find.data.query[0] ?? '').trim().toLowerCase()
             const exact = Boolean(find.data.exact?.[0])
+            const still = Boolean(find.data.still?.[0])
             const matches = (text) => exact ? text === query : text.includes(query)
+            // Where y grows down the screen, as a map's and a graph's do.
+            const down = Math.sign(plot.y_range.start - plot.y_range.end) || 1
+            const outline = (shape, data, i) => {
+              const x = data.x[i], y = data.y[i]
+              if (shape.kind === 'patch') return Array.from(data.xs[i], (px, k) => [px, data.ys[i][k]])
+              if (shape.kind === 'rect') {
+                const w = data.width[i] / 2, h = data.height[i] / 2
+                return [[x - w, y - h], [x + w, y - h], [x + w, y + h], [x - w, y + h]]
+              }
+              if (shape.kind !== 'ellipse' && shape.kind !== 'circle') return []
+              return Array.from({length: 48}, (_, k) => [
+                x + shape.width / 2 * Math.cos(2 * Math.PI * k / 48),
+                y + shape.height / 2 * Math.sin(2 * Math.PI * k / 48),
+              ])
+            }
+            const edges = {x0: [], y0: [], x1: [], y1: [], color: []}
+            const surround = (points) => {
+              if (points.length < 2) return
+              const xs = points.map((point) => point[0]), ys = points.map((point) => point[1] * down)
+              const left = Math.min(...xs), top = Math.min(...ys)
+              const span = Math.max(Math.max(...xs) - left, 1e-9) + Math.max(Math.max(...ys) - top, 1e-9)
+              // A side of a box or a diamond in short pieces, so its colour runs along it.
+              const pieces = points.length > 8 ? 1 : 12
+              points.forEach(([ax, ay], k) => {
+                const [bx, by] = points[(k + 1) % points.length]
+                for (let j = 0; j < pieces; j++) {
+                  const x0 = ax + (bx - ax) * j / pieces, y0 = ay + (by - ay) * j / pieces
+                  const x1 = ax + (bx - ax) * (j + 1) / pieces, y1 = ay + (by - ay) * (j + 1) / pieces
+                  edges.x0.push(x0); edges.y0.push(y0); edges.x1.push(x1); edges.y1.push(y1)
+                  edges.color.push(metabisGradient(((x0 + x1) / 2 - left + (y0 + y1) / 2 * down - top) / span))
+                }
+              })
+            }
+            const arcs = {x: [], y: [], start: [], end: [], color: []}
             const found = {x: [], y: [], label: []}
             if (query) {
-              for (const source of sources) {
+              sources.forEach((source, s) => {
                 const data = source.data
                 const names = data.display_label
                 const ids = data.element_id ?? data.id ?? names
@@ -413,32 +590,62 @@ def add_map_find(plot) -> Optional[ColumnDataSource]:
                   found.x.push(data.x[i])
                   found.y.push(data.y[i])
                   found.label.push(String(names[i]))
+                  surround(outline(shapes[s], data, i))
+                  // A ring's arcs: angles turn anticlockwise on screen, whichever
+                  // way the axes run, so its top left takes the gradient's start.
+                  for (let k = 0; k < pieces; k++) {
+                    const a0 = 2 * Math.PI * k / pieces, a1 = 2 * Math.PI * (k + 1) / pieces, am = (a0 + a1) / 2
+                    arcs.x.push(data.x[i]); arcs.y.push(data.y[i]); arcs.start.push(a0); arcs.end.push(a1)
+                    arcs.color.push(metabisGradient((Math.SQRT2 + Math.cos(am) - Math.sin(am)) / (2 * Math.SQRT2)))
+                  }
                 }
-              }
+              })
             }
             const count = found.x.length
             const index = count ? ((Number(find.data.index?.[0] ?? 0) % count) + count) % count : 0
             const first = count ? {x: found.x[index], y: found.y[index], label: found.label[index]} : null
-            ring.data = {x: found.x, y: found.y}
-            if (first !== null) {
+            ring.data = arcs
+            border.data = edges
+            // A graph that keeps its zoom moves only to bring a match in from its edges.
+            const within = (value, range) => {
+              const low = Math.min(range.start, range.end), high = Math.max(range.start, range.end)
+              return value >= low + (high - low) * 0.1 && value <= high - (high - low) * 0.1
+            }
+            const seen = first !== null && closest === 0 && within(first.x, plot.x_range) && within(first.y, plot.y_range)
+            if (first !== null && !seen && !still) {
               const xr = plot.x_range
               const yr = plot.y_range
               // As a zoom tool does, so a data range keeps the view rather than
               // computing it again from the data.
               xr.have_updated_interactively = true
               yr.have_updated_interactively = true
-              const width = Math.min(Math.abs(xr.end - xr.start), full_width / 5)
-              const height = width * Math.abs(yr.end - yr.start) / Math.abs(xr.end - xr.start)
-              xr.setv({start: first.x - width / 2, end: first.x + width / 2})
-              // The map's y-range runs downwards.
-              yr.setv({start: first.y + height / 2, end: first.y - height / 2})
+              const along = xr.end - xr.start, upwards = yr.end - yr.start
+              const width = closest > 0 ? Math.min(Math.abs(along), closest) : Math.abs(along)
+              const height = width * Math.abs(upwards) / Math.abs(along)
+              xr.setv({start: first.x - Math.sign(along) * width / 2, end: first.x + Math.sign(along) * width / 2})
+              yr.setv({start: first.y - Math.sign(upwards) * height / 2, end: first.y + Math.sign(upwards) * height / 2})
             }
             window.dispatchEvent(new CustomEvent(event, {detail: {
-              query, count, index, label: first === null ? null : first.label,
+              query, count, index, label: first === null ? null : first.label, still,
             }}))
             """,
         ),
     )
+    # The ring goes once the elements are near enough to be seen, their borders stay.
+    near = CustomJS(
+        args=dict(plot=plot, rings=rings, shown_from=MAP_NAMES_SHOWN_FROM),
+        code="""
+        let height
+        try { height = plot.inner_height } catch { return }
+        const span = Math.abs(plot.y_range.end - plot.y_range.start)
+        if (!(height > 0 && span > 0)) return
+        const far = height / span < shown_from
+        if (rings.visible !== far) rings.visible = far
+        """,
+    )
+    plot.y_range.js_on_change("start", near)
+    plot.y_range.js_on_change("end", near)
+    plot.js_on_change("inner_height", near)
     attach(plot, find)
     return find
 
@@ -458,36 +665,39 @@ def band_name(bands: Iterable[str], subsystem_name: Optional[str]) -> Optional[s
 
 
 def add_map_bands(plot, map_id: str, shown: Optional[str] = None) -> Optional[ColumnDataSource]:
-    """Outline Metabolic Atlas's band under one subsystem's links, in the logo's gradient.
+    """Lay Metabolic Atlas's band under one subsystem's links, as a soft yellow glow.
 
     ``shown`` is the band shown first, by its name in :func:`map_bands`. The page
     writes another name, or none, into the returned source (:data:`MAP_BAND_SOURCE`,
     ``{"name": [...]}``), for a band chosen or a reaction clicked; pointing changes
-    nothing. A band keeps Metabolic Atlas's width in map units at
-    every zoom. It is outlined, never filled, so it is not read as a score: a
-    stroke in the gradient, and over it a white stroke narrower by the outline on
-    each side, both opaque, so where a band crosses itself the outlines merge
-    rather than darken. Both lie under everything but the compartments. Returns
-    ``None`` for a map without bands.
+    nothing. The glow is a background, not a line: the map has lines enough. It is
+    three strokes along the band, each narrower and yellower than the one under it
+    (:data:`BAND_GLOW`), so its edge fades into the page; all opaque, so where a
+    band crosses itself it merges rather than darkens. A stroke keeps its width in
+    map units at every zoom. All lie under everything but the compartments.
+    Returns ``None`` for a map without bands.
     """
     bands = map_bands(map_id)
     if not bands:
         return None
-    every: dict = {"name": [], "x0": [], "y0": [], "x1": [], "y1": [], "color": []}
+    every: dict = {"name": [], "xs": [], "ys": []}
     for name, lines in bands.items():
-        # Each band runs the whole gradient across its own extent.
-        pieces = gradient_segments(lines, piece=BAND_PIECE)
-        every["name"].extend([name] * len(pieces["x0"]))
-        for key, values in pieces.items():
-            every[key].extend(values)
+        for line in lines:
+            every["name"].append(name)
+            every["xs"].append(list(line[0::2]))
+            every["ys"].append(list(line[1::2]))
     every = ColumnDataSource(every)
-    drawn = ColumnDataSource({key: [] for key in ("x0", "y0", "x1", "y1", "color")})
+    drawn = ColumnDataSource({"xs": [], "ys": []})
     # On the links' own level, before them: under the links and the nodes, over
     # the compartments only.
-    common = dict(x0="x0", y0="y0", x1="x1", y1="y1", line_cap="round", level="image", source=drawn)
-    outline = plot.segment(line_color="color", line_width=1, **common)
-    core = plot.segment(line_color="#ffffff", line_width=0, **common)
-    renderers = [renderer for renderer in plot.renderers if renderer not in (outline, core)]
+    glow = [
+        plot.multi_line(
+            xs="xs", ys="ys", line_color=color, line_width=1, line_cap="round", line_join="round",
+            level="image", source=drawn,
+        )
+        for _units, color in BAND_GLOW
+    ]
+    renderers = [renderer for renderer in plot.renderers if renderer not in glow]
     after = max(
         (
             index + 1
@@ -496,7 +706,7 @@ def add_map_bands(plot, map_id: str, shown: Optional[str] = None) -> Optional[Co
         ),
         default=0,
     )
-    plot.renderers = renderers[:after] + [outline, core] + renderers[after:]
+    plot.renderers = renderers[:after] + glow + renderers[after:]
 
     chosen = ColumnDataSource({"name": [shown] if shown in bands else []}, name=MAP_BAND_SOURCE)
     # Only the page changes the band: one that followed the pointer would repaint
@@ -506,23 +716,19 @@ def add_map_bands(plot, map_id: str, shown: Optional[str] = None) -> Optional[Co
         code="""
         const name = (chosen.data.name[0] ?? '').toLowerCase()
         const rows = every.data.name.map((band, i) => band.toLowerCase() === name ? i : -1).filter((i) => i >= 0)
-        const pick = (key) => rows.map((i) => every.data[key][i])
-        drawn.data = {x0: pick('x0'), y0: pick('y0'), x1: pick('x1'), y1: pick('y1'), color: pick('color')}
+        drawn.data = {xs: rows.map((i) => every.data.xs[i]), ys: rows.map((i) => every.data.ys[i])}
         """,
     )
     chosen.js_on_change("data", show)
-    # Metabolic Atlas's width in map units, whatever the zoom; the outline stays
-    # a fixed width on screen.
+    # Each stroke's width in map units, whatever the zoom.
     width = CustomJS(
-        args=dict(plot=plot, outline=outline, core=core, units=BAND_WIDTH, edge=OUTLINE_WIDTH),
+        args=dict(plot=plot, glow=glow, units=[units for units, _color in BAND_GLOW]),
         code="""
         let pixels
         try { pixels = plot.inner_width } catch { return }
         const span = Math.abs(plot.x_range.end - plot.x_range.start)
         if (!(pixels > 0 && span > 0)) return
-        const across = Math.max(2 * edge, units * pixels / span)
-        outline.glyph.line_width = across
-        core.glyph.line_width = across - 2 * edge
+        glow.forEach((stroke, i) => { stroke.glyph.line_width = Math.max(1, units[i] * pixels / span) })
         """,
     )
     for attribute in ("start", "end"):
@@ -530,13 +736,14 @@ def add_map_bands(plot, map_id: str, shown: Optional[str] = None) -> Optional[Co
     plot.js_on_change("inner_width", width)
     # The band shown first.
     rows = [i for i, name in enumerate(every.data["name"]) if name == shown]
-    drawn.data = {key: [every.data[key][i] for i in rows] for key in ("x0", "y0", "x1", "y1", "color")}
+    drawn.data = {key: [every.data[key][i] for i in rows] for key in ("xs", "ys")}
     attach(plot, every)
     attach(plot, chosen)
     return chosen
 
 
 __all__ = [
+    "BAND_GLOW",
     "BAND_WIDTH",
     "COMPARTMENT_MAPS",
     "CompartmentMap",
@@ -554,10 +761,15 @@ __all__ = [
     "highlight_reactions",
     "keep_map_scale",
     "map_ids_for_reactions",
+    "map_metabolite_ids",
+    "map_metabolites",
     "map_reaction_ids",
     "map_reaction_names",
     "map_subsystems",
     "maps_for_reactions",
+    "model_metabolite_id",
     "reaction_subsystems",
     "resolve_map_reactions",
+    "tap_dispatches",
+    "use_model_identifiers",
 ]

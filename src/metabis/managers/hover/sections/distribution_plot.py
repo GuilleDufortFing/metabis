@@ -1,4 +1,4 @@
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from ....visual_config import theme
 from ...workspace_mode import AnalysisWorkspaceMode
@@ -92,6 +92,58 @@ class DistributionPlotSection(HoverSection):
         # which must import without Bokeh (ADR-0006, AM10).
         from ....viz.plot_violins import create_static_violin_for_hover
 
+        drawn = self.groups(data, context)
+        if not drawn:
+            return []
+        y_label, _ = self._get_plot_labels(context.element_type or "element", data)
+        min_y, max_y = self.shared_axis(drawn) or (None, None)
+
+        panels = []
+        for direction in drawn:
+            left, right = direction["groups"]
+            panels.append(
+                (
+                    direction["direction"],
+                    create_static_violin_for_hover(
+                        left["values"],
+                        right["values"],
+                        left["color"],
+                        right["color"],
+                        x_label="Groups",
+                        y_label=y_label,
+                        plot_title="",
+                        group1_name=left["name"],
+                        group2_name=right["name"],
+                        size=(300, 220),
+                        min_y=min_y,
+                        max_y=max_y,
+                    ),
+                )
+            )
+        return panels
+
+    @staticmethod
+    def shared_axis(drawn: list[dict]) -> Optional[tuple[float, float]]:
+        """The one axis two directions' violins (:meth:`groups`) share, or None.
+
+        A shared axis only means something across two panels. Blocked
+        directions sit at the activity floor, so zeros are excluded -- and
+        when that leaves nothing, the axis is left to each plot rather than
+        taking min() of an empty sequence.
+        """
+        if len(drawn) < 2:
+            return None
+        plotted = [value for direction in drawn for group in direction["groups"] for value in group["values"] if value > 0]
+        return (min(plotted), max(plotted)) if plotted else None
+
+    def groups(self, data: HoverData, context: HoverContext) -> list[dict]:
+        """Each direction's two groups as its violins draw them, left first.
+
+        One entry per direction that has values: ``{"direction", "significant",
+        "groups": [{"name", "color", "values"}, ...]}``. In a comparison the
+        Baseline is on the left, as the comparison page shows it, and a direction
+        that is not significant is drawn grey.
+        """
         dist_data = data["distributions"]
         element_type = context.element_type or "element"
         back_dist_data = (
@@ -113,30 +165,11 @@ class DistributionPlotSection(HoverSection):
         if not available:
             return []
 
-        y_label, _ = self._get_plot_labels(element_type, data)
         # Colours are resolved from a direction that has group labels, which
         # is not necessarily the forward one.
         group1_color, group2_color = self._get_plot_colors(available[0][1], context)
 
-        # A shared axis only means something across two panels. Blocked
-        # directions sit at the activity floor, so zeros are excluded -- and
-        # when that leaves nothing, the axis is left to each plot rather than
-        # taking min() of an empty sequence.
-        min_y = max_y = None
-        if len(available) > 1:
-            plotted = [
-                value
-                for _, distributions in available
-                for value in (
-                    list(distributions["group1_values"])
-                    + list(distributions["group2_values"])
-                )
-                if value > 0
-            ]
-            if plotted:
-                min_y, max_y = min(plotted), max(plotted)
-
-        panels = []
+        drawn = []
         for direction, distributions in available:
             significant = (
                 stats.get(direction, {}).get("is_significant", False)
@@ -153,26 +186,17 @@ class DistributionPlotSection(HoverSection):
                 right_color,
                 baseline_first=is_gc_mode,
             )
-            panels.append(
-                (
-                    direction,
-                    create_static_violin_for_hover(
-                        plot_groups[0],
-                        plot_groups[1],
-                        plot_groups[2],
-                        plot_groups[3],
-                        x_label="Groups",
-                        y_label=y_label,
-                        plot_title="",
-                        group1_name=plot_groups[4],
-                        group2_name=plot_groups[5],
-                        size=(300, 220),
-                        min_y=min_y,
-                        max_y=max_y,
-                    ),
-                )
+            drawn.append(
+                {
+                    "direction": direction,
+                    "significant": bool(significant),
+                    "groups": [
+                        {"name": plot_groups[4], "color": plot_groups[2], "values": list(plot_groups[0])},
+                        {"name": plot_groups[5], "color": plot_groups[3], "values": list(plot_groups[1])},
+                    ],
+                }
             )
-        return panels
+        return drawn
 
     def _get_plot_labels(self, element_type: str, data: HoverData) -> tuple[str, str]:
         """Determine plot labels based on element type."""

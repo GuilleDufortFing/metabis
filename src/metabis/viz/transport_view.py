@@ -305,6 +305,7 @@ def plot_transport_view(
     for_genes: bool = False,
     download_flag: Optional[str] = None,
     hover_detail: Optional[str] = None,
+    details_on_tap: bool = False,
 ):
     """A transport subsystem's families as rows, each with its score, in one grid.
 
@@ -313,8 +314,66 @@ def plot_transport_view(
     activity, its dots are activity scores and its score their median. A row's
     score is coloured on its subsystems' scale, as a subsystem's with that score
     would be, and hovers as a subsystem node does; its elements hover at the
-    graph card's ``hover_detail``.
+    graph card's ``hover_detail``. With ``details_on_tap``, a tap on a reaction
+    or a gene asks the page for its details, as a map's do
+    (:func:`add_details_on_tap`), and opens no page.
     """
+    layout = _transport_layout(
+        data_manager,
+        subsystem_id,
+        visualization_mode=visualization_mode,
+        metric=metric,
+        delta_options=delta_options,
+        activity_artifact=activity_artifact,
+        overlay=overlay,
+        for_genes=for_genes,
+        download_flag=download_flag,
+        hover_detail=hover_detail,
+    )
+    if layout is not None and details_on_tap:
+        from ..analysis.activity_analysis import ActivityOverlay
+
+        genes = for_genes if visualization_mode != "activity" else ActivityOverlay(overlay or ActivityOverlay.REACTION) is ActivityOverlay.GENE
+        add_details_on_tap(layout, "gene" if genes else "reaction")
+    return layout
+
+
+def add_details_on_tap(layout, kind: str) -> None:
+    """A tap on one of a ranking's elements asks the page for its details, as a map's do.
+
+    The dots' source takes a ``model_id``, the element's identifier without a
+    direction's ``_back``, and a tap dispatches
+    :data:`~metabis.viz.compartment_maps.MAP_ELEMENT_EVENT` with ``kind``; the
+    source carries :data:`~metabis.viz.click_behavior.OWN_TAP_TAG`, so the
+    click behaviour opens no page for it.
+    """
+    from bokeh.models import Plot
+
+    from .compartment_maps import tap_dispatches
+    from .ranking_layout import RANKING_DOTS
+
+    for plot in layout.select({"type": Plot}):
+        for renderer in plot.renderers:
+            if getattr(renderer, "name", None) != RANKING_DOTS:
+                continue
+            source = renderer.data_source
+            source.data["model_id"] = [str(element).removesuffix("_back") for element in source.data["element_id"]]
+            tap_dispatches(plot, renderer, source, kind)
+
+
+def _transport_layout(
+    data_manager,
+    subsystem_id: str,
+    *,
+    visualization_mode: str,
+    metric: str,
+    delta_options: Optional[Mapping[str, str]],
+    activity_artifact,
+    overlay,
+    for_genes: bool,
+    download_flag: Optional[str],
+    hover_detail: Optional[str],
+):
     from ..managers.workspace_mode import AnalysisWorkspaceMode
     from .metabolic_visualization.generation.graph_building.spaced_network import (
         category_numbers,
@@ -444,6 +503,7 @@ __all__ = [
     "TRANSPORT_SUBSYSTEMS",
     "GroupDelta",
     "TransportRow",
+    "add_details_on_tap",
     "group_delta",
     "group_delta_score",
     "is_transport_subsystem",

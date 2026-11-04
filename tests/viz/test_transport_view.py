@@ -57,3 +57,27 @@ def test_a_familys_delta_score_is_computed_as_a_subsystems():
     assert group_delta_score(results, ["r1", "r2", "r3", "r4"], {"r1", "r2"}, options) == 0.0
     assert group_delta_score(results, ["r1", "r3"], {"r1"}, options) == pytest.approx(0.5)
     assert group_delta_score(results, ["r9"], {"r1"}, options) is None
+
+
+def test_a_tap_on_a_rows_reaction_asks_the_page_for_its_details_and_opens_no_page():
+    from bokeh.layouts import column
+    from bokeh.models import ColumnDataSource, TapTool
+    from bokeh.plotting import figure
+
+    from metabis.viz.click_behavior import OWN_TAP_TAG
+    from metabis.viz.compartment_maps import MAP_ELEMENT_EVENT
+    from metabis.viz.ranking_layout import RANKING_DOTS
+    from metabis.viz.transport_view import add_details_on_tap
+
+    plot = figure()
+    source = ColumnDataSource({"x": [0, 1], "y": [0, 0], "element_id": ["MAR1_back", "MAR2"], "display_label": ["MAR1", "MAR2"]})
+    dots = plot.scatter("x", "y", source=source, name=RANKING_DOTS)
+    plot.add_tools(TapTool(renderers=[dots]))
+
+    add_details_on_tap(column(plot), "reaction")
+
+    # By the reaction's own identifier, either direction; the tap tool already there takes the taps.
+    assert source.data["model_id"] == ["MAR1", "MAR2"]
+    assert OWN_TAP_TAG in source.tags and len(plot.select(type=TapTool)) == 1
+    (callback,) = source.selected.js_property_callbacks["change:indices"]
+    assert callback.args["event"] == MAP_ELEMENT_EVENT and callback.args["kind"] == "reaction"

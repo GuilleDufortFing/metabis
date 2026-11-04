@@ -13,6 +13,12 @@ from bokeh.plotting import figure
 
 from ..visual_config import theme
 
+# Marks where a hover's histogram changes from what every element of its kind
+# shares (its bars, axes and frame) to what is its own (its marker and value):
+# a figure's hover panels can then cross the API with the shared pieces once
+# (metabis_api.figures.share_panels). An HTML comment, so a hover shows nothing of it.
+HOVER_PART = "<!--metabis-part-->"
+
 
 def create_color_reference_histogram(
     histogram_data: List[Dict[str, Any]],
@@ -389,10 +395,13 @@ def render_histogram_with_marker(
           Current: {current_value:.3f}</text>
     '''
 
-    final_svg = svg_content.replace("<!-- MARKER_PLACEHOLDER -->", marker_line)
-    final_svg = final_svg.replace("<!-- CURRENT_VALUE_LABEL_PLACEHOLDER -->", current_value_label)
+    # The marker and its value are the element's own; the rest its kind's (HOVER_PART).
+    final_svg = svg_content.replace("<!-- MARKER_PLACEHOLDER -->", f"{HOVER_PART}{marker_line}{HOVER_PART}")
+    final_svg = final_svg.replace(
+        "<!-- CURRENT_VALUE_LABEL_PLACEHOLDER -->", f"{HOVER_PART}{current_value_label}{HOVER_PART}"
+    )
 
-    return f'''
+    return f'''{HOVER_PART}
     <div style="width:{background_data["width"]}px;height:{background_data["height"]}px;font-family:Arial,sans-serif;
                 font-size:11px;background:white;border:1px solid #ddd;
                 border-radius:4px;">

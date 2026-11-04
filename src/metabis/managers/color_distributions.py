@@ -208,6 +208,10 @@ class ColorDistributionRegistry:
         """Distance from the centre at which the registered palette saturates."""
         return self.lookup().get_color_limit(*args, **kwargs)
 
+    def get_distribution_values(self, *args: Any, **kwargs: Any):
+        """Every element's value of a registered distribution, by element ID."""
+        return self.lookup().get_distribution_values(*args, **kwargs)
+
     def get_distribution_details(self, *args: Any, **kwargs: Any) -> Dict[str, Any]:
         """Histogram, bin, colour, and value for one element's distribution."""
         return self.lookup().get_distribution_details(*args, **kwargs)

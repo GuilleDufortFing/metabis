@@ -270,6 +270,18 @@ class ColorManager:
         """
         return self.color_lookup().get_color_limit(mode, element_type, metric_name)
 
+    def get_distribution_values(
+        self,
+        mode: AnalysisWorkspaceMode,
+        element_type: str,
+        metric_name: str = "default",
+    ):
+        """Every element's value of a registered distribution, by element ID; None when none is registered.
+
+        What an element's value is set among, as the details beside a graph show it.
+        """
+        return self.color_lookup().get_distribution_values(mode, element_type, metric_name)
+
     def get_distribution_details(
         self,
         mode: AnalysisWorkspaceMode,

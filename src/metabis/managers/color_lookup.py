@@ -166,6 +166,18 @@ class GraphColorLookup:
             return None
         return dist_info["binner"].color_limit
 
+    def get_distribution_values(
+        self,
+        mode: AnalysisWorkspaceMode,
+        element_type: str,
+        metric_name: str = "default",
+    ) -> Optional[pd.Series]:
+        """Every element's value of a registered distribution, by element ID; None when none is registered."""
+        dist_info = self.distributions.get((mode, element_type, metric_name))
+        if not dist_info:
+            return None
+        return dist_info["binner"].series
+
     def get_distribution_details(
         self,
         mode: AnalysisWorkspaceMode,

@@ -12,6 +12,7 @@ from metabis import MetabolicModel
 from metabis.viz.atlas_paths import ATLAS_SUFFIX, atlas_paths
 from metabis.viz.click_behavior import OWN_TAP_TAG, add_click_behavior
 from metabis.viz.compartment_maps import (
+    BAND_GLOW,
     COMPARTMENT_MAPS,
     MAP_BAND_SOURCE,
     MAP_ELEMENT_EVENT,
@@ -31,6 +32,9 @@ from metabis.viz.compartment_maps import (
     map_subsystems,
     maps_for_reactions,
     resolve_map_reactions,
+)
+from metabis.viz.metabolic_visualization.rendering.map_labels import (
+    MAP_NAMES_SHOWN_FROM,
 )
 
 TCA = "tricarboxylic_acid_cycle_and_glyoxylate_dicarboxylate_metabolism"
@@ -207,17 +211,31 @@ def test_no_tap_in_a_map_opens_a_page_each_names_what_was_tapped():
     }
 
 
-def test_a_find_rings_reactions_genes_and_metabolites_by_name():
+def test_a_find_marks_reactions_genes_and_metabolites_by_name():
     plot, reactions, metabolites = _map_plot()
     find = add_map_find(plot)
 
     assert find.name == MAP_FIND_SOURCE and find in plot.tags
     (callback,) = find.js_property_callbacks["change:data"]
     assert reactions in callback.args["sources"] and metabolites in callback.args["sources"]
-    assert callback.args["full_width"] == 800.0
+    # A map zooms in to at least a fifth of its width; a subsystem's graph keeps its zoom.
+    assert callback.args["closest"] == 160.0
+    plain = figure(x_range=(0, 1000), y_range=(1000, 0))
+    plain.scatter("x", "y", source=ColumnDataSource({"x": [1.0], "y": [1.0], "display_label": ["a"]}))
+    (kept,) = add_map_find(plain, zoom=False).js_property_callbacks["change:data"]
+    assert kept.args["closest"] == 0.0
+    # The ring, a fixed size on screen, and the border round each match's shape, in
+    # the logo's gradient on the frame-clipped glyph level; the ring goes once the
+    # elements can be seen, as the names appear.
+    ring = next(renderer for renderer in plot.renderers if type(renderer.glyph).__name__ == "Arc")
+    border = next(renderer for renderer in plot.renderers if type(renderer.glyph).__name__ == "Segment")
+    assert ring.glyph.radius_units == "screen" and ring.level == border.level == "glyph"
+    assert ring.glyph.line_color == border.glyph.line_color == "color"
+    (near,) = plot.y_range.js_property_callbacks["change:start"][-1:]
+    assert near.args["rings"] is ring and near.args["shown_from"] == MAP_NAMES_SHOWN_FROM
 
 
-def _find(plot, query: str, *, exact: bool = False, index: int = 0) -> dict:
+def _find(plot, query: str, *, exact: bool = False, index: int = 0, still: bool = False) -> dict:
     """Run a map's find callback in Node on ``query``: what it reports and where it centres."""
     node = shutil.which("node")
     if node is None:
@@ -226,21 +244,34 @@ def _find(plot, query: str, *, exact: bool = False, index: int = 0) -> dict:
     (callback,) = find.js_property_callbacks["change:data"]
     sources = [dict(source.data) for source in callback.args["sources"]]
     script = """
-    const [code, sources, fullWidth, event, query, exact, index] = JSON.parse(process.argv[1]);
+    const [code, sources, shapes, closest, pieces, event, query, exact, index, still] = JSON.parse(process.argv[1]);
     const events = [];
     globalThis.window = {dispatchEvent: (dispatched) => events.push(dispatched.detail)};
     globalThis.CustomEvent = class { constructor(type, init) { this.detail = init.detail } };
     const range = (start, end) => ({start, end, setv(values) { Object.assign(this, values) }});
     const plot = {x_range: range(0, 1000), y_range: range(1000, 0)};
     const ring = {data: null};
-    const find = {data: {query: [query], exact: [exact], index: [index]}};
-    new Function('find', 'sources', 'ring', 'plot', 'full_width', 'event', code)(
-      find, sources.map((data) => ({data})), ring, plot, fullWidth, event);
-    console.log(JSON.stringify({found: events[0], ringed: ring.data.x.length,
+    const border = {data: null};
+    const find = {data: {query: [query], exact: [exact], index: [index], still: [still]}};
+    new Function('find', 'sources', 'shapes', 'ring', 'border', 'plot', 'closest', 'event', 'pieces', code)(
+      find, sources.map((data) => ({data})), shapes, ring, border, plot, closest, event, pieces);
+    console.log(JSON.stringify({found: events[0], ringed: ring.data.x.length / pieces,
+      edges: border.data.x0.length, colours: new Set(border.data.color).size,
       centre: (plot.x_range.start + plot.x_range.end) / 2}));
     """
     arguments = json.dumps(
-        [callback.code, sources, callback.args["full_width"], callback.args["event"], query, exact, index]
+        [
+            callback.code,
+            sources,
+            callback.args["shapes"],
+            callback.args["closest"],
+            callback.args["pieces"],
+            callback.args["event"],
+            query,
+            exact,
+            index,
+            still,
+        ]
     )
     result = subprocess.run([node, "-e", script, arguments], capture_output=True, text=True, check=True)
     return json.loads(result.stdout)
@@ -254,6 +285,8 @@ def test_a_find_matches_exactly_when_asked_and_steps_through_its_matches():
     assert _find(plot, "hadh")["found"]["count"] == 3
     exact = _find(plot, "HADH", exact=True)
     assert (exact["found"]["count"], exact["ringed"]) == (2, 2)
+    # Each found shape bordered in short pieces of the gradient.
+    assert exact["edges"] > 8 and exact["colours"] > 4
     # Each match in turn, counting round, as Metabolic Atlas's map search steps.
     assert _find(plot, "HADH", exact=True, index=1)["centre"] == 890.0
     stepped_back = _find(plot, "HADH", exact=True, index=-1)
@@ -261,7 +294,10 @@ def test_a_find_matches_exactly_when_asked_and_steps_through_its_matches():
     assert _find(plot, "HADH", exact=True, index=2)["centre"] == 110.0
     # A gene or a metabolite by the model's identifier, which its label does not show.
     assert _find(plot, "ENSG00000138796", exact=True)["found"]["count"] == 2
-    assert _find(plot, "MAM01965m", exact=True)["found"] == {"query": "mam01965m", "count": 1, "index": 0, "label": "glucose"}
+    assert _find(plot, "MAM01965m", exact=True)["found"] == {"query": "mam01965m", "count": 1, "index": 0, "label": "glucose", "still": False}
+    # A click marks every place the element is drawn, the view where it is.
+    clicked = _find(plot, "ENSG00000138796", exact=True, index=1, still=True)
+    assert (clicked["found"]["count"], clicked["found"]["still"], clicked["ringed"], clicked["centre"]) == (2, True, 2, 500.0)
 
 
 def test_every_human1_map_carries_metabolic_atlas_paths():
@@ -297,17 +333,16 @@ def test_one_subsystems_band_at_a_time():
 
     assert chosen.name == MAP_BAND_SOURCE and chosen.data["name"] == [shown]
     assert chosen in plot.tags
-    # Outlined in the gradient over a white core, both drawn from one source,
-    # under everything else the map draws.
-    outline, core = plot.renderers[:2]
-    assert outline.data_source is core.data_source
-    # On the lowest level, with the links, which come after it, so its white core
-    # never covers them.
-    assert outline.level == core.level == "image"
-    assert core.glyph.line_color == "#ffffff" and outline.glyph.line_color == "color"
-    band = outline.data_source.data
-    assert band["x0"] and len(set(band["color"])) > 3
-    assert all(color.startswith("#") for color in band["color"])
+    # A soft yellow glow, no line: strokes each narrower and yellower than the one
+    # under it, all opaque and drawn from one source, under everything else the
+    # map draws, on the lowest level, with the links, which come after it.
+    glow = plot.renderers[: len(BAND_GLOW)]
+    assert [stroke.glyph.line_color for stroke in glow] == [color for _units, color in BAND_GLOW]
+    assert [units for units, _color in BAND_GLOW] == sorted((units for units, _color in BAND_GLOW), reverse=True)
+    assert len({stroke.data_source for stroke in glow}) == 1
+    assert all(stroke.level == "image" and stroke.glyph.line_alpha == 1.0 for stroke in glow)
+    band = glow[0].data_source.data
+    assert band["xs"] and len(band["xs"]) == len(band["ys"])
     # Only the page changes the band: nothing redraws it under the pointer, which
     # would repaint the whole map at every reaction the pointer crossed.
     (show,) = chosen.js_property_callbacks["change:data"]
@@ -317,19 +352,26 @@ def test_one_subsystems_band_at_a_time():
 
 
 def _resized(plot, frames, x=(0.0, 2000.0), y=(1000.0, 0.0)) -> list:
-    """Run a map's scale keeper in Node as its frame takes each (width, height): its x-range after each."""
+    """Run a map's scale keeper in Node as its frame takes each (width, height): its ranges after each.
+
+    A frame given as ``{"x": [start, end]}`` is the reader panning the map there instead.
+    """
     node = shutil.which("node")
     if node is None:
         pytest.skip("Node.js runs the resize")
     (callback,) = plot.js_property_callbacks["change:inner_width"]
     script = """
     const [code, frames, x, y] = JSON.parse(process.argv[1]);
-    const plot = {x_range: {start: x[0], end: x[1]}, y_range: {start: y[0], end: y[1]}};
+    const range = (start, end) => ({start, end, setv(values) { Object.assign(this, values) }});
+    const plot = {x_range: range(x[0], x[1]), y_range: range(y[0], y[1])};
     const seen = [];
-    for (const [width, height] of frames) {
-      plot.inner_width = width; plot.inner_height = height;
-      new Function('plot', code)(plot);
-      seen.push([plot.x_range.start, plot.x_range.end]);
+    for (const frame of frames) {
+      if (frame.x) { plot.x_range.start = frame.x[0]; plot.x_range.end = frame.x[1] }
+      else {
+        [plot.inner_width, plot.inner_height] = frame;
+        new Function('plot', code)(plot);
+      }
+      seen.push([plot.x_range.start, plot.x_range.end, plot.y_range.start, plot.y_range.end]);
     }
     console.log(JSON.stringify(seen));
     """
@@ -338,13 +380,26 @@ def _resized(plot, frames, x=(0.0, 2000.0), y=(1000.0, 0.0)) -> list:
     return json.loads(result.stdout)
 
 
-def test_a_narrowed_map_is_cut_from_the_left_never_squeezed():
+def test_a_map_fits_its_plot_then_is_cut_never_squeezed():
     plot = _map_plot()[0]
     keep_map_scale(plot)
 
     assert set(plot.js_property_callbacks) == {"change:inner_width", "change:inner_height"}
+    # First laid out in a frame of the screen's shape, the map drawn 2,000 by 1,000
+    # units is shown whole and centred at one scale, 0.4 pixels a unit across and down.
+    assert _resized(plot, [(800, 600)])[0] == [0, 2000, 1250, -250]
     # Two map units a pixel across and down; narrowed to 600 px at the same height by a
     # sidebar, it shows 1,200 units, its right edge kept; widened again, all of it.
-    assert _resized(plot, [(1000, 500), (600, 500), (1000, 500)]) == [[0, 2000], [800, 2000], [0, 2000]]
+    assert [frame[:2] for frame in _resized(plot, [(1000, 500), (600, 500), (1000, 500)])] == [
+        [0, 2000],
+        [800, 2000],
+        [0, 2000],
+    ]
+    # A box that takes its height after the map's first layout fits it again, whole,
+    # until the reader moves it: 0.25 pixels a unit when 300 px high, then 0.5.
+    assert _resized(plot, [(1000, 250), (1000, 500)]) == [[-1000, 3000, 1000, 0], [0, 2000, 1000, 0]]
+    assert _resized(plot, [(1000, 250), (600, 250), (1000, 500)])[2] == [0, 2000, 1000, 0]
+    # Once panned, a lower frame keeps the scale, the map cut from its bottom, its top kept.
+    assert _resized(plot, [(1000, 500), {"x": [100, 2100]}, (1000, 400)])[2] == [100, 2100, 800, 0]
     # A data range without its span yet is left to fit itself.
-    assert _resized(plot, [(600, 500)], x=(None, None)) == [[None, None]]
+    assert _resized(plot, [(600, 500)], x=(None, None))[0][:2] == [None, None]

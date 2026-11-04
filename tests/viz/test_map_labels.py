@@ -6,6 +6,7 @@ from pathlib import Path
 from bokeh.models import CustomJS, GlyphRenderer, LabelSet
 from bokeh.plotting import figure
 
+from metabis.viz.compartment_maps import add_map_find
 from metabis.viz.metabolic_visualization.rendering.bokeh_plotting import (
     draw_graph_elements,
 )
@@ -135,9 +136,11 @@ def test_a_graph_without_metabolic_atlas_names_keeps_its_names_on_screen():
 
 def test_nothing_on_a_map_is_drawn_outside_its_frame():
     """BokehJS clips only the image, underlay and glyph levels to the frame: a gene
-    box on a later level, beyond a narrowed map, was drawn over the key under it."""
+    box or a find ring on a later level, beyond a narrowed map, was drawn over the
+    key under it."""
     plot = figure(width=600, height=400)
     draw_graph_elements(plot, _map_glyphs(), [], {"atlas": {"links": {}, "labels": {}}})
+    add_map_find(plot)
 
     levels = {renderer.level for renderer in plot.renderers if isinstance(renderer, GlyphRenderer)}
     assert levels <= {"image", "underlay", "glyph"}
