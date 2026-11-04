@@ -1296,7 +1296,11 @@ def _draw_atlas_links(plot, atlas, connections):
     :func:`_draw_metabolic_connections_with_arrowheads` draws them). Its
     arrowheads stand where Metabolic Atlas's do, pointing the same way, but are
     drawn as the straight links' are: a filled grey triangle over a halo in the
-    reaction's colour. The paths and arrowheads of every reaction sharing a style
+    reaction's colour. A reversible reaction's arrowheads point both ways; those
+    pointing against the direction its colour reads (``shown_direction``) are
+    drawn hollow, a white triangle outlined in grey with no halo, as Escher draws a
+    reversible reaction's arrowheads against its flux (Draw.js, update_segment).
+    The paths and arrowheads of every reaction sharing a style
     are drawn as one line broken by gaps, rather than one each: a map has
     thousands, and a few dozen lines repaint faster while the view is dragged.
     The arrowheads (8,500 in Mitochondria) are one triangle each, so only those
@@ -1308,6 +1312,9 @@ def _draw_atlas_links(plot, atlas, connections):
     links = atlas.get("links") or {}
     heads = atlas.get("heads") or {}
     styles = {}
+    # A reversible reaction's links, each from its start to its end as the
+    # direction its colour reads runs.
+    reads = {}
     remaining = []
     for connection in connections:
         source, target = connection.get("source"), connection.get("target")
@@ -1316,6 +1323,10 @@ def _draw_atlas_links(plot, atlas, connections):
             remaining.append(connection)
             continue
         styles.setdefault(reaction, connection)
+        if connection.get("shown_direction") and "x0" in connection:
+            reads.setdefault(reaction, []).append(
+                (connection["x0"], connection["y0"], connection["x1"], connection["y1"])
+            )
     if not styles:
         return remaining
 
@@ -1328,6 +1339,7 @@ def _draw_atlas_links(plot, atlas, connections):
     overlays = {}
     halos = {"xs": [], "ys": [], "color": []}
     tips = {"xs": [], "ys": [], "alpha": []}
+    hollows = {"xs": [], "ys": [], "alpha": []}
 
     def add(groups, key, flat):
         xs, ys = groups.setdefault(key, ([], []))
@@ -1345,6 +1357,11 @@ def _draw_atlas_links(plot, atlas, connections):
             add(overlays, (VisualizationConstants.EDGE_OVERLAY_COLOR, style["line_alpha"], dash), flat)
         for flat in heads.get(reaction, ()):
             xs, ys = _arrowhead(flat)
+            if reaction in reads and _points_against(xs, ys, reads[reaction]):
+                hollows["xs"].append(xs)
+                hollows["ys"].append(ys)
+                hollows["alpha"].append(style["line_alpha"])
+                continue
             tips["xs"].append(xs)
             tips["ys"].append(ys)
             tips["alpha"].append(style.get("fill_alpha", style["line_alpha"]))
@@ -1403,6 +1420,19 @@ def _draw_atlas_links(plot, atlas, connections):
                 level="image",
             )
         )
+    if hollows["xs"]:
+        arrowheads.append(
+            plot.patches(
+                xs="xs",
+                ys="ys",
+                source=ColumnDataSource(hollows),
+                fill_color="#ffffff",
+                line_color=VisualizationConstants.EDGE_OVERLAY_COLOR,
+                line_alpha="alpha",
+                line_width=VisualizationConstants.DEFAULT_LINE_WIDTH,
+                level="image",
+            )
+        )
     if arrowheads:
         _hide_while_too_small(plot, arrowheads)
     return remaining
@@ -1444,6 +1474,29 @@ def _arrowhead(flat):
     base = [points[(tip + 1) % 3], points[(tip + 2) % 3]]
     middle = ((base[0][0] + base[1][0]) / 2, (base[0][1] + base[1][1]) / 2)
     return calculate_arrowhead_vertices(middle[0], middle[1], points[tip][0], points[tip][1])
+
+
+def _points_against(xs, ys, reads):
+    """Whether an arrowhead points against the direction its reaction's links run.
+
+    ``xs`` and ``ys`` are the arrowhead, its tip first (:func:`_arrowhead`);
+    ``reads``, the reaction's links, each ``(x0, y0, x1, y1)`` from its start to
+    its end. Metabolic Atlas sets a reversible reaction's arrowheads at both ends
+    of each link: one points along the link into its end, the other against it
+    into its start. The link end nearest the tip, of those the head points into,
+    decides; a head farther than ``ATLAS_HEAD_REACH`` from every such end is not
+    read as pointing either way.
+    """
+    tip_x, tip_y = xs[0], ys[0]
+    dx, dy = tip_x - (xs[1] + xs[2]) / 2, tip_y - (ys[1] + ys[2]) / 2
+    nearest, against = VisualizationConstants.ATLAS_HEAD_REACH, False
+    for x0, y0, x1, y1 in reads:
+        along = dx * (x1 - x0) + dy * (y1 - y0)
+        for end_x, end_y, points_into, is_against in ((x1, y1, along > 0, False), (x0, y0, along < 0, True)):
+            distance = math.hypot(tip_x - end_x, tip_y - end_y)
+            if points_into and distance <= nearest:
+                nearest, against = distance, is_against
+    return against
 
 
 def _draw_simple_connections(plot, connections):

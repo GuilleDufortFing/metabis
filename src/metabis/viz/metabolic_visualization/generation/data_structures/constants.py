@@ -301,6 +301,10 @@ class VisualizationConstants:
     # they can be read; seen whole, a map's arrowheads are a pixel or two.
     ARROWHEAD_MIN_PIXELS = 3
     ARROWHEAD_ANGLE_RADIANS = 3.14159 / 6  # 30 degrees = π/6 radians
+    # A Metabolic Atlas arrowhead is read as pointing into the end of one of its
+    # reaction's links when its tip is within this many map units of it (99% are
+    # within 125; a farther one is drawn as Metabolic Atlas draws it).
+    ATLAS_HEAD_REACH = 60.0
 
     # Connection geometry
     CONNECTION_OFFSET = 20  # Default offset from node edges

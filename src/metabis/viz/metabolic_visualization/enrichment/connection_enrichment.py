@@ -177,6 +177,9 @@ def enrich_connections(
             )
             # Mark missing to control glow rendering downstream
             enriched_connection["is_missing_connection"] = is_missing_connection
+            enriched_connection["shown_direction"] = reversible_direction(
+                source_glyph, target_glyph, data_manager
+            )
 
         enriched_connections.append(enriched_connection)
 
@@ -432,3 +435,25 @@ def align_connection_direction(source_glyph, target_glyph, data_manager):
     except Exception:
         # If anything goes wrong, keep original direction
         return False
+
+
+def reversible_direction(source_glyph, target_glyph, data_manager):
+    """The direction a reversible reaction's metabolite link is drawn in, or None.
+
+    ``"forward"`` or ``"backward"``, the one :func:`align_connection_direction`
+    turns the link to, which the reaction's colour reads; None for a link of an
+    irreversible reaction, one not between a reaction and a metabolite, or one
+    whose reaction has no direction resolved. A map that draws both directions'
+    arrowheads marks the other direction's as not the one shown
+    (rendering.bokeh_plotting).
+    """
+    classes = {source_glyph.get("glyph_class"), target_glyph.get("glyph_class")}
+    if classes != {GlyphClass.METABOLITE, GlyphClass.REACTION} or data_manager is None:
+        return None
+    reaction = source_glyph if source_glyph.get("glyph_class") == GlyphClass.REACTION else target_glyph
+    try:
+        if not data_manager.metabolic_model.is_reaction_reversible(reaction["label"]):
+            return None
+        return data_manager.get_display_direction(reaction["label"])
+    except Exception:
+        return None

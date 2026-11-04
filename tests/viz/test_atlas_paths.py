@@ -347,3 +347,62 @@ def test_an_atlas_arrowhead_becomes_the_straight_links_arrowhead_at_its_tip():
     assert all(y < 14.0 for y in ys[1:])
     length = VisualizationConstants.ARROWHEAD_SIZE
     assert all(abs(((x - 10.0) ** 2 + (y - 14.0) ** 2) ** 0.5 - length) < 1e-9 for x, y in zip(xs[1:], ys[1:]))
+
+
+def test_a_reversible_reactions_arrowheads_against_the_direction_its_colour_reads_are_hollow():
+    from bokeh.models import Patches
+
+    plot = figure()
+    # m1 (0, 0) <=> R (50, 0) <=> m2 (100, 0), read backward: its links run from
+    # m2 into R and from R into m1. Metabolic Atlas sets a head at both ends of
+    # each link, a 10-unit base with its tip 14 beyond.
+    atlas = {
+        "links": {"R": [[0.0, 0.0, 45.0, 0.0], [55.0, 0.0, 100.0, 0.0]]},
+        "heads": {
+            "R": [
+                [31.0, -5.0, 31.0, 5.0, 45.0, 0.0],  # into R from m1: forward
+                [81.0, -5.0, 81.0, 5.0, 95.0, 0.0],  # into m2: forward
+                [69.0, -5.0, 69.0, 5.0, 55.0, 0.0],  # into R from m2: backward
+                [19.0, -5.0, 19.0, 5.0, 5.0, 0.0],  # into m1: backward
+                # Far from every link's end: drawn as Metabolic Atlas draws it.
+                [500.0, -5.0, 500.0, 5.0, 514.0, 0.0],
+            ]
+        },
+    }
+    style = dict(connection_class="metabolic", color="#ff0000", line_alpha=0.9, shown_direction="backward")
+    connections = [
+        {"source": "R", "target": "m1", "x0": 50.0, "y0": 0.0, "x1": 0.0, "y1": 0.0, **style},
+        {"source": "m2", "target": "R", "x0": 100.0, "y0": 0.0, "x1": 50.0, "y1": 0.0, **style},
+    ]
+
+    _draw_atlas_links(plot, atlas, connections)
+
+    halo, filled, hollow = [r for r in plot.renderers if isinstance(r.glyph, Patches)]
+    # The backward heads, and the far one, as every arrowhead is drawn: filled, over a halo.
+    assert [xs[0] for xs in filled.data_source.data["xs"]] == [55.0, 5.0, 514.0]
+    assert halo.data_source.data["color"] == ["#ff0000"] * 3
+    # The forward ones hollow, without a halo, as Escher draws those against the flux.
+    assert [xs[0] for xs in hollow.data_source.data["xs"]] == [45.0, 95.0]
+    assert hollow.glyph.fill_color == "#ffffff" and hollow.glyph.line_color == "#606060"
+    (hide,) = plot.x_range.js_property_callbacks["change:start"]
+    assert hide.args["renderers"] == [halo, filled, hollow]
+
+
+def test_only_a_reversible_reactions_links_carry_the_direction_they_are_drawn_in():
+    from types import SimpleNamespace
+
+    from metabis.viz.metabolic_visualization.enrichment.connection_enrichment import (
+        reversible_direction,
+    )
+
+    workspace = SimpleNamespace(
+        metabolic_model=SimpleNamespace(is_reaction_reversible=lambda reaction: reaction == "R"),
+        get_display_direction=lambda reaction: "backward",
+    )
+    metabolite = {"glyph_class": "metabolite", "label": "m1"}
+
+    assert reversible_direction(metabolite, {"glyph_class": "reaction", "label": "R"}, workspace) == "backward"
+    assert reversible_direction({"glyph_class": "reaction", "label": "R"}, metabolite, workspace) == "backward"
+    assert reversible_direction(metabolite, {"glyph_class": "reaction", "label": "S"}, workspace) is None
+    assert reversible_direction({"glyph_class": "enzyme_group", "label": "E"}, {"glyph_class": "reaction", "label": "R"}, workspace) is None
+    assert reversible_direction(metabolite, {"glyph_class": "reaction", "label": "R"}, None) is None
