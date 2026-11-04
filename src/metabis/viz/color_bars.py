@@ -18,6 +18,14 @@ from ..managers.workspace_mode import AnalysisWorkspaceMode
 COLOR_BAR_SAMPLES = 121
 COLOR_BAR_WIDTH = 10
 COLOR_BAR_LENGTH = 160
+# The tag of the colour bars a page sets side by side in one row under a figure.
+# BokehJS gives each item under a plot a row of its own; the React client's
+# patchKeyRow groups the tagged ones that follow each other into one.
+KEY_ROW = "metabis-key-row"
+# Pixels a pathway key's row of shapes, and its row of colour bars, take under a
+# figure, as BokehJS 3.8 lays them out.
+KEY_SHAPES_HEIGHT = 34
+KEY_BARS_HEIGHT = 65
 
 
 def _lookup(registry: Any) -> Any:
@@ -161,13 +169,16 @@ def add_pathway_key(
     color_metric: str = "cohens_d",
     activity_artifact: Any = None,
 ) -> None:
-    """A key row under a subsystem graph: what each shape is, and what each colour means.
+    """The key under a subsystem graph or a map: what each shape is, and what each colour means.
 
     A diamond is a reaction, a rectangle a gene, an oval a metabolite. In a
     comparison grey is a feature that is not significant or has no data; in
     single-group activity grey is the typical level, so no data is white with a
     dashed edge. Each feature family that colours the graph adds its colour bar,
-    read from its own distribution.
+    read from its own distribution: a short horizontal bar under the shapes, the
+    bars side by side where the page sets them so (:data:`KEY_ROW`), and in a row
+    each otherwise. A figure scaled to its width grows by its key, which takes
+    none of its drawing's height.
     """
     from ..visual_config import theme
 
@@ -194,10 +205,11 @@ def add_pathway_key(
             )
         ),
     ]
+    # The key reads from the left, as the figure's title and caption do.
     legend = Legend(
         items=[LegendItem(label=label, renderers=[renderer]) for label, renderer in shapes],
         orientation="horizontal",
-        location="center",
+        location="left",
         click_policy="none",
         # A rectangle's key fills its glyph box: a low box keeps it a gene's shape.
         glyph_width=18,
@@ -206,9 +218,9 @@ def add_pathway_key(
     plot.add_layout(legend, "below")
 
     registry = getattr(data_manager, "color_manager", None)
-    if visualization_mode == "activity":
-        if activity_artifact is None:
-            return
+    if visualization_mode == "activity" and activity_artifact is None:
+        families = []
+    elif visualization_mode == "activity":
         from ..analysis.activity_analysis import ActivityOverlay
 
         families = [
@@ -226,6 +238,7 @@ def add_pathway_key(
             (AnalysisWorkspaceMode.GROUP_COMPARISON, "reaction", color_metric, f"Reactions, {metric}"),
             (AnalysisWorkspaceMode.GROUP_COMPARISON, "gene", color_metric, f"Genes, {metric}"),
         ]
+    bars = 0
     for mode, element_type, metric_name, title in families:
         try:
             bar = registered_color_bar(
@@ -236,10 +249,77 @@ def add_pathway_key(
             bar = None
         if bar is None:
             continue
-        # Beside the graph, which is wider than tall: below, the bars would take
-        # its height.
-        bar.height = 140
-        plot.add_layout(bar, "right")
+        # Under the graph: beside it, a column as tall as the graph held two short
+        # bars, and took a map's width. In a row under a plot BokehJS spaces a bar
+        # by its padding, not its margin.
+        bar.update(
+            orientation="horizontal",
+            width=COLOR_BAR_LENGTH,
+            height=COLOR_BAR_WIDTH,
+            location="left",
+            padding=10,
+            tags=[*bar.tags, KEY_ROW],
+        )
+        plot.add_layout(bar, "below")
+        bars += 1
+    _grow_by_key(plot, KEY_SHAPES_HEIGHT + (KEY_BARS_HEIGHT if bars else 0))
+    _credit_last(plot)
+
+
+# Marks the credit lines, which stay under everything else under a graph.
+ATLAS_CREDIT_TAG = "metabis-atlas-credit"
+CREDIT_LINE_HEIGHT = 13  # pixels a credit line takes
+
+
+def add_atlas_credit(plot) -> None:
+    """Credit Metabolic Atlas's maps under a figure drawn from them, in small grey type.
+
+    Drawn in the figure, the credit goes with an exported PNG or SVG, as the
+    notice in a Human-maps SVG's corner goes with it; :func:`add_pathway_key`
+    keeps it under the key.
+    """
+    from bokeh.models import Title
+
+    from .atlas_paths import ATLAS_CREDIT
+    from .metabolic_visualization.generation.data_structures.constants import (
+        VisualizationConstants,
+    )
+
+    for line in ATLAS_CREDIT:
+        plot.add_layout(
+            Title(
+                text=line,
+                align="left",
+                text_font=VisualizationConstants.FONT_FAMILY,
+                text_font_size="9px",
+                text_font_style="normal",
+                text_color="#606060",
+                standoff=1,
+                tags=[ATLAS_CREDIT_TAG],
+            ),
+            "below",
+        )
+    _grow_by_key(plot, CREDIT_LINE_HEIGHT * len(ATLAS_CREDIT))
+
+
+def _credit_last(plot) -> None:
+    """Keep the credit under whatever else lies under the figure."""
+    credit = [item for item in plot.below if ATLAS_CREDIT_TAG in (getattr(item, "tags", None) or [])]
+    if credit:
+        plot.below = [item for item in plot.below if item not in credit] + credit
+
+
+def _grow_by_key(plot, height: int) -> None:
+    """A figure scaled to its width, ``height`` pixels taller at its own width, for its key.
+
+    Its aspect ratio is the whole figure's, so a key under it would otherwise take
+    its drawing's height.
+    """
+    ratio = plot.aspect_ratio
+    scaled = plot.sizing_mode in ("scale_width", "scale_both")
+    if not scaled or not isinstance(ratio, (int, float)) or not ratio or not plot.width:
+        return
+    plot.aspect_ratio = plot.width / (plot.width / ratio + height)
 
 
 # The network's category key, which the page shows on demand (an export's key).

@@ -3,7 +3,8 @@
 Beside each Human1 layout ``<map>.json``, a compartment map or a subsystem's
 curated map, ``scripts/import_atlas_paths.py`` writes ``<map>.atlas.json``: each
 reaction's link paths and arrowheads as Metabolic Atlas draws them, and, for a
-compartment map, the band Metabolic Atlas lays under each subsystem's links. A map
+compartment map, the band Metabolic Atlas lays under each subsystem's links and
+how it sets each metabolite's name (rendering.map_labels). A map
 draws a reaction's links along these paths, so a reaction drawn twice, or routed
 to many partners along one bent line, no longer crosses the map; a reaction
 without them keeps its straight links. They come from the Human-maps SVG files,
@@ -19,6 +20,18 @@ from typing import Any, Mapping, Optional
 
 ATLAS_SUFFIX = ".atlas.json"
 ATLAS_LICENSE = "CC BY-SA 4.0"
+# The Human-maps commit the packaged files were read from: its last before the
+# Human-GEM 2.1.1 maps moved them, whose SVG files carry Human1 1.8.0.
+ATLAS_COMMIT = "bec4a0605655de29e549e20b0988fe5fbc5ed53e"
+# What a figure drawn from them credits, as CC BY-SA 4.0 asks (Section 3): the
+# copyright notice the SVG files hold, where they come from, their licence, that
+# they were changed, and that the figure is shared under the same licence. Lines
+# short enough to fit under a graph.
+ATLAS_CREDIT = (
+    f"Map layout adapted from Metabolic Atlas Human-maps (github.com/SysBioChalmers/Human-maps, commit {ATLAS_COMMIT[:7]}),",
+    "© Department of Biology and Biological Engineering, Chalmers University of Technology, licensed under CC BY-SA 4.0.",
+    "Redrawn by Metabis with its own colours, glyphs and data; this adapted map is shared under CC BY-SA 4.0, without warranty.",
+)
 
 
 @lru_cache(maxsize=8)
@@ -30,8 +43,10 @@ def atlas_paths(resource_path: Optional[str]) -> Optional[Mapping[str, Any]]:
     """The Atlas paths beside a layout file, or ``None`` when it has none.
 
     The result has ``links`` and ``heads`` (each reaction's paths, as flat
-    ``[x0, y0, x1, y1, ...]`` lists in the layout's frame) and ``subsystems``
-    (each subsystem's band, the same way), and must not be changed.
+    ``[x0, y0, x1, y1, ...]`` lists in the layout's frame), ``subsystems``
+    (each subsystem's band, the same way) and, for a compartment map, ``labels``
+    (each metabolite's name's lines and place, under its glyph), and must not be
+    changed.
     """
     if not resource_path:
         return None
@@ -42,4 +57,4 @@ def atlas_paths(resource_path: Optional[str]) -> Optional[Mapping[str, Any]]:
     return _read(str(companion))
 
 
-__all__ = ["ATLAS_LICENSE", "ATLAS_SUFFIX", "atlas_paths"]
+__all__ = ["ATLAS_COMMIT", "ATLAS_CREDIT", "ATLAS_LICENSE", "ATLAS_SUFFIX", "atlas_paths"]

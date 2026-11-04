@@ -6,6 +6,7 @@ from pathlib import Path
 
 from bokeh.plotting import figure
 
+from metabis.viz.atlas_paths import atlas_paths
 from metabis.viz.metabolic_visualization.rendering.bokeh_plotting import (
     _draw_atlas_links,
 )
@@ -79,6 +80,76 @@ def test_a_reaction_keeps_the_paths_to_metabolites_the_layout_draws(tmp_path):
     assert data["heads"] == {"R1": [[155.0, 107.0, 150.0, 104.0]]}
     assert data["subsystems"] == {"tca": [[5.0, 7.0, 105.0, 7.0]]}
     assert (report["routed"], report["dropped"]) == (1, 1)
+
+
+LABELLED = """
+<g class="met MAM01532g R1" transform="matrix(1,0,0,1,160.0,100.0)">
+  <ellipse class="shape" rx="30" ry="20" fill="#9df" stroke="#333"/>
+  <g class="lbl" font-family="Arial" font-size="18" font-weight="700" text-anchor="middle">
+    <text y="-4">
+      fucfucgalac-glcgal14ac-
+    </text>
+    <text y="16">
+      glcgalgluside heparan sulfate
+    </text>
+  </g>
+</g>
+<g class="met MAM01261g R1" transform="matrix(1,0,0,1,100.0,150.0)">
+  <circle class="shape" r="7" fill="#222"/>
+  <text class="lbl" font-family="Arial" font-size="18" font-weight="700" text-anchor="middle" x="-61.5" y="6">
+    acetyl-CoA &amp; H+
+  </text>
+</g>
+"""
+
+
+def test_a_compartment_maps_metabolites_take_metabolic_atlas_names_places_and_shapes(tmp_path):
+    svg = tmp_path / "golgi_apparatus.svg"
+    svg.write_text(SVG.replace("</svg>", LABELLED + "</svg>"))
+    layout = tmp_path / "golgi_apparatus.json"
+    layout.write_text(
+        json.dumps(
+            {
+                "glyphs": [
+                    {"id": "R1", "glyph_class": "reaction", "x": 105.0, "y": 107.0},
+                    {"id": "R2", "glyph_class": "reaction", "x": 305.0, "y": 307.0},
+                    {"id": "R4", "glyph_class": "reaction", "x": 505.0, "y": 507.0},
+                    {"id": "R5", "glyph_class": "reaction", "x": 705.0, "y": 707.0},
+                    {"id": "ID7", "glyph_class": "metabolite", "x": 165.0, "y": 107.0},
+                    {"id": "ID8", "glyph_class": "metabolite", "x": 105.0, "y": 157.0},
+                ],
+                "connections": [],
+            }
+        )
+    )
+    data, report = _importer().import_map(svg, layout, "compartment")
+
+    assert data["labels"] == {
+        "ID7": {"lines": ["fucfucgalac-glcgal14ac-", "glcgalgluside heparan sulfate"]},
+        # A small metabolite's name stands beside its dot.
+        "ID8": {"lines": ["acetyl-CoA & H+"], "dx": -61.5, "dot": True},
+    }
+    assert report["labels"] == 2
+    # A subsystem's map is drawn as before, its names as they were.
+    subsystem, _report = _importer().import_map(svg, layout, "subsystem")
+    assert "labels" not in subsystem
+
+
+def test_a_compartment_maps_metabolite_takes_the_shape_metabolic_atlas_gives_it_there():
+    from metabis.viz.metabolic_visualization.generation.utilities.cache_utils import (
+        load_graph_resource,
+    )
+
+    layout = Path(__file__).resolve().parents[2] / "src/metabis/resources/graphs/compartment/human1/golgi_apparatus.json"
+    glyphs, _connections = load_graph_resource(str(layout))
+    placed = atlas_paths(str(layout))["labels"]
+    metabolites = [glyph for glyph in glyphs if glyph["glyph_class"] == "metabolite" and glyph["id"] in placed]
+
+    # The layout classes PAPS small or main once, for all its places; each is drawn as Metabolic Atlas draws it there.
+    assert {glyph["subtype"] for glyph in metabolites if glyph["label"] == "MAM02682g"} == {"main", "intermediate"}
+    assert all(
+        glyph["subtype"] == ("intermediate" if placed[glyph["id"]].get("dot") else "main") for glyph in metabolites
+    )
 
 
 def test_a_routed_reaction_is_drawn_along_its_paths_in_its_links_style():

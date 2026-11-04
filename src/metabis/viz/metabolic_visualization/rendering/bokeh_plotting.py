@@ -28,7 +28,15 @@ from .js_callbacks import (
     NETWORK_LABEL_CHARACTER_WIDTH,
     NETWORK_LABEL_LINE_HEIGHT,
     add_fitting_label_callback,
+    add_map_label_scale,
     add_zoom_based_alpha_callback,
+)
+from .map_labels import (
+    MAP_LABEL_LINE_HEIGHT,
+    MAP_LABEL_UNITS,
+    MAP_NAMES_SHOWN_FROM,
+    gene_label_units,
+    map_label_columns,
 )
 
 # The network's subsystem names, which the page's shared selection also names.
@@ -320,8 +328,13 @@ def draw_graph_elements(
     # Group glyphs by type for efficient processing
     grouped_glyphs = _group_glyphs_by_type(enriched_glyphs)
 
-    # Draw all glyph types
-    _draw_enriched_nodes(plot, grouped_glyphs, auxiliary_data.get("influence_circles"))
+    # Draw all glyph types; a compartment map's names as Metabolic Atlas sets them.
+    _draw_enriched_nodes(
+        plot,
+        grouped_glyphs,
+        auxiliary_data.get("influence_circles"),
+        placed=(atlas or {}).get("labels"),
+    )
 
     # Draw all connection types; where Metabolic Atlas routes a reaction's links,
     # along its paths.
@@ -364,8 +377,12 @@ def _group_glyphs_by_type(enriched_glyphs):
     return grouped
 
 
-def _draw_enriched_nodes(plot, grouped_glyphs, influence_circles):
-    """Draw different types of nodes using enriched glyph data."""
+def _draw_enriched_nodes(plot, grouped_glyphs, influence_circles, placed=None):
+    """Draw different types of nodes using enriched glyph data.
+
+    ``placed``, a compartment map's metabolite names as Metabolic Atlas sets them,
+    draws its names in map units (:func:`_draw_map_labels`).
+    """
     renderers = {}
 
     # Draw subsystem categories first (as background boundaries)
@@ -377,23 +394,23 @@ def _draw_enriched_nodes(plot, grouped_glyphs, influence_circles):
     # Draw main metabolites
     if grouped_glyphs["main_metabolite"]:
         renderers["main_metabolites"] = _draw_enriched_main_metabolites(
-            plot, grouped_glyphs["main_metabolite"]
+            plot, grouped_glyphs["main_metabolite"], placed
         )
 
     # Draw intermediate metabolites
     if grouped_glyphs["intermediate_metabolite"]:
         renderers["intermediate_metabolites"] = _draw_enriched_intermediate_metabolites(
-            plot, grouped_glyphs["intermediate_metabolite"]
+            plot, grouped_glyphs["intermediate_metabolite"], placed
         )
 
     # Draw genes
     if grouped_glyphs["gene"]:
-        renderers["genes"] = _draw_enriched_genes(plot, grouped_glyphs["gene"])
+        renderers["genes"] = _draw_enriched_genes(plot, grouped_glyphs["gene"], placed)
 
     # Draw reactions
     if grouped_glyphs["reaction"]:
         renderers["reactions"] = _draw_enriched_reactions(
-            plot, grouped_glyphs["reaction"]
+            plot, grouped_glyphs["reaction"], placed
         )
 
     # Draw compartments
@@ -423,12 +440,53 @@ def _draw_enriched_nodes(plot, grouped_glyphs, influence_circles):
     return renderers
 
 
+def _draw_map_labels(plot, glyphs, kind, placed):
+    """A compartment map's names of one kind, in map units, where Metabolic Atlas sets them.
+
+    A metabolite's name takes Metabolic Atlas's place and lines (``placed``);
+    reactions' and genes' are centred on them. Each kind is drawn in Metabolic
+    Atlas's size for it, a gene's as large as its box takes, one label set to a
+    size, and all are hidden while a metabolite's is too small to read (map_labels).
+    The label source holds only what the labels draw: a map's sources hold
+    thousands of rows.
+    """
+    columns = map_label_columns(glyphs, placed, metabolites=kind == "metabolite")
+    columns["text_alpha"] = [glyph["alpha"] for glyph in glyphs]
+    if kind == "gene":
+        sizes = [
+            gene_label_units(str(glyph["display_label"]), glyph.get("width", 60), glyph.get("height", 30))
+            for glyph in glyphs
+        ]
+    else:
+        sizes = [MAP_LABEL_UNITS[kind]] * len(glyphs)
+    drawn = []
+    for units in sorted(set(sizes)):
+        rows = [index for index, size in enumerate(sizes) if size == units]
+        labels = LabelSet(
+            x="label_x",
+            y="label_y",
+            text="label_text",
+            text_color="black",
+            text_font_style="bold",
+            text_align="center",
+            text_baseline="middle",
+            text_line_height=MAP_LABEL_LINE_HEIGHT,
+            text_alpha="text_alpha",
+            level="annotation",
+            source=ColumnDataSource({key: [values[index] for index in rows] for key, values in columns.items()}),
+        )
+        plot.add_layout(labels)
+        add_map_label_scale(plot, labels, units, MAP_NAMES_SHOWN_FROM)
+        drawn.append(labels)
+    return drawn
+
+
 def _label_only_data(data):
     """Project glyph data to fields labels use, excluding rich hover HTML."""
     return {key: value for key, value in data.items() if key != "hover"}
 
 
-def _draw_enriched_main_metabolites(plot, metabolite_glyphs):
+def _draw_enriched_main_metabolites(plot, metabolite_glyphs, placed=None):
     """Draw main metabolites using enriched glyph data."""
     # Convert enriched glyphs to ColumnDataSource format
     data = _convert_glyphs_to_bokeh_data(metabolite_glyphs)
@@ -456,6 +514,10 @@ def _draw_enriched_main_metabolites(plot, metabolite_glyphs):
         else _FALLBACK_TOOLTIP,
     )
     plot.add_tools(hover)
+
+    if placed is not None:
+        _draw_map_labels(plot, metabolite_glyphs, "metabolite", placed)
+        return renderer
 
     # Add labels
     # Initialize label alpha based on current zoom level
@@ -498,7 +560,7 @@ def _draw_enriched_main_metabolites(plot, metabolite_glyphs):
     return renderer
 
 
-def _draw_enriched_intermediate_metabolites(plot, metabolite_glyphs):
+def _draw_enriched_intermediate_metabolites(plot, metabolite_glyphs, placed=None):
     """Draw intermediate metabolites using enriched glyph data."""
     data = _convert_glyphs_to_bokeh_data(metabolite_glyphs)
 
@@ -524,6 +586,10 @@ def _draw_enriched_intermediate_metabolites(plot, metabolite_glyphs):
         else _FALLBACK_TOOLTIP,
     )
     plot.add_tools(hover)
+
+    if placed is not None:
+        _draw_map_labels(plot, metabolite_glyphs, "metabolite", placed)
+        return renderer
 
     # Add labels
     # Initialize label alpha based on current zoom level
@@ -565,7 +631,7 @@ def _draw_enriched_intermediate_metabolites(plot, metabolite_glyphs):
     return renderer
 
 
-def _draw_enriched_genes(plot, gene_glyphs):
+def _draw_enriched_genes(plot, gene_glyphs, placed=None):
     """Draw genes using enriched glyph data."""
     data = _convert_glyphs_to_bokeh_data(gene_glyphs)
 
@@ -580,7 +646,9 @@ def _draw_enriched_genes(plot, gene_glyphs):
         line_color=VisualizationConstants.GLOBAL_BORDER_COLOR,
         line_alpha="alpha",
         line_dash="line_dash",
-        level="annotation",
+        # The glyph level, which the frame clips: on the annotation level a gene
+        # beyond the frame was drawn over the key beside it.
+        level="glyph",
         source=source,
     )
 
@@ -592,6 +660,10 @@ def _draw_enriched_genes(plot, gene_glyphs):
         else _FALLBACK_TOOLTIP,
     )
     plot.add_tools(hover)
+
+    if placed is not None:
+        _draw_map_labels(plot, gene_glyphs, "gene", placed)
+        return renderer
 
     # Add labels
     # Initialize label alpha based on current zoom level
@@ -633,7 +705,7 @@ def _draw_enriched_genes(plot, gene_glyphs):
     return renderer
 
 
-def _draw_enriched_reactions(plot, reaction_glyphs):
+def _draw_enriched_reactions(plot, reaction_glyphs, placed=None):
     """Draw reactions using enriched glyph data.
 
     A reaction is a diamond, taller than wide as the key's and the rankings' are,
@@ -668,6 +740,10 @@ def _draw_enriched_reactions(plot, reaction_glyphs):
         else _FALLBACK_TOOLTIP,
     )
     plot.add_tools(hover)
+
+    if placed is not None:
+        _draw_map_labels(plot, reaction_glyphs, "reaction", placed)
+        return renderer
 
     # Add labels
     # Initialize label alpha based on current zoom level

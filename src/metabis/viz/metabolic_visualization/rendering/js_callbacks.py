@@ -187,6 +187,37 @@ def add_zoom_based_alpha_callback(
     plot.js_on_change("inner_width", callback)
 
 
+def add_map_label_scale(plot, labels, units, shown_from):
+    """Draw a map's ``labels`` ``units`` map units tall, as the map's own shapes are.
+
+    The labels are hidden while a map unit takes fewer than ``shown_from`` pixels:
+    every kind of name on a map appears at once (map_labels.MAP_NAMES_SHOWN_FROM).
+    A map keeps one scale across and down (compartment_maps.keep_map_scale), so its
+    height says how many pixels a map unit takes. Seen first, before the map is laid
+    out, the labels are hidden; its first layout sizes them.
+    """
+    labels.visible = False
+    callback = CustomJS(
+        args=dict(plot=plot, labels=labels, units=float(units), shown_from=float(shown_from)),
+        code="""
+        let height
+        try { height = plot.inner_height } catch { return }
+        const span = Math.abs(plot.y_range.end - plot.y_range.start)
+        if (!(height > 0 && span > 0)) return
+        const scale = height / span
+        const shown = scale >= shown_from
+        if (labels.visible !== shown) labels.visible = shown
+        // A view that only moved keeps its size: nothing to redraw.
+        const size = `${(units * scale).toFixed(1)}px`
+        if (shown && labels.text_font_size?.value !== size) labels.text_font_size = {value: size}
+        """,
+    )
+    plot.y_range.js_on_change("start", callback)
+    plot.y_range.js_on_change("end", callback)
+    plot.js_on_change("inner_width", callback)
+    plot.js_on_change("inner_height", callback)
+
+
 def add_factor_range_zoom_alpha_callback(
     plot,
     subsystem_label_source,

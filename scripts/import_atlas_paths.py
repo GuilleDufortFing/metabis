@@ -16,7 +16,9 @@ them and writes, beside each layout ``<map>.json``, a ``<map>.atlas.json``::
       "links": {"MAR03577": [[x0, y0, x1, y1, ...], ...]},
       "heads": {"MAR03577": [[x0, y0, ...], ...]},
       "subsystems": {"Tricarboxylic acid cycle and ...": [[x0, y0, ...], ...]},
-      "metabolites": ["dolp_U_r", ...]
+      "metabolites": ["dolp_U_r", ...],
+      "labels": {"ID881": {"lines": ["chondroitin sulfate", "C (GalNAc6S-GlcA)"]},
+                 "ID882": {"lines": ["acetyl-CoA"], "dx": -61.5, "dot": true}}
     }
 
 with every coordinate in the layout's own frame, to a tenth of a unit. A
@@ -28,14 +30,25 @@ Atlas also draws some metabolites the layout leaves out (those outside Human1,
 such as ``Rtotal_c``); a path whose end is nearest one of those is left out with
 it. ``metabolites`` lists the layout's glyphs classed as reactions that sit
 exactly where Metabolic Atlas draws a metabolite and no reaction: metabolites
-with Recon3D identifiers, which the map draws as metabolites. Usage::
+with Recon3D identifiers, which the map draws as metabolites.
+
+A compartment map also takes Metabolic Atlas's labels for its metabolites:
+``labels`` gives, under the layout glyph drawn where Metabolic Atlas draws the
+metabolite, its name's ``lines``, where their centre sits from the metabolite
+(``dx`` and ``dy``, given when not on it: a small metabolite's name stands beside
+its dot), and ``dot`` where Metabolic Atlas draws it as a small dot rather than an
+oval: the layout classes a metabolite as small or not once, for all its places.
+Usage::
 
     python -I scripts/import_atlas_paths.py SVG_DIRECTORY [--check]
 
 ``SVG_DIRECTORY`` holds Human-maps' ``compartment/svg`` and ``subsystem/svg``
 files as ``compartment/<map>.svg`` and ``subsystem/<map>.svg``. They are Git LFS
 files, fetched from
-``https://media.githubusercontent.com/media/SysBioChalmers/Human-maps/main/<kind>/svg/<map>.svg``.
+``https://media.githubusercontent.com/media/SysBioChalmers/Human-maps/<commit>/<kind>/svg/<map>.svg``,
+at the commit whose files carry ``data-modelversion="1.8.0"``, bec4a06, the last
+before the Human-GEM 2.1.1 maps: the packaged layouts were drawn from those, and
+later files move the maps.
 The files are parsed as text and nothing in them runs. ``--check`` reports what it
 would write, changing nothing.
 
@@ -46,17 +59,18 @@ written here are shared under it too (THIRD_PARTY_NOTICES.md).
 from __future__ import annotations
 
 import argparse
+import html
 import json
 import re
 import statistics
 import sys
 from collections import defaultdict
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, Iterable, List, Tuple
 
 GRAPHS = Path(__file__).resolve().parent.parent / "src/metabis/resources/graphs"
 KINDS = ("compartment", "subsystem")
-SOURCE = "https://github.com/SysBioChalmers/Human-maps/blob/main/{kind}/svg/{name}.svg"
+SOURCE = "https://github.com/SysBioChalmers/Human-maps/blob/bec4a0605655de29e549e20b0988fe5fbc5ed53e/{kind}/svg/{name}.svg"
 LICENSE = "CC BY-SA 4.0"
 # How far, in map units, a reaction or metabolite may sit from Metabolic Atlas's
 # place for it, after the map's offset, and still count as the same place.
@@ -72,6 +86,15 @@ PATH = re.compile(r'<path class="(fe|feh) ([^"]+)" d="([^"]*)"')
 BAND = re.compile(
     r'<g id="([^"]*)" class="subsystem"[^>]*>\s*<path class="shape" d="([^"]*)"'
 )
+GROUP_TAG = re.compile(r"<g\b|</g>")
+# A small metabolite's shape: a dot, where a main one's is an oval.
+DOT = re.compile(r"<circle\b")
+TEXT = re.compile(r"<text([^>]*)>\s*(.*?)\s*</text>", re.S)
+TEXT_X = re.compile(r'\bx="([-\d.]+)"')
+TEXT_Y = re.compile(r'\by="([-\d.]+)"')
+# Where Metabolic Atlas sets a name's baseline below its centre: its 18-unit text
+# on one line, centred on the metabolite, has its baseline 6 units down.
+LABEL_BASELINE = 6.0
 
 Point = Tuple[float, float]
 
@@ -141,6 +164,60 @@ def _flat(line: List[Point], offset: Point) -> List[float]:
 
 def _near(place: Point, places: List[Point]) -> bool:
     return any(abs(place[0] - x) <= TOLERANCE and abs(place[1] - y) <= TOLERANCE for x, y in places)
+
+
+def _group_body(svg: str, start: int) -> str:
+    """The text of the ``<g>`` element whose opening tag begins before ``start``, to its end."""
+    depth = 1
+    for tag in GROUP_TAG.finditer(svg, start):
+        depth += 1 if tag.group() == "<g" else -1
+        if depth == 0:
+            return svg[start : tag.start()]
+    return svg[start:]
+
+
+def metabolite_labels(
+    svg: str, offset: Point, glyphs: List[dict], drawn_as_metabolites: Iterable[str] = ()
+) -> Dict[str, dict]:
+    """Where Metabolic Atlas sets each metabolite's name, under the layout glyph drawn there.
+
+    The layout's metabolites, and the glyphs it classes as reactions that the map
+    draws as metabolites, take the name Metabolic Atlas sets where they are: its
+    ``lines``, and ``dx`` and ``dy`` placing their centre from the metabolite,
+    given when it is not on it. ``dot`` marks a metabolite Metabolic Atlas draws as
+    a small dot.
+    """
+    also = set(drawn_as_metabolites)
+    by_place: Dict[Tuple[int, int], List[Tuple[str, Point]]] = defaultdict(list)
+    for glyph in glyphs:
+        if glyph["glyph_class"] == "metabolite" or str(glyph["id"]) in also:
+            by_place[(round(glyph["x"]), round(glyph["y"]))].append((str(glyph["id"]), (glyph["x"], glyph["y"])))
+    labels: Dict[str, dict] = {}
+    for found in METABOLITE.finditer(svg):
+        x, y = float(found.group(2)) + offset[0], float(found.group(3)) + offset[1]
+        drawn = [
+            glyph_id
+            for dx in (-1, 0, 1)
+            for dy in (-1, 0, 1)
+            for glyph_id, place in by_place.get((round(x) + dx, round(y) + dy), ())
+            if _near(place, [(x, y)])
+        ]
+        body = _group_body(svg, found.end())
+        texts = TEXT.findall(body)
+        if len(drawn) != 1 or not texts:
+            continue
+        lines = [" ".join(html.unescape(text).split()) for _attributes, text in texts]
+        across = TEXT_X.search(texts[0][0])
+        downs = [float(match.group(1)) for attributes, _text in texts if (match := TEXT_Y.search(attributes))]
+        label = {"lines": lines}
+        if across and float(across.group(1)):
+            label["dx"] = round(float(across.group(1)), 1)
+        if downs and abs(statistics.mean(downs) - LABEL_BASELINE) >= 0.05:
+            label["dy"] = round(statistics.mean(downs) - LABEL_BASELINE, 1)
+        if DOT.search(body):
+            label["dot"] = True
+        labels[drawn[0]] = label
+    return labels
 
 
 def import_map(svg_path: Path, layout_path: Path, kind: str) -> Tuple[dict, dict]:
@@ -240,9 +317,11 @@ def import_map(svg_path: Path, layout_path: Path, kind: str) -> Tuple[dict, dict
                 dropped += 1
 
     subsystems: Dict[str, List[List[float]]] = {}
+    labels: Dict[str, dict] = {}
     if kind == "compartment":
         for name, d in BAND.findall(svg):
             subsystems[name] = [_flat(line, offset) for line in polylines(d)]
+        labels = metabolite_labels(svg, offset, glyphs, drawn_as_metabolites)
 
     name = layout_path.stem
     data = {
@@ -254,6 +333,8 @@ def import_map(svg_path: Path, layout_path: Path, kind: str) -> Tuple[dict, dict
         "subsystems": subsystems,
         "metabolites": drawn_as_metabolites,
     }
+    if kind == "compartment":
+        data["labels"] = labels
     report = {
         "map": f"{kind}/{name}",
         "reactions": len(ours),
@@ -263,6 +344,7 @@ def import_map(svg_path: Path, layout_path: Path, kind: str) -> Tuple[dict, dict
         "dropped": dropped,
         "subsystems": len(subsystems),
         "metabolites": len(drawn_as_metabolites),
+        "labels": len(labels),
     }
     return data, report
 
@@ -289,7 +371,8 @@ def main(argv=None) -> int:
                 f"({report['routed_by_place']} by place), "
                 f"{report['dropped']} paths to undrawn metabolites left out, "
                 f"{report['metabolites']} metabolites drawn as reactions, "
-                f"{report['subsystems']} subsystem bands, {len(text) / 1e6:.2f} MB"
+                f"{report['subsystems']} subsystem bands, {report['labels']} names placed, "
+                f"{len(text) / 1e6:.2f} MB"
             )
             if not args.check:
                 target.write_text(text + "\n")

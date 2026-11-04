@@ -4,7 +4,12 @@ import pandas as pd
 
 from metabis.managers.color_manager import ColorManager
 from metabis.managers.workspace_mode import AnalysisWorkspaceMode
-from metabis.viz.color_bars import overview_color_bar, registered_color_bar
+from metabis.viz.color_bars import (
+    COLOR_BAR_LENGTH,
+    KEY_ROW,
+    overview_color_bar,
+    registered_color_bar,
+)
 
 MODE = AnalysisWorkspaceMode.GROUP_COMPARISON
 
@@ -91,9 +96,41 @@ def test_the_pathway_key_names_each_shape_and_adds_a_bar_per_family():
         "Metabolite",
         "Not significant, or no data",
     ]
-    # Reactions have a distribution here and genes none, so one bar.
-    bars = [item for item in plot.right if isinstance(item, ColorBar)]
+    # Reactions have a distribution here and genes none, so one bar: short and
+    # horizontal, under the graph, for the page to set beside the others.
+    bars = [item for item in plot.below if isinstance(item, ColorBar)]
     assert [bar.title for bar in bars] == ["Reactions, Cohen's d"]
+    assert (bars[0].orientation, bars[0].width) == ("horizontal", COLOR_BAR_LENGTH)
+    assert KEY_ROW in bars[0].tags
+    assert not plot.right
+
+
+def test_a_figure_scaled_to_its_width_grows_by_its_key_and_keeps_its_drawing():
+    from bokeh.plotting import figure
+
+    from metabis.viz.color_bars import (
+        KEY_BARS_HEIGHT,
+        KEY_SHAPES_HEIGHT,
+        add_pathway_key,
+    )
+
+    workspace = _Workspace({"a": 0.1})
+    workspace.color_manager.register_distribution(
+        mode=MODE,
+        element_type="reaction",
+        data=pd.Series({"r1": -1.0, "r2": 0.5, "r3": 0.8}, dtype=float),
+        metric_name="cohens_d",
+        center_method="zero",
+        spread_method="std",
+    )
+    scaled = figure(width=900, height=300, sizing_mode="scale_width", aspect_ratio=3.0)
+    add_pathway_key(scaled, workspace, visualization_mode="group_comparison", color_metric="cohens_d")
+    fixed = figure(width=900, height=300)
+    add_pathway_key(fixed, workspace, visualization_mode="group_comparison", color_metric="cohens_d")
+
+    # At its own width, the figure is the drawing's 300 pixels and its key's rows tall.
+    assert round(900 / scaled.aspect_ratio) == 300 + KEY_SHAPES_HEIGHT + KEY_BARS_HEIGHT
+    assert (fixed.height, fixed.aspect_ratio) == (300, None)
 
 
 def test_the_activity_key_draws_no_data_white_and_dashed_since_grey_is_the_typical_level():
@@ -109,3 +146,31 @@ def test_the_activity_key_draws_no_data_white_and_dashed_since_grey_is_the_typic
     assert [item.label.value for item in legend.items][-1] == "No data"
     (renderer,) = legend.items[-1].renderers
     assert renderer.glyph.fill_color == "#ffffff" and renderer.glyph.line_dash == "dashed"
+
+
+def test_a_figure_drawn_from_metabolic_atlas_maps_credits_them_under_its_key():
+    from bokeh.models import Legend, Title
+    from bokeh.plotting import figure
+
+    from metabis.viz.atlas_paths import ATLAS_CREDIT
+    from metabis.viz.color_bars import (
+        CREDIT_LINE_HEIGHT,
+        add_atlas_credit,
+        add_pathway_key,
+    )
+
+    plot = figure(width=900, height=300, sizing_mode="scale_width", aspect_ratio=3.0)
+    add_atlas_credit(plot)
+    add_pathway_key(plot, _Workspace({"a": 0.1}), visualization_mode="group_comparison", color_metric="cohens_d")
+
+    # In the figure, so an export carries it: who holds the copyright, where the
+    # maps come from, their licence, that they were redrawn, and the licence the
+    # figure is shared under; under the key, the figure grown by its lines.
+    credit = [item for item in plot.below if isinstance(item, Title)]
+    assert [line.text for line in credit] == list(ATLAS_CREDIT)
+    (legend,) = [item for item in plot.below if isinstance(item, Legend)]
+    assert plot.below[-len(credit):] == credit and plot.below.index(legend) < plot.below.index(credit[0])
+    text = " ".join(ATLAS_CREDIT)
+    for part in ("Metabolic Atlas Human-maps", "commit bec4a06", "© Department of Biology and Biological Engineering, Chalmers University of Technology", "Redrawn by Metabis", "shared under CC BY-SA 4.0"):
+        assert part in text
+    assert round(900 / plot.aspect_ratio) > 300 + CREDIT_LINE_HEIGHT * len(ATLAS_CREDIT)

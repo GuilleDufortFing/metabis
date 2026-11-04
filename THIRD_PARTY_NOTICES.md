@@ -35,22 +35,29 @@ adapted from the following upstream repositories:
 ### Human-maps
 
 - Upstream project: Human-maps
-- Source: https://github.com/SysBioChalmers/Human-maps
+- Source: https://github.com/SysBioChalmers/Human-maps, at commit
+  bec4a0605655de29e549e20b0988fe5fbc5ed53e (the last whose maps carry Human1
+  1.8.0)
+- Copyright notice, as the map SVG files carry it: Copyright Department of
+  Biology and Biological Engineering, Chalmers University of Technology.
 - Upstream license: Creative Commons Attribution-ShareAlike 4.0 International,
   as the map SVG files declare in their metadata
   (`THIRD_PARTY_LICENSES/CC-BY-SA-4.0.txt`). The repository's own LICENSE file
   is Creative Commons Attribution 4.0 International.
 - Metabis use: packaged Human1 graph resources derived from Human-maps: the
   compartment and subsystem layouts (`resources/graphs/*/human1/*.json`), and
-  Metabolic Atlas's link paths and subsystem bands beside them
-  (`*.atlas.json`, written by `scripts/import_atlas_paths.py`). These derived
-  files are shared under CC BY-SA 4.0.
+  Metabolic Atlas's link paths and subsystem bands beside them, with a
+  compartment map's metabolite labels (`*.atlas.json`, written by
+  `scripts/import_atlas_paths.py`). These derived files are shared under
+  CC BY-SA 4.0.
 - Change notice: upstream map assets were converted into Metabis runtime graph
   JSON resources and may include filtering, coordinate extraction,
   normalization, or curation; the link paths and bands are shifted into each
   layout's frame, paths to metabolites a layout does not draw are left out, and
   the glyphs a layout classes as reactions where Metabolic Atlas draws
-  metabolites are listed, so the maps draw them as metabolites.
+  metabolites are listed, so the maps draw them as metabolites. Each
+  metabolite's label lines, their offset from it, and whether it is drawn as a
+  dot are kept under the layout glyph drawn in its place.
 
 Use of these Human1-derived materials does not imply endorsement by the
 Human-GEM or Human-maps authors or maintainers.
