@@ -60,8 +60,10 @@ def test_a_maps_reactions_resolve_to_the_models_own(model):
 
     assert len(drawn) > 1000
     assert set(resolved.values()) <= own
-    # Most carry Human1's identifiers; Recon3D's and BiGG's bring in more.
-    assert sum(identifier in own for identifier in drawn) < len(resolved) <= len(drawn)
+    # Each carries Human-GEM's identifier. The maps are fitted to Human-GEM 2.1.1,
+    # so the few reactions it added since the model's release are not the model's.
+    assert len(resolved) == sum(identifier in own for identifier in drawn)
+    assert 0 < len(drawn) - len(resolved) < 20
 
 
 def test_a_subsystem_leads_to_the_maps_of_its_compartments(model):
@@ -309,7 +311,7 @@ def test_every_human1_map_carries_metabolic_atlas_paths():
         for path in (graphs / kind / "human1").glob("*.json")
         if not path.name.endswith(ATLAS_SUFFIX)
     ]
-    assert len(layouts) == 115
+    assert len(layouts) == 118
     atlas = atlas_paths(str(MAPS_DIRECTORY / "mitochondria.json"))
     assert atlas["license"] == "CC BY-SA 4.0"
     # Most of the map's reactions are routed, each path at least one segment.

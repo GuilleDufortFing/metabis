@@ -1,6 +1,6 @@
 """The Metabolic Atlas compartment maps: their names, their reactions, and links into them.
 
-The library packages eleven compartment maps from Metabolic Atlas's Human-maps
+The library packages twelve compartment maps from Metabolic Atlas's Human-maps
 (``resources/graphs/compartment/human1``), drawn by the code that draws a
 subsystem's graph, so they take the same colours, hovers and key. This module
 names them, says which model reactions each draws, and leads between a subsystem's
@@ -8,8 +8,10 @@ graph and the maps of its compartments:
 
 * **Names.** Metabolic Atlas splits the cytosol into five maps by content, so each
   part is named by its largest pathways.
-* **Membership.** Most of a map's reactions carry Human1's own identifiers; the
-  rest carry Recon3D's or BiGG's, which the model translates back.
+* **Membership.** A map's reactions carry Human-GEM's identifiers, of the
+  release the maps were fitted to (2.1.1): the few that release added are not the
+  model's, and take no data. A layout may also name a reaction by Recon3D's or
+  BiGG's identifier, as older Human-maps did, which the model translates back.
 * **Into a map.** :func:`highlight_reactions` frames a subsystem's reactions,
   and :func:`add_map_bands` lays its band under them.
 * **Out of a map.** :func:`add_map_links` names each reaction's subsystem, and a
@@ -92,6 +94,7 @@ COMPARTMENT_MAPS: Tuple[CompartmentMap, ...] = (
     CompartmentMap("cytosol_4", "Cytosol 4 (xenobiotics, purines)", "c"),
     CompartmentMap("cytosol_5", "Cytosol 5 (aromatic amino acids, arginine and proline)", "c"),
     CompartmentMap("endoplasmic_reticulum", "Endoplasmic reticulum", "r"),
+    CompartmentMap("extracellular", "Extracellular", "e"),
     CompartmentMap("golgi_apparatus", "Golgi apparatus", "g"),
     CompartmentMap("lysosome", "Lysosome", "l"),
     CompartmentMap("mitochondria", "Mitochondria", "m"),

@@ -1,7 +1,7 @@
 """Metabolic Atlas's own link paths, and subsystem bands, for the packaged Human1 maps.
 
 Beside each Human1 layout ``<map>.json``, a compartment map or a subsystem's
-curated map, ``scripts/import_atlas_paths.py`` writes ``<map>.atlas.json``: each
+curated map, ``scripts/import_human_maps.py`` writes ``<map>.atlas.json``: each
 reaction's link paths and arrowheads as Metabolic Atlas draws them, and, for a
 compartment map, the band Metabolic Atlas lays under each subsystem's links and
 how it sets each metabolite's name (rendering.map_labels). A map
@@ -20,9 +20,9 @@ from typing import Any, Mapping, Optional
 
 ATLAS_SUFFIX = ".atlas.json"
 ATLAS_LICENSE = "CC BY-SA 4.0"
-# The Human-maps commit the packaged files were read from: its last before the
-# Human-GEM 2.1.1 maps moved them, whose SVG files carry Human1 1.8.0.
-ATLAS_COMMIT = "bec4a0605655de29e549e20b0988fe5fbc5ed53e"
+# The Human-maps commit the packaged maps were read from (scripts/import_human_maps.py):
+# its maps fitted to Human-GEM 2.1.1, of 2026-10-28.
+ATLAS_COMMIT = "8ab97f21dd23cf3afe71f2acf385b6a0c08e4634"
 # What a figure drawn from them credits, as CC BY-SA 4.0 asks (Section 3): the
 # copyright notice the SVG files hold, where they come from, their licence, that
 # they were changed, and that the figure is shared under the same licence. Lines

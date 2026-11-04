@@ -218,4 +218,4 @@ def test_a_graph_artifact_is_computed_without_bokeh():
     )
 
     assert result.returncode == 0, result.stderr
-    assert json.loads(result.stdout.strip()) == {"nodes": 348, "edges": 230}
+    assert json.loads(result.stdout.strip()) == {"nodes": 350, "edges": 248}

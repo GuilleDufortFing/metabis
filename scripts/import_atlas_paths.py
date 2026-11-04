@@ -1,13 +1,13 @@
-"""Import Metabolic Atlas's own link paths and subsystem bands beside the packaged maps.
+"""Import Metabolic Atlas's own link paths, subsystem bands and names beside the packaged maps.
 
 The packaged Human1 maps (``resources/graphs/compartment/human1`` and
 ``resources/graphs/subsystem/human1``) place every reaction and metabolite where
-Metabolic Atlas's Human-maps SVG files place them, shifted by one offset per map.
-Their links, though, were drawn straight from reaction to metabolite, so a
-reaction Metabolic Atlas draws twice, or routes along a bent path to many
-partners, crossed the map. The SVG files hold those paths, and a band per
-subsystem that Metabolic Atlas lays under its reactions' links. This script reads
-them and writes, beside each layout ``<map>.json``, a ``<map>.atlas.json``::
+Metabolic Atlas's Human-maps files place them (``import_human_maps.py``, which
+runs this script after it writes a layout). A layout links a reaction straight to
+each of its metabolites, but Metabolic Atlas routes a link along a bent path, to
+many partners. The SVG files hold those paths, and a band per subsystem that
+Metabolic Atlas lays under its reactions' links. This script reads them and
+writes, beside each layout ``<map>.json``, a ``<map>.atlas.json``::
 
     {
       "source": "<the SVG file's address>",
@@ -17,38 +17,36 @@ them and writes, beside each layout ``<map>.json``, a ``<map>.atlas.json``::
       "heads": {"MAR03577": [[x0, y0, ...], ...]},
       "subsystems": {"Tricarboxylic acid cycle and ...": [[x0, y0, ...], ...]},
       "metabolites": ["dolp_U_r", ...],
-      "labels": {"ID881": {"lines": ["chondroitin sulfate", "C (GalNAc6S-GlcA)"]},
-                 "ID882": {"lines": ["acetyl-CoA"], "dx": -61.5, "dot": true}}
+      "labels": {"met881": {"lines": ["chondroitin sulfate", "C (GalNAc6S-GlcA)"]},
+                 "met882": {"lines": ["acetyl-CoA"], "dx": -61.5, "dot": true}}
     }
 
-with every coordinate in the layout's own frame, to a tenth of a unit. A
-reaction's paths are kept only where the layout draws it exactly where Metabolic
-Atlas does; any other reaction keeps its straight links. Where the layout names a
-reaction otherwise (a Recon3D identifier, say) but draws it exactly where
-Metabolic Atlas draws one reaction, it takes that reaction's paths. Metabolic
-Atlas also draws some metabolites the layout leaves out (those outside Human1,
-such as ``Rtotal_c``); a path whose end is nearest one of those is left out with
-it. ``metabolites`` lists the layout's glyphs classed as reactions that sit
-exactly where Metabolic Atlas draws a metabolite and no reaction: metabolites
-with Recon3D identifiers, which the map draws as metabolites.
+with every coordinate in the layout's own frame, to a tenth of a unit: the
+``offset`` that takes the SVG's frame to the layout's, nothing for a layout
+``import_human_maps.py`` wrote. A reaction's paths are kept only where the layout
+draws it exactly where Metabolic Atlas does; any other reaction keeps its straight
+links. Where the layout names a reaction otherwise (a Recon3D identifier, say) but
+draws it exactly where Metabolic Atlas draws one reaction, it takes that
+reaction's paths. Metabolic Atlas may also draw metabolites the layout leaves
+out; a path whose end is nearest one of those is left out with it.
+``metabolites`` lists the layout's glyphs classed as reactions that sit exactly
+where Metabolic Atlas draws a metabolite and no reaction. Both arose in layouts
+drawn from older Human-maps, whose metabolites outside Human1 (``Rtotal_c``) or
+with Recon3D identifiers they drew otherwise.
 
 A compartment map also takes Metabolic Atlas's labels for its metabolites:
 ``labels`` gives, under the layout glyph drawn where Metabolic Atlas draws the
 metabolite, its name's ``lines``, where their centre sits from the metabolite
 (``dx`` and ``dy``, given when not on it: a small metabolite's name stands beside
 its dot), and ``dot`` where Metabolic Atlas draws it as a small dot rather than an
-oval: the layout classes a metabolite as small or not once, for all its places.
+oval.
 Usage::
 
-    python -I scripts/import_atlas_paths.py SVG_DIRECTORY [--check]
+    python -I scripts/import_atlas_paths.py HUMAN_MAPS [--check]
 
-``SVG_DIRECTORY`` holds Human-maps' ``compartment/svg`` and ``subsystem/svg``
-files as ``compartment/<map>.svg`` and ``subsystem/<map>.svg``. They are Git LFS
-files, fetched from
-``https://media.githubusercontent.com/media/SysBioChalmers/Human-maps/<commit>/<kind>/svg/<map>.svg``,
-at the commit whose files carry ``data-modelversion="1.8.0"``, bec4a06, the last
-before the Human-GEM 2.1.1 maps: the packaged layouts were drawn from those, and
-later files move the maps.
+``HUMAN_MAPS`` holds the Human-maps repository at the commit
+:data:`metabis.viz.atlas_paths.ATLAS_COMMIT`, whose ``compartment/svg`` and
+``subsystem/svg`` files the layouts were built from (``import_human_maps.py``).
 The files are parsed as text and nothing in them runs. ``--check`` reports what it
 would write, changing nothing.
 
@@ -68,9 +66,11 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Dict, Iterable, List, Tuple
 
+from metabis.viz.atlas_paths import ATLAS_COMMIT, ATLAS_SUFFIX
+
 GRAPHS = Path(__file__).resolve().parent.parent / "src/metabis/resources/graphs"
 KINDS = ("compartment", "subsystem")
-SOURCE = "https://github.com/SysBioChalmers/Human-maps/blob/bec4a0605655de29e549e20b0988fe5fbc5ed53e/{kind}/svg/{name}.svg"
+SOURCE = f"https://github.com/SysBioChalmers/Human-maps/blob/{ATLAS_COMMIT}/{{kind}}/svg/{{name}}.svg"
 LICENSE = "CC BY-SA 4.0"
 # How far, in map units, a reaction or metabolite may sit from Metabolic Atlas's
 # place for it, after the map's offset, and still count as the same place.
@@ -349,31 +349,35 @@ def import_map(svg_path: Path, layout_path: Path, kind: str) -> Tuple[dict, dict
     return data, report
 
 
+def describe(report: dict) -> str:
+    """What :func:`import_map` kept of a map, on one line."""
+    return (
+        f"{report['map']}: {report['routed']} of {report['reactions']} reactions routed "
+        f"({report['routed_by_place']} by place), "
+        f"{report['dropped']} paths to undrawn metabolites left out, "
+        f"{report['metabolites']} metabolites drawn as reactions, "
+        f"{report['subsystems']} subsystem bands, {report['labels']} names placed"
+    )
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    parser.add_argument("svg_directory", type=Path)
+    parser.add_argument("human_maps", type=Path)
     parser.add_argument("--check", action="store_true", help="report, writing nothing")
     args = parser.parse_args(argv)
 
     for kind in KINDS:
         for layout_path in sorted((GRAPHS / kind / "human1").glob("*.json")):
-            if layout_path.name.endswith(".atlas.json"):
+            if layout_path.name.endswith(ATLAS_SUFFIX):
                 continue
-            svg_path = args.svg_directory / kind / f"{layout_path.stem}.svg"
+            svg_path = args.human_maps / kind / "svg" / f"{layout_path.stem}.svg"
             if not svg_path.exists():
                 print(f"{kind}/{layout_path.stem}: no SVG", file=sys.stderr)
                 continue
             data, report = import_map(svg_path, layout_path, kind)
-            target = layout_path.with_name(f"{layout_path.stem}.atlas.json")
+            target = layout_path.with_name(f"{layout_path.stem}{ATLAS_SUFFIX}")
             text = json.dumps(data, separators=(",", ":"))
-            print(
-                f"{report['map']}: {report['routed']} of {report['reactions']} reactions routed "
-                f"({report['routed_by_place']} by place), "
-                f"{report['dropped']} paths to undrawn metabolites left out, "
-                f"{report['metabolites']} metabolites drawn as reactions, "
-                f"{report['subsystems']} subsystem bands, {report['labels']} names placed, "
-                f"{len(text) / 1e6:.2f} MB"
-            )
+            print(f"{describe(report)}, {len(text) / 1e6:.2f} MB")
             if not args.check:
                 target.write_text(text + "\n")
     return 0

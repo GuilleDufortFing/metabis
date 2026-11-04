@@ -48,10 +48,13 @@ def enrich_connections(
     """
     enriched_connections = []
     glyph_dict = {g["id"]: g for g in enriched_glyphs}
+    # A map may draw a reaction in several places, each a glyph of its identifier.
+    places = {}
+    for glyph in enriched_glyphs:
+        places.setdefault(glyph["id"], []).append(glyph)
 
     for connection in connections:
-        source_glyph = glyph_dict.get(connection["source"])
-        target_glyph = glyph_dict.get(connection["target"])
+        source_glyph, target_glyph = _nearest_ends(places, connection["source"], connection["target"])
 
         if not source_glyph or not target_glyph:
             continue
@@ -184,6 +187,23 @@ def enrich_connections(
         enriched_connections.append(enriched_connection)
 
     return enriched_connections
+
+
+def _nearest_ends(places, source, target):
+    """A connection's two glyphs: of an end drawn in several places, the one nearest the other end.
+
+    Metabolic Atlas draws some reactions twice on a map; each drawing's
+    metabolites and genes link to the reaction drawn beside them.
+    """
+    sources, targets = places.get(source), places.get(target)
+    if not sources or not targets:
+        return None, None
+    if len(sources) == 1 and len(targets) == 1:
+        return sources[0], targets[0]
+    return min(
+        ((a, b) for a in sources for b in targets),
+        key=lambda pair: (pair[0]["x"] - pair[1]["x"]) ** 2 + (pair[0]["y"] - pair[1]["y"]) ** 2,
+    )
 
 
 def process_influence_connections(

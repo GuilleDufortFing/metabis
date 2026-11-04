@@ -171,6 +171,6 @@ def test_a_figure_drawn_from_metabolic_atlas_maps_credits_them_under_its_key():
     (legend,) = [item for item in plot.below if isinstance(item, Legend)]
     assert plot.below[-len(credit):] == credit and plot.below.index(legend) < plot.below.index(credit[0])
     text = " ".join(ATLAS_CREDIT)
-    for part in ("Metabolic Atlas Human-maps", "commit bec4a06", "© Department of Biology and Biological Engineering, Chalmers University of Technology", "Redrawn by Metabis", "shared under CC BY-SA 4.0"):
+    for part in ("Metabolic Atlas Human-maps", "commit 8ab97f2", "© Department of Biology and Biological Engineering, Chalmers University of Technology", "Redrawn by Metabis", "shared under CC BY-SA 4.0"):
         assert part in text
     assert round(900 / plot.aspect_ratio) > 300 + CREDIT_LINE_HEIGHT * len(ATLAS_CREDIT)

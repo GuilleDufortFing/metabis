@@ -227,15 +227,26 @@ def test_a_glyph_on_an_atlas_metabolite_is_a_metabolite_and_a_renamed_reaction_t
     assert report["routed_by_place"] == 1
 
 
-def test_a_layouts_metabolites_drawn_as_reactions_load_as_metabolites():
+def test_a_layouts_metabolites_drawn_as_reactions_load_as_metabolites(tmp_path):
     from metabis.viz.metabolic_visualization.generation.utilities.cache_utils import (
         load_graph_resource,
     )
 
-    layout = (
-        Path(__file__).resolve().parents[2]
-        / "src/metabis/resources/graphs/compartment/human1/endoplasmic_reticulum.json"
+    # As layouts drawn from older Human-maps classed dolp_U_r, which Metabolic
+    # Atlas draws as a metabolite.
+    layout = tmp_path / "endoplasmic_reticulum.json"
+    layout.write_text(
+        json.dumps(
+            {
+                "glyphs": [
+                    {"id": "dolp_U_r", "glyph_class": "reaction", "label": "dolp_U_r", "x": 0.0, "y": 0.0},
+                    {"id": "DOLPMT_U", "glyph_class": "reaction", "label": "DOLPMT_U", "x": 50.0, "y": 0.0},
+                ],
+                "connections": [],
+            }
+        )
     )
+    (tmp_path / "endoplasmic_reticulum.atlas.json").write_text(json.dumps({"links": {}, "metabolites": ["dolp_U_r"]}))
     glyphs, _connections = load_graph_resource(str(layout))
     classes = {glyph["id"]: glyph["glyph_class"] for glyph in glyphs}
 

@@ -30,6 +30,10 @@ COMPARTMENT_GRAPH_MANIFEST: Dict[str, Dict[str, str]] = {
         "display_label": "Endoplasmic reticulum",
         "display_title": "Compartment: Endoplasmic reticulum",
     },
+    "extracellular": {
+        "display_label": "Extracellular",
+        "display_title": "Compartment: Extracellular",
+    },
     "golgi_apparatus": {
         "display_label": "Golgi apparatus",
         "display_title": "Compartment: Golgi apparatus",
@@ -105,12 +109,6 @@ def normalize_compartment_resource_id(element_name: str) -> str:
         raise ValueError(
             "Cytosol is split across five packaged Human1 compartment graphs. "
             "Use one of: cytosol_1, cytosol_2, cytosol_3, cytosol_4, cytosol_5"
-        )
-
-    if normalized == "extracellular":
-        raise ValueError(
-            "No packaged Human1 compartment graph is available for extracellular. "
-            f"Available compartment resources: {available_ids}"
         )
 
     raise ValueError(
