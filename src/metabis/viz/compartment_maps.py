@@ -1,13 +1,16 @@
 """The Metabolic Atlas compartment maps: their names, their reactions, and links into them.
 
 The library packages twelve compartment maps from Metabolic Atlas's Human-maps
-(``resources/graphs/compartment/human1``), drawn by the code that draws a
-subsystem's graph, so they take the same colours, hovers and key. This module
-names them, says which model reactions each draws, and leads between a subsystem's
-graph and the maps of its compartments:
+(``resources/graphs/compartment/human1``), and beside them its twelve transport
+maps, each drawing the transport across one membrane, or between organelles.
+They are drawn by the code that draws a subsystem's graph, so they take the same
+colours, hovers and key. This module names them, says which model reactions each
+draws, and leads between a subsystem's graph and the maps that draw it:
 
 * **Names.** Metabolic Atlas splits the cytosol into five maps by content, so each
-  part is named by its largest pathways.
+  part is named by its largest pathways, and the plasma membrane's transport into
+  five, each named by its largest transporter families. A transport map is named
+  as the model's transport subsystem it draws.
 * **Membership.** A map's reactions carry Human-GEM's identifiers, of the
   release the maps were fitted to (2.1.1): the few that release added are not the
   model's, and take no data. A layout may also name a reaction by Recon3D's or
@@ -78,11 +81,16 @@ MAP_REACTION_FORMATS = ("rxnRecon3DID", "rxnBiGGID", "rxnHMR2ID")
 
 @dataclass(frozen=True)
 class CompartmentMap:
-    """One packaged map: its file's name, its name, and its Human1 compartment."""
+    """One packaged map: its file's name, its name, its Human1 compartment, and its group.
+
+    A transport map's compartment is the one across whose membrane it draws the
+    cytosol's transport, none for transport between organelles.
+    """
 
     map_id: str
     name: str
     compartment: str
+    group: str = "compartment"
 
 
 COMPARTMENT_MAPS: Tuple[CompartmentMap, ...] = (
@@ -101,7 +109,31 @@ COMPARTMENT_MAPS: Tuple[CompartmentMap, ...] = (
     CompartmentMap("nucleus", "Nucleus", "n"),
     CompartmentMap("peroxisome", "Peroxisome", "x"),
 )
-MAPS_BY_ID: Dict[str, CompartmentMap] = {entry.map_id: entry for entry in COMPARTMENT_MAPS}
+# Metabolic Atlas's transport maps, named as the model's transport subsystems are
+# (loaders.TRANSPORT_PARTS), each drawing most of one. Metabolic Atlas divides the
+# plasma membrane over five maps; each is named by the HGNC transporter families
+# most of its reactions name (transport_view.FAMILY_NAMES), the fifth by its
+# reactions' having mostly no gene.
+TRANSPORT_MAPS: Tuple[CompartmentMap, ...] = tuple(
+    CompartmentMap(map_id, name, compartment, "transport")
+    for map_id, name, compartment in (
+        ("transport_endoplasmic_reticulum", "Transport, endoplasmic reticular", "r"),
+        ("transport_golgi_apparatus", "Transport, Golgi apparatus", "g"),
+        ("transport_lysosome", "Transport, lysosomal", "l"),
+        ("transport_mitochondria", "Transport, mitochondrial", "m"),
+        ("transport_nucleus", "Transport, nuclear", "n"),
+        ("transport_peroxisome", "Transport, peroxisomal", "x"),
+        ("transport_plasma_membrane_1", "Transport, plasma membrane 1 (oligopeptides, amino acids)", "e"),
+        ("transport_plasma_membrane_2", "Transport, plasma membrane 2 (organic anions, amino acids)", "e"),
+        ("transport_plasma_membrane_3", "Transport, plasma membrane 3 (ABC transporters, fatty acids)", "e"),
+        ("transport_plasma_membrane_4", "Transport, plasma membrane 4 (sodium symporters, organic ions)", "e"),
+        ("transport_plasma_membrane_5", "Transport, plasma membrane 5 (mostly without a gene)", "e"),
+        ("transport_between_organelles", "Transport, between organelles", ""),
+    )
+)
+# Every packaged map, the compartments' first.
+ATLAS_MAPS: Tuple[CompartmentMap, ...] = COMPARTMENT_MAPS + TRANSPORT_MAPS
+MAPS_BY_ID: Dict[str, CompartmentMap] = {entry.map_id: entry for entry in ATLAS_MAPS}
 
 
 @lru_cache(maxsize=None)
@@ -247,11 +279,11 @@ def maps_for_reactions(model, reactions: Iterable[str]) -> List[Tuple[Compartmen
     """The maps that draw any of ``reactions``, with how many, the most first."""
     wanted = {str(reaction).removesuffix("_back") for reaction in reactions}
     found = []
-    for entry in COMPARTMENT_MAPS:
+    for entry in ATLAS_MAPS:
         count = len(set(resolve_map_reactions(model, entry.map_id).values()) & wanted)
         if count:
             found.append((entry, count))
-    return sorted(found, key=lambda pair: (-pair[1], COMPARTMENT_MAPS.index(pair[0])))
+    return sorted(found, key=lambda pair: (-pair[1], ATLAS_MAPS.index(pair[0])))
 
 
 def map_ids_for_reactions(model, map_id: str, reactions: Iterable[str]) -> List[str]:
@@ -746,6 +778,7 @@ def add_map_bands(plot, map_id: str, shown: Optional[str] = None) -> Optional[Co
 
 
 __all__ = [
+    "ATLAS_MAPS",
     "BAND_GLOW",
     "BAND_WIDTH",
     "COMPARTMENT_MAPS",
@@ -756,6 +789,7 @@ __all__ = [
     "MAP_FIND_SOURCE",
     "MAP_REACTION_EVENT",
     "MAPS_BY_ID",
+    "TRANSPORT_MAPS",
     "add_map_bands",
     "add_map_find",
     "band_name",

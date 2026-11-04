@@ -123,8 +123,10 @@ EXPECTED_ROOT_ALL = frozenset(
         "outline_elements",
         "plot_metabolic_graph",
         # Plotting
+        "ATLAS_MAPS",
         "COMPARTMENT_MAPS",
         "PLOT_THEME",
+        "TRANSPORT_MAPS",
         "add_category_key",
         "add_map_bands",
         "add_map_find",

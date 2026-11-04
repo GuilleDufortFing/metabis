@@ -12,6 +12,7 @@ from metabis import MetabolicModel
 from metabis.viz.atlas_paths import ATLAS_SUFFIX, atlas_paths
 from metabis.viz.click_behavior import OWN_TAP_TAG, add_click_behavior
 from metabis.viz.compartment_maps import (
+    ATLAS_MAPS,
     BAND_GLOW,
     COMPARTMENT_MAPS,
     MAP_BAND_SOURCE,
@@ -19,6 +20,7 @@ from metabis.viz.compartment_maps import (
     MAP_FIND_SOURCE,
     MAP_REACTION_EVENT,
     MAPS_DIRECTORY,
+    TRANSPORT_MAPS,
     add_map_bands,
     add_map_find,
     add_map_links,
@@ -47,10 +49,16 @@ def model():
 
 def test_every_packaged_map_is_named_once():
     packaged = {path.stem for path in MAPS_DIRECTORY.glob("*.json") if not path.name.endswith(ATLAS_SUFFIX)}
-    assert {entry.map_id for entry in COMPARTMENT_MAPS} == packaged
+    assert {entry.map_id for entry in ATLAS_MAPS} == packaged and len(ATLAS_MAPS) == len(packaged)
     # The cytosol's five maps are named by their largest pathways.
     cytosol = [entry.name for entry in COMPARTMENT_MAPS if entry.compartment == "c"]
     assert len(cytosol) == 5 and all("(" in name for name in cytosol)
+    # Metabolic Atlas's twelve transport maps follow, the plasma membrane's five
+    # named by their largest transporter families.
+    assert {entry.group for entry in COMPARTMENT_MAPS} == {"compartment"}
+    assert len(TRANSPORT_MAPS) == 12 and {entry.group for entry in TRANSPORT_MAPS} == {"transport"}
+    plasma = [entry.name for entry in TRANSPORT_MAPS if entry.compartment == "e"]
+    assert len(plasma) == 5 and all(name.startswith("Transport, plasma membrane") and "(" in name for name in plasma)
 
 
 def test_a_maps_reactions_resolve_to_the_models_own(model):
@@ -80,6 +88,25 @@ def test_a_subsystem_leads_to_the_maps_of_its_compartments(model):
     short = map_reaction_names(model, "mitochondria")
     assert set(short) == set(resolve_map_reactions(model, "mitochondria"))
     assert sum(short[identifier] != identifier for identifier in drawn) > len(drawn) / 2
+
+
+def test_a_transport_subsystem_leads_first_to_its_transport_map(model):
+    maps = maps_for_reactions(model, model.get_reactions_for_subsystem("transport_mitochondrial"))
+
+    assert [entry.map_id for entry, _count in maps[:2]] == ["transport_mitochondria", "mitochondria"]
+    # The transport maps of the plasma membrane draw the extracellular transport.
+    extracellular = maps_for_reactions(model, model.get_reactions_for_subsystem("transport_extracellular"))
+    assert {entry.map_id for entry, _count in extracellular[:5]} == {
+        f"transport_plasma_membrane_{number}" for number in range(1, 6)
+    }
+
+
+def test_a_transport_map_comes_from_metabolic_atlas_subsystem_maps_without_a_band():
+    for entry in TRANSPORT_MAPS:
+        atlas = atlas_paths(str(MAPS_DIRECTORY / f"{entry.map_id}.json"))
+        assert atlas["source"].endswith(f"/subsystem/svg/{entry.map_id}.svg")
+        # Its one band, "Transport reactions", lay under the whole map.
+        assert map_bands(entry.map_id) == {} and atlas["labels"]
 
 
 def _map_plot():
@@ -311,7 +338,7 @@ def test_every_human1_map_carries_metabolic_atlas_paths():
         for path in (graphs / kind / "human1").glob("*.json")
         if not path.name.endswith(ATLAS_SUFFIX)
     ]
-    assert len(layouts) == 118
+    assert len(layouts) == 130
     atlas = atlas_paths(str(MAPS_DIRECTORY / "mitochondria.json"))
     assert atlas["license"] == "CC BY-SA 4.0"
     # Most of the map's reactions are routed, each path at least one segment.

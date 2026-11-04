@@ -34,6 +34,9 @@ where Metabolic Atlas draws a metabolite and no reaction. Both arose in layouts
 drawn from older Human-maps, whose metabolites outside Human1 (``Rtotal_c``) or
 with Recon3D identifiers they drew otherwise.
 
+Metabolic Atlas's transport maps, one per membrane, are packaged and read as
+compartment maps, from Human-maps' ``subsystem/svg`` files (:func:`svg_kind`).
+
 A compartment map also takes Metabolic Atlas's labels for its metabolites:
 ``labels`` gives, under the layout glyph drawn where Metabolic Atlas draws the
 metabolite, its name's ``lines``, where their centre sits from the metabolite
@@ -71,6 +74,9 @@ from metabis.viz.atlas_paths import ATLAS_COMMIT, ATLAS_SUFFIX
 GRAPHS = Path(__file__).resolve().parent.parent / "src/metabis/resources/graphs"
 KINDS = ("compartment", "subsystem")
 SOURCE = f"https://github.com/SysBioChalmers/Human-maps/blob/{ATLAS_COMMIT}/{{kind}}/svg/{{name}}.svg"
+# Metabolic Atlas files its transport maps, one per membrane, with its subsystem
+# maps; the library draws them as maps, beside the compartments'.
+TRANSPORT_PREFIX = "transport_"
 LICENSE = "CC BY-SA 4.0"
 # How far, in map units, a reaction or metabolite may sit from Metabolic Atlas's
 # place for it, after the map's offset, and still count as the same place.
@@ -220,8 +226,14 @@ def metabolite_labels(
     return labels
 
 
+def svg_kind(kind: str, name: str) -> str:
+    """The Human-maps folder that holds the SVG file of the packaged ``kind`` map ``name``."""
+    return "subsystem" if kind == "compartment" and name.startswith(TRANSPORT_PREFIX) else kind
+
+
 def import_map(svg_path: Path, layout_path: Path, kind: str) -> Tuple[dict, dict]:
     """The map's Atlas paths in its layout's frame, and a report of what was kept."""
+    name = layout_path.stem
     svg = svg_path.read_text()
     glyphs = json.loads(layout_path.read_text())["glyphs"]
     ours: Dict[str, List[Point]] = defaultdict(list)
@@ -319,13 +331,16 @@ def import_map(svg_path: Path, layout_path: Path, kind: str) -> Tuple[dict, dict
     subsystems: Dict[str, List[List[float]]] = {}
     labels: Dict[str, dict] = {}
     if kind == "compartment":
-        for name, d in BAND.findall(svg):
-            subsystems[name] = [_flat(line, offset) for line in polylines(d)]
+        # A transport map's one band, Human-GEM's "Transport reactions", lies under
+        # all of it, and the model divides that subsystem by compartment
+        # (loaders.transport_part): it names no subsystem a map can highlight.
+        if not name.startswith(TRANSPORT_PREFIX):
+            for band, d in BAND.findall(svg):
+                subsystems[band] = [_flat(line, offset) for line in polylines(d)]
         labels = metabolite_labels(svg, offset, glyphs, drawn_as_metabolites)
 
-    name = layout_path.stem
     data = {
-        "source": SOURCE.format(kind=kind, name=name),
+        "source": SOURCE.format(kind=svg_kind(kind, name), name=name),
         "license": LICENSE,
         "offset": list(offset),
         "links": dict(sorted(links.items())),
@@ -370,7 +385,7 @@ def main(argv=None) -> int:
         for layout_path in sorted((GRAPHS / kind / "human1").glob("*.json")):
             if layout_path.name.endswith(ATLAS_SUFFIX):
                 continue
-            svg_path = args.human_maps / kind / "svg" / f"{layout_path.stem}.svg"
+            svg_path = args.human_maps / svg_kind(kind, layout_path.stem) / "svg" / f"{layout_path.stem}.svg"
             if not svg_path.exists():
                 print(f"{kind}/{layout_path.stem}: no SVG", file=sys.stderr)
                 continue

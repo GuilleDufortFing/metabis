@@ -27,8 +27,9 @@ A layout places everything where Metabolic Atlas draws it, in its units:
   reversible reaction's reactants as products too.
 
 Which maps: every compartment map the library lists (``COMPARTMENT_GRAPH_MANIFEST``),
-and every subsystem map whose file is named as the graph card looks a subsystem's
-map up: by the name of a subsystem of the packaged model (``reaction_catalog.csv``).
+Metabolic Atlas's transport maps of each membrane among them, and every subsystem
+map whose file is named as the graph card looks a subsystem's map up: by the name
+of a subsystem of the packaged model (``reaction_catalog.csv``).
 
 Usage::
 
@@ -370,13 +371,17 @@ def subsystem_maps() -> Dict[str, str]:
 
 
 def maps(human_maps: Path) -> List[Tuple[str, str]]:
-    """Each map to build, as (kind, name), of those the checkout holds."""
+    """Each map to build, as (kind, name), of those the checkout holds.
+
+    ``kind`` is the packaged folder it is written to; a transport map's files
+    are among Human-maps' subsystem maps (import_atlas_paths.svg_kind).
+    """
     wanted = {"compartment": set(COMPARTMENT_GRAPH_MANIFEST), "subsystem": set(subsystem_maps())}
     return [
-        (kind, svg.stem)
+        (kind, name)
         for kind in ("compartment", "subsystem")
-        for svg in sorted((human_maps / kind / "svg").glob("*.svg"))
-        if svg.stem in wanted[kind]
+        for name in sorted(wanted[kind])
+        if (human_maps / paths.svg_kind(kind, name) / "svg" / f"{name}.svg").exists()
     ]
 
 
@@ -387,8 +392,9 @@ def main(argv=None) -> int:
     args = parser.parse_args(argv)
 
     for kind, name in maps(args.human_maps):
-        sbgn_path = args.human_maps / kind / "sbgn" / f"{name}.sbgn"
-        svg_path = args.human_maps / kind / "svg" / f"{name}.svg"
+        source = args.human_maps / paths.svg_kind(kind, name)
+        sbgn_path = source / "sbgn" / f"{name}.sbgn"
+        svg_path = source / "svg" / f"{name}.svg"
         glyphs, connections, report = build_layout(sbgn_path, svg_path)
         layout_path = GRAPHS / kind / "human1" / f"{name}.json"
         print(

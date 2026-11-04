@@ -202,7 +202,9 @@ _MODULE_EXPORTS: dict[str, tuple[str, ...]] = {
     ".viz.subsystem_link": ("add_network_focus_link", "link_events"),
     ".viz.transport_view": ("is_transport_subsystem", "plot_transport_view"),
     ".viz.compartment_maps": (
+        "ATLAS_MAPS",
         "COMPARTMENT_MAPS",
+        "TRANSPORT_MAPS",
         "add_map_bands",
         "add_map_find",
         "add_map_links",
@@ -357,7 +359,9 @@ if TYPE_CHECKING:
         registered_color_bar,
     )
     from .viz.compartment_maps import (
+        ATLAS_MAPS,
         COMPARTMENT_MAPS,
+        TRANSPORT_MAPS,
         add_map_bands,
         add_map_find,
         add_map_links,
@@ -573,8 +577,10 @@ __all__ = [
     "outline_elements",
     "plot_metabolic_graph",
     # Plotting
+    "ATLAS_MAPS",
     "COMPARTMENT_MAPS",
     "PLOT_THEME",
+    "TRANSPORT_MAPS",
     "add_category_key",
     "add_map_bands",
     "add_map_find",

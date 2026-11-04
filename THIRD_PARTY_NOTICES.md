@@ -45,7 +45,8 @@ adapted from the following upstream repositories:
   (`THIRD_PARTY_LICENSES/CC-BY-SA-4.0.txt`). The repository's own LICENSE file
   is Creative Commons Attribution 4.0 International.
 - Metabis use: packaged Human1 graph resources derived from Human-maps: the
-  compartment and subsystem layouts (`resources/graphs/*/human1/*.json`), and
+  compartment and subsystem layouts (`resources/graphs/*/human1/*.json`), the
+  transport maps of each membrane among the compartment layouts, and
   Metabolic Atlas's link paths and subsystem bands beside them, with a
   compartment map's metabolite labels (`*.atlas.json`), both written by
   `scripts/import_human_maps.py` from the maps' SBGN and SVG files. These
@@ -57,7 +58,8 @@ adapted from the following upstream repositories:
   boxes are grouped as one enzyme, and a compartment drawn as a line or a name
   alone becomes a box. Each metabolite's label lines, their offset from it, and
   whether it is drawn as a dot are kept under the layout glyph drawn in its
-  place.
+  place. A transport map's one subsystem band, under the whole map, is left
+  out.
 
 Use of these Human1-derived materials does not imply endorsement by the
 Human-GEM or Human-maps authors or maintainers.

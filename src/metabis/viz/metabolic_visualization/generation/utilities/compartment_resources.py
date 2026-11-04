@@ -55,6 +55,26 @@ COMPARTMENT_GRAPH_MANIFEST: Dict[str, Dict[str, str]] = {
         "display_title": "Compartment: Peroxisome",
     },
 }
+# Metabolic Atlas's maps of each membrane's transport, drawn as the compartments'
+# maps are (compartment_maps.TRANSPORT_MAPS).
+COMPARTMENT_GRAPH_MANIFEST.update(
+    {
+        f"transport_{part}": {
+            "display_label": f"Transport, {label}",
+            "display_title": f"Transport: {label}",
+        }
+        for part, label in (
+            ("between_organelles", "between organelles"),
+            ("endoplasmic_reticulum", "endoplasmic reticular"),
+            ("golgi_apparatus", "Golgi apparatus"),
+            ("lysosome", "lysosomal"),
+            ("mitochondria", "mitochondrial"),
+            ("nucleus", "nuclear"),
+            ("peroxisome", "peroxisomal"),
+            *((f"plasma_membrane_{number}", f"plasma membrane {number}") for number in range(1, 6)),
+        )
+    }
+)
 
 
 COMPARTMENT_GRAPH_ALIASES = {
