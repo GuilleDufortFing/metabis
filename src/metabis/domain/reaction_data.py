@@ -322,8 +322,12 @@ class ReactionData:
             claimed = set(old_identifier_claims.get(base_id, ()))
 
             if source_reactions and base_id in source_reactions:
-                # The declared source model's own pairing, read from its chemistry
+                # The declared source model's own pairing, read from its chemistry.
+                # Human1's annotation still says how lumped the source is: Recon2's
+                # FAOXC80 is listed under twelve reactions, the thiolase step under one.
                 mar_id = source_reactions[base_id][0]
+                if listed is not None:
+                    claimed.update(annotation_claims[listed])
                 high_effort = False
             # Low effort: Check if base_id exists in model reactions (input format)
             elif base_id in model_reactions_in_input_format:

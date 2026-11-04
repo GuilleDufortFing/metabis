@@ -333,6 +333,20 @@ def test_each_source_reaction_carries_its_own_orientation(tmp_path, model):
     assert lumped.reversed_reactions == frozenset()
 
 
+def test_a_table_pairing_still_counts_how_lumped_its_source_is(tmp_path, model):
+    # Both back MAR03146 by the table. Human1's Recon3D annotation lists the
+    # thiolase step r0634 under that reaction alone and the lumped FAOXC101C8m
+    # under three, so the step backs it, although it sorts last.
+    table = {"r0634": ("MAR03146", -1), "FAOXC101C8m": ("MAR03146", 1)}
+    loaded = declared(
+        tmp_path, model, {"FAOXC101C8m_pos": [1.0, 2.0, 3.0], "r0634_pos": [4.0, 5.0, 6.0]}, table
+    )
+
+    (record,) = loaded.mapping_stats["id_collisions"]
+    assert record["kept"] == "r0634"
+    assert record["discarded"] == [("FAOXC101C8m", 3)]
+
+
 def test_a_table_row_with_no_human1_reaction_leaves_the_id_unmapped(tmp_path, model):
     # The legacy aliases file CITL, citrate lyase, under chitobiose hydrolysis.
     loaded = declared(tmp_path, model, {"CITL_pos": [1.0, 2.0, 3.0]}, {"CITL": ("", 0)})
