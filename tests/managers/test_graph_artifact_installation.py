@@ -177,7 +177,7 @@ def test_stale_activity_install_changes_nothing():
     manager.mark_groups_changed()
     before = _activity_state(manager, analysis)
 
-    with pytest.raises(StaleAnalysisResultError, match="groups revision"):
+    with pytest.raises(StaleAnalysisResultError, match="The groups changed while"):
         manager.install_activity_artifact(provenance, artifact)
 
     assert _activity_state(manager, analysis) == before
@@ -203,7 +203,7 @@ def test_stale_dataset_activity_install_is_rejected_before_any_write():
     manager.mark_dataset_changed()
     before = _activity_state(manager, analysis)
 
-    with pytest.raises(StaleAnalysisResultError, match="dataset revision"):
+    with pytest.raises(StaleAnalysisResultError, match="The data changed while"):
         manager.install_activity_artifact(provenance, artifact)
 
     assert _activity_state(manager, analysis) == before

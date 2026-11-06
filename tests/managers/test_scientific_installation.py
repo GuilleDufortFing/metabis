@@ -112,7 +112,7 @@ def test_stale_install_rejects_before_any_scientific_or_presentation_write():
     manager.mark_groups_changed()
     before = _scientific_and_presentation_state(manager)
 
-    with pytest.raises(StaleAnalysisResultError, match="groups revision"):
+    with pytest.raises(StaleAnalysisResultError, match="The groups changed while"):
         manager.install_experiment_analysis(provenance, _Analysis())
 
     assert _scientific_and_presentation_state(manager) == before

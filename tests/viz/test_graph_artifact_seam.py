@@ -7,6 +7,7 @@ with the picture, it fails here.
 """
 
 from dataclasses import replace
+from types import SimpleNamespace
 
 import numpy as np
 import pandas as pd
@@ -32,7 +33,10 @@ from metabis.viz.metabolic_visualization import (
     graph_edge_frame,
     render_graph_artifact,
 )
-from metabis.viz.metabolic_visualization.artifact import STRUCTURAL_MODE
+from metabis.viz.metabolic_visualization.artifact import (
+    STRUCTURAL_MODE,
+    resolve_color_meaning,
+)
 from metabis.viz.metabolic_visualization.export import (
     AUXILIARY_AUDIT_COLUMNS,
     EDGE_AUDIT_COLUMNS,
@@ -334,3 +338,15 @@ def test_edge_and_auxiliary_exports_preserve_complete_payloads_and_empty_headers
     assert tuple(graph_auxiliary_frame(replace(artifact, auxiliary={})).columns) == (
         AUXILIARY_AUDIT_COLUMNS
     )
+
+
+def test_a_palette_with_no_finite_limit_records_none():
+    """One measured reaction gives the colour scale no spread: the limit is NaN."""
+    workspace = SimpleNamespace(
+        mode=SimpleNamespace(value="group_comparison"),
+        color_manager=SimpleNamespace(get_color_limit=lambda mode, element_type, metric: float("nan")),
+    )
+
+    meaning = resolve_color_meaning(workspace, color_metric="cohens_d")
+
+    assert meaning.saturation_limit is None

@@ -200,6 +200,10 @@ class MetabolicModel(MetabolicModelInterface):
     - Improved error handling and validation
     """
 
+    # The Human-GEM release the packaged reference model is built from
+    # (scripts/import_human_gem.py's HUMAN_GEM_VERSION).
+    RELEASE = "2.1.1"
+
     def __init__(
         self,
         base_path: str = DEFAULT_RESOURCES_ROOT,

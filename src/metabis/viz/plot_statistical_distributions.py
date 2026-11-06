@@ -435,7 +435,7 @@ def _create_scatter_figure(
 
     if legend:
         n_marked = sum(1 for value in significant if value)
-        coloured = f", coloured by {color_label}" if color_label else ""
+        coloured = f", colored by {color_label}" if color_label else ""
         scatter_fig.add_layout(
             Legend(
                 items=[

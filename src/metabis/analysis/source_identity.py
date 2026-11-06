@@ -154,7 +154,11 @@ def model_identity(model: Any) -> dict[str, Any]:
     """Return the order-canonical scientific content of a metabolic model.
 
     Entity collections are sorted by content, so two models that were built in a
-    different order but describe the same network share one identity.
+    different order but describe the same network share one identity. The
+    subsystem categories are left out: they only group subsystems for
+    presentation, and no analysis reads them, so a model whose categories alone
+    changed describes the same network (see
+    ``AnalysisWorkspace.apply_category_transition``).
     """
     identity: dict[str, Any] = {"class": type(model).__name__}
     for name in _MODEL_COLLECTIONS:
@@ -163,10 +167,14 @@ def model_identity(model: Any) -> dict[str, Any]:
             values = collection.get_all()
         except AttributeError:
             continue
-        identity[name] = sorted(
-            (_normalize_model_value(value) for value in values),
-            key=_fingerprint_normalized_json,
-        )
+        normalized = [_normalize_model_value(value) for value in values]
+        if name == "subsystems":
+            # A subsystem's category is presentation, not network (see above).
+            normalized = [
+                {key: item for key, item in value.items() if key != "category"} if isinstance(value, dict) else value
+                for value in normalized
+            ]
+        identity[name] = sorted(normalized, key=_fingerprint_normalized_json)
     relationships = getattr(model, "subsystem_neighbor_relationships", None)
     if relationships is not None:
         identity["subsystem_neighbor_relationships"] = sorted(
@@ -178,23 +186,6 @@ def model_identity(model: Any) -> dict[str, Any]:
             identity["subsystems"] = sorted(map(str, model.get_subsystems()))
         except AttributeError:
             pass
-
-    get_categories = getattr(model, "get_categories", None)
-    if callable(get_categories):
-        categories = list(map(str, get_categories()))
-        identity["category_order"] = categories
-        get_category_color = getattr(model, "get_category_color", None)
-        if callable(get_category_color):
-            identity["category_colors"] = [
-                [category, str(get_category_color(category))]
-                for category in categories
-            ]
-    get_subsystems_by_category = getattr(model, "get_subsystems_by_category", None)
-    if callable(get_subsystems_by_category):
-        identity["subsystems_by_category"] = {
-            str(category): sorted(map(str, subsystems))
-            for category, subsystems in get_subsystems_by_category().items()
-        }
     return identity
 
 
@@ -360,6 +351,11 @@ class SourceIdentityCache:
             for name, prepared in prepared_fingerprints.components():
                 self._computed[name] = (prepared.source, prepared.value)
         self._warm(_DATASET_COMPONENTS)
+
+    def replace_model(self, metabolic_model: Any, fingerprint: str) -> None:
+        """Record a model whose identity its caller already paid for, as ``fingerprint``."""
+        self._record("model", metabolic_model, fingerprint_model)
+        self._computed["model"] = (metabolic_model, fingerprint)
 
     def identify_metadata(self, sample_metadata: Any) -> None:
         """Record sample metadata and pay for its identity now.

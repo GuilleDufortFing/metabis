@@ -12,6 +12,50 @@ from .preprocessing import (
     preprocess_reactions,
     signed_cuberoot,
 )
+from .table_values import (
+    SEPARATOR_NAMES,
+    describe_non_finite,
+    describe_repeated_samples,
+    describe_repeats,
+    describe_text_cell,
+    non_finite_cells,
+    renamed_repeats,
+    repeated_header_names,
+    text_cell,
+)
+
+# How a loading message names the file it read.
+READ_WHAT = "The reaction file"
+
+
+def _check_reaction_values(frame: pd.DataFrame) -> None:
+    """Raise a plain ValueError naming the first cell of ``frame`` (samples x
+    reactions, as read) that is not a number."""
+    found = text_cell(frame)
+    if found is not None:
+        sample, reaction, value = found
+        raise ValueError(describe_text_cell(READ_WHAT, "reaction", reaction, sample, value))
+    problem = non_finite_cells(frame.to_numpy(dtype=float))
+    if problem is not None:
+        count, (row, column) = problem
+        raise ValueError(
+            describe_non_finite(READ_WHAT, count, "reaction", frame.columns[column], frame.index[row])
+        )
+
+
+def no_reaction_matched_message(
+    path: str, reaction_name_format: str, data_mode: str, csv_separator: str, samples_in: str
+) -> str:
+    """Say that no reaction of the file at ``path`` was found in Human1, and how it was read."""
+    separator = SEPARATOR_NAMES.get(csv_separator, repr(csv_separator))
+    mode = "dual direction (_pos/_neg)" if str(data_mode).lower() == "dual" else "single direction"
+    return (
+        f"No reaction in '{path}' matches a Human1 reaction with its identifiers read as "
+        f"'{reaction_name_format}', in {mode} mode, separated by {separator}, with the samples in "
+        f"{samples_in}. Check the identifier format, the separator, which way the samples run "
+        "and the data mode."
+    )
+
 
 # Recon1 and Recon2 write a reaction's compartment in parentheses, ``EX_glc(e)``;
 # Recon3D - and so Human1's Recon3D annotation - writes it in brackets,
@@ -91,14 +135,8 @@ class ReactionData:
                 # Determine status based on mapping results
                 if alignment_report["mapped_count"] == 0:
                     validation_results["status"] = "error"
-                    error_msg = (
-                        f"No reactions found in the CSV file ('{path}') "
-                        f"match the reactions in the metabolic model "
-                        f"(using input format '{reaction_name_format}' "
-                        f"with '{data_mode}' mode processing and "
-                        f"translated to 'mar_id'). Please check the reaction "
-                        f"format, CSV separator ('{csv_separator}'), sample "
-                        f"orientation ('{samples_in}'), and file content."
+                    error_msg = no_reaction_matched_message(
+                        path, reaction_name_format, data_mode, csv_separator, samples_in
                     )
                     validation_results["messages"].append(error_msg)
                 else:
@@ -107,6 +145,7 @@ class ReactionData:
                     validation_results["messages"].append(
                         "Reaction data loaded successfully"
                     )
+                    validation_results["warnings"] = list(instance.load_warnings)
             else:
                 validation_results["status"] = "error"
                 validation_results["messages"].append(
@@ -125,12 +164,7 @@ class ReactionData:
             instance.df_reaction_data = None
         except Exception as e:
             validation_results["status"] = "error"
-            error_msg = (
-                f"Error loading reaction data from CSV '{path}' "
-                f"(sep='{csv_separator}', samples='{samples_in}', "
-                f"mode='{data_mode}'): {str(e)}"
-            )
-            validation_results["messages"].append(error_msg)
+            validation_results["messages"].append(str(e))
             # Create a minimal instance for consistency
             instance = cls.__new__(cls)
             instance.metabolic_model = metabolic_model
@@ -511,6 +545,8 @@ class ReactionData:
         self.df_reaction_data = None  # Initialize
         self.applied_normalizations = []  # Track which normalizations were applied
         self.preprocessing_report = None
+        # What the load left out or found odd, as sentences for the reader.
+        self.load_warnings: List[str] = []
         # Source base ID -> the Human1 reaction it backs, and the Human1 reactions
         # whose backing source the declared model writes the other way.
         self.reaction_mapping: Dict[str, str] = {}
@@ -537,15 +573,25 @@ class ReactionData:
             elif samples_in == "columns":
                 # Input: rows=reactions, columns=samples -> Transpose needed
                 original_df = df.T
+            repeated = (
+                repeated_header_names(path, csv_separator)
+                if samples_in == "columns"
+                else list(dict.fromkeys(original_df.index[original_df.index.duplicated()]))
+            )
+            if repeated:
+                raise ValueError(describe_repeated_samples(READ_WHAT, repeated))
 
-            # Check for duplicate columns (reactions) before any processing
-            if original_df.columns.duplicated().any():
-                print(
-                    "Warning: Found duplicate columns (reactions) in loaded reaction data. Keeping first instance."
-                )
-                original_df = original_df.loc[
-                    :, ~original_df.columns.duplicated(keep="first")
-                ]
+            # A reaction named twice keeps its first column. Along the header,
+            # pandas renamed the second (R1.1), so the header itself says which.
+            repeated_reactions = (
+                repeated_header_names(path, csv_separator)
+                if samples_in == "rows"
+                else list(dict.fromkeys(original_df.columns[original_df.columns.duplicated()]))
+            )
+            if repeated_reactions:
+                original_df = original_df.drop(columns=renamed_repeats(original_df.columns, repeated_reactions))
+                original_df = original_df.loc[:, ~original_df.columns.duplicated(keep="first")]
+                self.load_warnings.append(describe_repeats("reaction", repeated_reactions))
 
             # --- Step 1: Map base reactions to Human1 model FIRST ---
             # This is done before software-specific processing to avoid redundant translations
@@ -592,6 +638,24 @@ class ReactionData:
                     len(unread_orientations) if source_reactions else 0
                 ),
             }
+
+            # Only the columns that become reactions must hold numbers: one the
+            # model does not know, such as a description, is left alone.
+            dual = data_mode.lower() == "dual"
+            used = [
+                column
+                for column in original_df.columns
+                if (
+                    str(column)[:-4] in base_reaction_mapping
+                    if dual and str(column).endswith(("_pos", "_neg"))
+                    else not dual and column in base_reaction_mapping
+                )
+            ]
+            _check_reaction_values(original_df.loc[:, used])
+            if used and not original_df.loc[:, used].to_numpy(dtype=float).any():
+                self.load_warnings.append(
+                    "Every value of the reactions read is zero, so no reaction can differ between samples."
+                )
 
             # --- Step 2: Mode-specific processing ---
             if data_mode.lower() == "dual":
@@ -690,11 +754,18 @@ class ReactionData:
 
         except FileNotFoundError:
             raise FileNotFoundError(f"Reaction data file not found: {path}")
-        except Exception as e:
-            # Add more context to the error message
+        except UnicodeDecodeError as error:
             raise ValueError(
-                f"Error loading or processing reaction data from CSV '{path}': {str(e)}"
-            )
+                f"{READ_WHAT} is not text. Save it as CSV or TSV; a gzipped file's name must end in .gz."
+            ) from error
+        except pd.errors.EmptyDataError as error:
+            raise ValueError(f"{READ_WHAT} is empty.") from error
+        except pd.errors.ParserError as error:
+            raise ValueError(f"{READ_WHAT} could not be read as a table: {error}") from error
+        except ValueError:
+            raise
+        except Exception as error:
+            raise ValueError(f"{READ_WHAT} could not be read: {error}") from error
 
     def get_reaction_df(self) -> pd.DataFrame:
         """Get the reaction data as a DataFrame (samples x reactions).

@@ -445,7 +445,7 @@ def test_the_activity_legend_never_claims_regulation():
     assert "coverage threshold" not in legend.lower()
     # The legend names levels, not directions.
     assert "gold = high" in legend.lower()
-    assert "grey = typical" in legend.lower()
+    assert "gray = typical" in legend.lower()
     assert "purple = low" in legend.lower()
 
 

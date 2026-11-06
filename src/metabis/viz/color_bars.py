@@ -22,9 +22,9 @@ COLOR_BAR_LENGTH = 160
 # BokehJS gives each item under a plot a row of its own; the React client's
 # patchKeyRow groups the tagged ones that follow each other into one.
 KEY_ROW = "metabis-key-row"
-# Pixels a pathway key's row of shapes, and its row of colour bars, take under a
-# figure, as BokehJS 3.8 lays them out.
-KEY_SHAPES_HEIGHT = 34
+# Pixels a pathway key's rows of shapes and fills, and its row of colour bars,
+# take under a figure, as BokehJS 3.8 lays them out.
+KEY_SHAPES_HEIGHT = 45
 KEY_BARS_HEIGHT = 65
 
 
@@ -171,10 +171,10 @@ def add_pathway_key(
 ) -> None:
     """The key under a subsystem graph or a map: what each shape is, and what each colour means.
 
-    A diamond is a reaction, a rectangle a gene, an oval a metabolite. In a
-    comparison grey is a feature that is not significant or has no data; in
-    single-group activity grey is the typical level, so no data is white with a
-    dashed edge. Each feature family that colours the graph adds its colour bar,
+    A diamond is a reaction, a rectangle a gene, an oval a metabolite. A feature
+    with no data (not measured) is white with a dashed edge; grey is a measured
+    feature that is not significant in a comparison, and the typical level in
+    single-group activity, whose colour bar shows it. Each feature family that colours the graph adds its colour bar,
     read from its own distribution: a short horizontal bar under the shapes, the
     bars side by side where the page sets them so (:data:`KEY_ROW`), and in a row
     each otherwise. A figure scaled to its width grows by its key, which takes
@@ -196,26 +196,32 @@ def add_pathway_key(
             "Metabolite",
             plot.ellipse(**nowhere, width=18, height=11, width_units="screen", height_units="screen", **outline),
         ),
-        (
-            ("No data", plot.scatter(**nowhere, marker="square", size=11, **outline, line_dash="dashed"))
-            if visualization_mode == "activity"
-            else (
-                "Not significant, or no data",
+    ]
+    fills = []
+    if visualization_mode != "activity":
+        fills.append(
+            (
+                "Not significant",
                 plot.scatter(**nowhere, marker="square", size=11, fill_color=theme.NOT_SIGNIFICANT, line_color=None),
             )
-        ),
-    ]
-    # The key reads from the left, as the figure's title and caption do.
-    legend = Legend(
-        items=[LegendItem(label=label, renderers=[renderer]) for label, renderer in shapes],
-        orientation="horizontal",
-        location="left",
-        click_policy="none",
-        # A rectangle's key fills its glyph box: a low box keeps it a gene's shape.
-        glyph_width=18,
-        glyph_height=11,
-    )
-    plot.add_layout(legend, "below")
+        )
+    fills.append(("No data", plot.scatter(**nowhere, marker="square", size=11, **outline, line_dash="dashed")))
+    # The key reads from the left, as the figure's title and caption do: the shapes
+    # in one row and the fills that mean no colour in the next, so a graph narrowed
+    # by the details beside it still shows the whole key.
+    for row, margin in ((shapes, 10), (fills, 0)):
+        legend = Legend(
+            items=[LegendItem(label=label, renderers=[renderer]) for label, renderer in row],
+            orientation="horizontal",
+            location="left",
+            click_policy="none",
+            # A rectangle's key fills its glyph box: a low box keeps it a gene's shape.
+            glyph_width=18,
+            glyph_height=11,
+            margin=margin,
+            padding=6,
+        )
+        plot.add_layout(legend, "below")
 
     registry = getattr(data_manager, "color_manager", None)
     if visualization_mode == "activity" and activity_artifact is None:

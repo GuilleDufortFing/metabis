@@ -188,7 +188,7 @@ def _tap(source, index) -> dict:
     if node is None:
         pytest.skip("Node.js runs the tap")
     callbacks = [
-        [callback.code, {name: None if name == "source" else value for name, value in callback.args.items()}]
+        [callback.code, {name: None if name in ("source", "plot") else value for name, value in callback.args.items()}]
         for callback in source.selected.js_property_callbacks["change:indices"]
     ]
     script = """
@@ -198,11 +198,13 @@ def _tap(source, index) -> dict:
     globalThis.CustomEvent = class { constructor(type, init) { this.detail = init.detail } };
     globalThis.document = {createElement: () => ({click() { opened.push(this.href) }}), body: {appendChild() {}, removeChild() {}}};
     const source = {tags, data, selected: {indices: [index]}};
+    const plot = {};
     for (const [code, args] of callbacks) {
       const names = Object.keys(args);
-      new Function('cb_obj', ...names, code)(source.selected, ...names.map((name) => name === 'source' ? source : args[name]));
+      const given = (name) => (name === 'source' ? source : name === 'plot' ? plot : args[name]);
+      new Function('cb_obj', ...names, code)(source.selected, ...names.map(given));
     }
-    setTimeout(() => console.log(JSON.stringify({opened, events, selected: source.selected.indices})), 10);
+    setTimeout(() => console.log(JSON.stringify({opened, events, selected: source.selected.indices, tapped: plot.metabis_tapped})), 10);
     """
     arguments = json.dumps([callbacks, dict(source.data), list(source.tags), index])
     result = subprocess.run([node, "-e", script, arguments], capture_output=True, text=True, check=True)
@@ -229,13 +231,16 @@ def test_no_tap_in_a_map_opens_a_page_each_names_what_was_tapped():
             "subsystem": "Glycolysis",
         }
     ]
-    # Nothing is left selected, so no other reaction is drawn as unselected.
+    # Nothing is left selected, so no other reaction is drawn as unselected; where it
+    # is drawn is kept, so its details opening beside the map do not cut it away.
     assert tapped["selected"] == []
+    assert tapped["tapped"] == [reactions.data["x"][1], reactions.data["y"][1]]
     # A metabolite's tap names it for its details, as a gene's does, and opens no page.
     assert _tap(metabolites, 0) == {
         "opened": [],
         "events": [{"kind": "metabolite", "element_id": "m1", "model_id": "MAM01965m", "label": "glucose"}],
         "selected": [],
+        "tapped": [metabolites.data["x"][0], metabolites.data["y"][0]],
     }
 
 
@@ -249,9 +254,15 @@ def test_a_find_marks_reactions_genes_and_metabolites_by_name():
     # A map zooms in to at least a fifth of its width; a subsystem's graph keeps its zoom.
     assert callback.args["closest"] == 160.0
     plain = figure(x_range=(0, 1000), y_range=(1000, 0))
-    plain.scatter("x", "y", source=ColumnDataSource({"x": [1.0], "y": [1.0], "display_label": ["a"]}))
+    metabolite = {"x": [1.0], "y": [1.0], "display_label": ["a"], "model_id": ["MAM1"], "hover": [""], "size": [8]}
+    plain.scatter("x", "y", source=ColumnDataSource(metabolite))
     (kept,) = add_map_find(plain, zoom=False).js_property_callbacks["change:data"]
     assert kept.args["closest"] == 0.0
+    # The box round a reaction's enzymes is no element of its own to find.
+    enzymes = ColumnDataSource({"x": [2.0], "y": [2.0], "width": [4.0], "height": [2.0], "display_label": ["Enzymes for MAR1"]})
+    plain.rect("x", "y", "width", "height", source=enzymes)
+    (searched,) = add_map_find(plain).js_property_callbacks["change:data"]
+    assert enzymes not in searched.args["sources"]
     # The ring, a fixed size on screen, and the border round each match's shape, in
     # the logo's gradient on the frame-clipped glyph level; the ring goes once the
     # elements can be seen, as the names appear.
@@ -382,7 +393,8 @@ def test_one_subsystems_band_at_a_time():
 def _resized(plot, frames, x=(0.0, 2000.0), y=(1000.0, 0.0)) -> list:
     """Run a map's scale keeper in Node as its frame takes each (width, height): its ranges after each.
 
-    A frame given as ``{"x": [start, end]}`` is the reader panning the map there instead.
+    A frame given as ``{"x": [start, end]}`` is the reader panning the map there instead,
+    and one given as ``{"tap": [x, y]}`` a tap on an element drawn there.
     """
     node = shutil.which("node")
     if node is None:
@@ -395,6 +407,7 @@ def _resized(plot, frames, x=(0.0, 2000.0), y=(1000.0, 0.0)) -> list:
     const seen = [];
     for (const frame of frames) {
       if (frame.x) { plot.x_range.start = frame.x[0]; plot.x_range.end = frame.x[1] }
+      else if (frame.tap) { plot.metabis_tapped = frame.tap }
       else {
         [plot.inner_width, plot.inner_height] = frame;
         new Function('plot', code)(plot);
@@ -429,5 +442,11 @@ def test_a_map_fits_its_plot_then_is_cut_never_squeezed():
     assert _resized(plot, [(1000, 250), (600, 250), (1000, 500)])[2] == [0, 2000, 1000, 0]
     # Once panned, a lower frame keeps the scale, the map cut from its bottom, its top kept.
     assert _resized(plot, [(1000, 500), {"x": [100, 2100]}, (1000, 400)])[2] == [100, 2100, 800, 0]
+    # An element tapped near the left stays in view as its details narrow the frame,
+    # 48 px (96 units) in from the edge; one tapped where the cut leaves it is not moved.
+    assert _resized(plot, [(1000, 500), {"tap": [300, 500]}, (600, 500)])[2][:2] == [204, 1404]
+    assert _resized(plot, [(1000, 500), {"tap": [1500, 500]}, (600, 500)])[2][:2] == [800, 2000]
+    # Nor does one panned out of view bring the view back to it.
+    assert _resized(plot, [(1000, 500), {"tap": [300, 500]}, {"x": [1000, 3000]}, (600, 500)])[3][:2] == [1800, 3000]
     # A data range without its span yet is left to fit itself.
     assert _resized(plot, [(600, 500)], x=(None, None))[0][:2] == [None, None]

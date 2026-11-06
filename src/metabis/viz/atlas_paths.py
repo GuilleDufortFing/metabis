@@ -26,11 +26,14 @@ ATLAS_COMMIT = "8ab97f21dd23cf3afe71f2acf385b6a0c08e4634"
 # What a figure drawn from them credits, as CC BY-SA 4.0 asks (Section 3): the
 # copyright notice the SVG files hold, where they come from, their licence, that
 # they were changed, and that the figure is shared under the same licence. Lines
-# short enough to fit under a graph.
+# short enough to fit under a graph narrowed by the details beside it.
 ATLAS_CREDIT = (
-    f"Map layout adapted from Metabolic Atlas Human-maps (github.com/SysBioChalmers/Human-maps, commit {ATLAS_COMMIT[:7]}),",
-    "© Department of Biology and Biological Engineering, Chalmers University of Technology, licensed under CC BY-SA 4.0.",
-    "Redrawn by Metabis with its own colours, glyphs and data; this adapted map is shared under CC BY-SA 4.0, without warranty.",
+    "Map layout adapted from Metabolic Atlas Human-maps",
+    f"(github.com/SysBioChalmers/Human-maps, commit {ATLAS_COMMIT[:7]}),",
+    "© Department of Biology and Biological Engineering,",
+    "Chalmers University of Technology, licensed under CC BY-SA 4.0.",
+    "Redrawn by Metabis with its own colors, glyphs and data;",
+    "this adapted map is shared under CC BY-SA 4.0, without warranty.",
 )
 
 

@@ -326,11 +326,13 @@ def tap_dispatches(plot, renderer, source, kind: str) -> None:
     source.selected.js_on_change(
         "indices",
         CustomJS(
-            args=dict(source=source, event=MAP_ELEMENT_EVENT, kind=kind),
+            args=dict(plot=plot, source=source, event=MAP_ELEMENT_EVENT, kind=kind),
             code="""
             const index = source.selected.indices[0]
             if (index === undefined) return
             const data = source.data
+            // Kept in view as its details open beside the map (keep_map_scale).
+            plot.metabis_tapped = [data.x[index], data.y[index]]
             window.dispatchEvent(new CustomEvent(event, {detail: {
               kind,
               element_id: data.element_id[index],
@@ -420,11 +422,13 @@ def add_map_links(
         source.selected.js_on_change(
             "indices",
             CustomJS(
-                args=dict(source=source, event=MAP_REACTION_EVENT),
+                args=dict(plot=plot, source=source, event=MAP_REACTION_EVENT),
                 code="""
                 const index = source.selected.indices[0]
                 if (index === undefined) return
                 const data = source.data
+                // Kept in view as its details open beside the map (keep_map_scale).
+                plot.metabis_tapped = [data.x[index], data.y[index]]
                 window.dispatchEvent(new CustomEvent(event, {detail: {
                   element_id: data.element_id[index],
                   model_id: (data.model_id ?? data.element_id)[index],
@@ -453,7 +457,9 @@ def keep_map_scale(plot) -> None:
     as many pixels as before across and down, and its top right corner stays
     where it was, so nothing on screen moves: what the sidebar takes is cut from
     the map's left, and a lower frame cuts its bottom. A subsystem's graph keeps
-    its scale the same way.
+    its scale the same way. An element just tapped, whose details the sidebar
+    opens, is not cut away with it: the view moves across, at its scale, just
+    enough to keep the element in, if it was in view before.
     """
     keep = CustomJS(
         args=dict(plot=plot),
@@ -494,6 +500,15 @@ def keep_map_scale(plot) -> None:
         const scale = before[1] / down
         const span = width / scale
         if (Math.abs(Math.abs(along) - span) > 1e-9 * span) xr.start = xr.end - Math.sign(along) * span
+        // The element tapped stays in view, a little in from the edge, if it was in view.
+        const tapped = plot.metabis_tapped
+        if (tapped && width < before[0]) {
+          const margin = Math.min(48 / scale, span / 4)
+          const low = Math.min(xr.start, xr.end), high = Math.max(xr.start, xr.end)
+          const shown = tapped[0] >= Math.min(now[0], now[1]) && tapped[0] <= Math.max(now[0], now[1])
+          const shift = tapped[0] < low + margin ? tapped[0] - low - margin : tapped[0] > high - margin ? tapped[0] - high + margin : 0
+          if (shown && shift) xr.setv({start: xr.start + shift, end: xr.end + shift})
+        }
         const rise = height / scale
         if (Math.abs(down - rise) > 1e-9 * rise) yr.start = yr.end - Math.sign(upwards) * rise
         if (untouched) plot.metabis_set = [xr.start, xr.end, yr.start, yr.end]
@@ -536,10 +551,12 @@ def add_map_find(plot, *, zoom: bool = True) -> Optional[ColumnDataSource]:
     where it is. :data:`MAP_FIND_EVENT` reports how many matched, which is shown
     and its label.
     """
+    # Only reactions, genes and metabolites: the box round a reaction's enzymes, which
+    # its label names, is not found as a second place of the reaction.
     searched = [
         (source, _shape(renderer))
         for renderer, source in _sources(plot)
-        if "display_label" in source.data and "x" in source.data
+        if "display_label" in source.data and "x" in source.data and _element_kind(source.data)
     ]
     if not searched:
         return None

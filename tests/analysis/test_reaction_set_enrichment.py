@@ -456,7 +456,7 @@ def test_stale_enrichment_install_is_rejected_without_state_change():
     manager, provenance = _manager_with_comparison(comparison)
     manager.mark_thresholds_changed()
 
-    with pytest.raises(StaleAnalysisResultError, match="thresholds revision"):
+    with pytest.raises(StaleAnalysisResultError, match="The significance changed while"):
         manager.install_reaction_set_enrichment_artifact(provenance, artifact)
 
     assert manager.get_reaction_set_enrichment_artifact() is None

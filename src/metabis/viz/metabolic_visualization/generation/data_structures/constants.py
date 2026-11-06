@@ -310,7 +310,7 @@ class VisualizationConstants:
     CONNECTION_OFFSET = 20  # Default offset from node edges
 
     # Missing data styling
-    MISSING_DATA_COLOR = "white"
+    MISSING_DATA_COLOR = "#ffffff"
     MISSING_DATA_LINE_DASH = "dashed"  # Dashed line pattern
     MISSING_DATA_ALPHA = 0.7
     MISSING_DATA_OUTLINE_COLOR = "gray"  # For dashed borders

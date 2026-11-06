@@ -263,10 +263,10 @@ def identify_missing_data_subgraph(glyphs, connections, data_manager):
     This function uses sophisticated logic to determine which elements should be
     styled as missing data:
     - Missing reactions: always marked as missing
-    - Genes: marked as missing if connected to missing reactions, unless they
-      have data of their own: a gene is coloured by its own test, so one beside
-      a reaction Compass found blocked (SAT1 beside MAR08603 in the Th17 data)
-      keeps its colour rather than reading as no data
+    - Genes: marked as missing when they have no data of their own (not
+      measured, or no expression loaded), so grey only ever means measured and
+      not significant; one with data keeps its colour even beside a reaction
+      Compass found blocked (SAT1 beside MAR08603 in the Th17 data)
     - Enzyme groups: marked as missing if associated with missing reactions and
       none of their genes has data
     - Metabolites: marked as missing only if ALL connected reactions are missing
@@ -285,8 +285,10 @@ def identify_missing_data_subgraph(glyphs, connections, data_manager):
     missing_data_elements = {}
     missing_reaction_ids = set()
     missing_reaction_labels = set()
-    # Genes with data of their own in the workspace's mode, which stay coloured.
+    # Genes with data of their own in the workspace's mode, which stay coloured,
+    # and those without, which are drawn as no data.
     scored_genes = set()
+    unmeasured_genes = {}
 
     # Phase 1: Identify missing reactions
     for glyph in glyphs:
@@ -325,13 +327,17 @@ def identify_missing_data_subgraph(glyphs, connections, data_manager):
                     missing_data_elements[glyph["id"]] = "no_metadata"
                 elif _has_data(gene_data):
                     scored_genes.add(glyph["id"])
+                else:
+                    unmeasured_genes[glyph["id"]] = "no_experimental_data"
             except Exception:
                 missing_data_elements[glyph["id"]] = "no_metadata"
 
 
-    # If no missing reactions, return empty dict
+    for gene_id, reason in unmeasured_genes.items():
+        missing_data_elements.setdefault(gene_id, reason)
+    # With every reaction measured, only the genes without data are drawn as such.
     if not missing_reaction_ids:
-        return {}
+        return dict(unmeasured_genes)
 
     # Phase 2: Get active reactions for metabolite analysis
     active_reactions = get_active_reactions(glyphs, data_manager)

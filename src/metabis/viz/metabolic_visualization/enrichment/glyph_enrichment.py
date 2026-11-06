@@ -6,7 +6,10 @@ visualization properties like colors, alphas, hover text, and styling.
 """
 
 import math
+import re
+from html import escape
 
+from ....managers.hover import panel as hover_panel
 from ....visual_config import theme
 from ...click_behavior import get_external_reference_data
 from ..generation.data_structures.constants import VisualizationConstants
@@ -808,6 +811,10 @@ def enrich_subsystem_glyph_with_data(
     if no_data:
         subsystem_color = VisualizationConstants.SUBSYSTEM_NO_DATA_COLOR
         line_dash = VisualizationConstants.SUBSYSTEM_NO_DATA_LINE_DASH
+    # A subsystem with nothing measured has no statistics: its hover says so, rather
+    # than opening an empty box over its name.
+    if not re.sub(r"<[^>]*>", "", hover_text or "").strip():
+        hover_text = _unmeasured_hover(display_name, element_type, int(glyph.get("reaction_count", 0) or 0))
 
     # Create enriched subsystem glyph
     border_color = (
@@ -924,3 +931,17 @@ def enrich_subsystem_category_glyph_with_data(
     )
 
     return enriched
+
+
+def _unmeasured_hover(display_name: str, element_type: str, reactions: int) -> str:
+    """The hover of a subsystem none of whose reactions or genes was measured."""
+    noun = "gene" if element_type == "gene" else "reaction"
+    in_model = f" It has {reactions:,} reaction{'s' if reactions != 1 else ''} in Human1." if reactions else ""
+    return hover_panel.panel(
+        hover_panel.row("Subsystem", escape(str(display_name))),
+        hover_panel.section(
+            hover_panel.note(
+                f"No {noun} of it was measured, so it has no score: drawn white with a dashed edge.{in_model}"
+            )
+        ),
+    )

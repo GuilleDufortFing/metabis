@@ -89,13 +89,11 @@ def test_the_pathway_key_names_each_shape_and_adds_a_bar_per_family():
     plot = figure()
     add_pathway_key(plot, workspace, visualization_mode="group_comparison", color_metric="cohens_d")
 
-    (legend,) = [item for item in plot.below if isinstance(item, Legend)]
-    assert [item.label.value for item in legend.items] == [
-        "Reaction",
-        "Gene",
-        "Metabolite",
-        "Not significant, or no data",
-    ]
+    # The shapes in one row, and the fills that mean no colour in the next, so a
+    # narrow graph shows the whole key.
+    shapes, fills = [item for item in plot.below if isinstance(item, Legend)]
+    assert [item.label.value for item in shapes.items] == ["Reaction", "Gene", "Metabolite"]
+    assert [item.label.value for item in fills.items] == ["Not significant", "No data"]
     # Reactions have a distribution here and genes none, so one bar: short and
     # horizontal, under the graph, for the page to set beside the others.
     bars = [item for item in plot.below if isinstance(item, ColorBar)]
@@ -142,8 +140,8 @@ def test_the_activity_key_draws_no_data_white_and_dashed_since_grey_is_the_typic
     plot = figure()
     add_pathway_key(plot, _Workspace({"a": 0.1}), visualization_mode="activity")
 
-    (legend,) = [item for item in plot.below if isinstance(item, Legend)]
-    assert [item.label.value for item in legend.items][-1] == "No data"
+    legend = [item for item in plot.below if isinstance(item, Legend)][-1]
+    assert [item.label.value for item in legend.items] == ["No data"]
     (renderer,) = legend.items[-1].renderers
     assert renderer.glyph.fill_color == "#ffffff" and renderer.glyph.line_dash == "dashed"
 
@@ -168,7 +166,7 @@ def test_a_figure_drawn_from_metabolic_atlas_maps_credits_them_under_its_key():
     # figure is shared under; under the key, the figure grown by its lines.
     credit = [item for item in plot.below if isinstance(item, Title)]
     assert [line.text for line in credit] == list(ATLAS_CREDIT)
-    (legend,) = [item for item in plot.below if isinstance(item, Legend)]
+    legend = [item for item in plot.below if isinstance(item, Legend)][-1]
     assert plot.below[-len(credit):] == credit and plot.below.index(legend) < plot.below.index(credit[0])
     text = " ".join(ATLAS_CREDIT)
     for part in ("Metabolic Atlas Human-maps", "commit 8ab97f2", "© Department of Biology and Biological Engineering, Chalmers University of Technology", "Redrawn by Metabis", "shared under CC BY-SA 4.0"):

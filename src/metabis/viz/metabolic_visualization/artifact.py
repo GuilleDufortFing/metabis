@@ -191,6 +191,9 @@ def resolve_color_meaning(
             )
         except (AttributeError, KeyError, TypeError):
             saturation_limit = None
+        # One reaction, or none that varies, gives the palette no finite limit.
+        if saturation_limit is not None and not np.isfinite(saturation_limit):
+            saturation_limit = None
 
     return GraphColorMeaning(
         mode=mode_value,

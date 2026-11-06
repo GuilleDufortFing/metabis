@@ -44,6 +44,7 @@ from ..analysis.set_enrichment import (
 from ..analysis.source_identity import (
     PreparedDatasetFingerprints,
     SourceIdentityCache,
+    fingerprint_model,
     prepare_reaction_fingerprints,
 )
 from ..analysis.statistical_analysis import StatisticalAnalysis
@@ -87,6 +88,17 @@ _ACTIVITY_DEPENDENCIES = frozenset(
         RevisionKind.PREPROCESSING,
     }
 )
+
+
+# What each revision axis is, as a message about a result made stale names it.
+_CHANGED = {
+    "dataset": "data",
+    "metadata": "sample sheet",
+    "groups": "groups",
+    "preprocessing": "preprocessing",
+    "thresholds": "significance",
+    "visualization": "display settings",
+}
 
 
 class AnalysisWorkspace:
@@ -369,7 +381,8 @@ class AnalysisWorkspace:
         for kind in provenance.dependencies:
             if provenance.revisions.value_for(kind) != current_revisions.value_for(kind):
                 raise StaleAnalysisResultError(
-                    f"The workspace {kind.value} revision changed during analysis"
+                    f"The {_CHANGED.get(kind.value, kind.value)} changed while this was computed, "
+                    "so its result was set aside; run it again."
                 )
 
         data_dependencies = {
@@ -561,6 +574,29 @@ class AnalysisWorkspace:
             preprocessing_changed=False,
             clear_metadata=False,
         )
+
+    def apply_category_transition(self, prepared_model) -> None:
+        """Install a fresh model whose only change is its subsystem categories.
+
+        Categories group the subsystems for presentation (the metabolic overview,
+        its ranking, a table's category column); no analysis reads them, and the
+        model's identity leaves them out. So the data, the groups and every result
+        stay current, and only the VISUALIZATION revision moves, for what shows
+        categories to be drawn again. A model whose network changed too is
+        refused, before anything changes: that is :meth:`apply_model_transition`.
+        """
+        if prepared_model is None or prepared_model is self.metabolic_model:
+            raise ValueError("A category transition installs a fresh model object")
+        fingerprint = fingerprint_model(prepared_model)
+        if fingerprint != self._source_identity.fingerprints.get("model"):
+            raise ValueError("Only the subsystem categories may change in a category transition")
+        clear_memory_cache = getattr(prepared_model, "clear_memory_cache", None)
+        if callable(clear_memory_cache):
+            clear_memory_cache()
+        self.metabolic_model = prepared_model
+        self.data_provider.metabolic_model = prepared_model
+        self._source_identity.replace_model(prepared_model, fingerprint)
+        self.mark_visualization_changed()
 
     def replace_metabolic_model(self, metabolic_model) -> None:
         """Atomically replace the model and invalidate every derived result.
@@ -1356,6 +1392,22 @@ class AnalysisWorkspace:
     def get_group_comparison_artifact(self) -> GroupComparisonArtifact | None:
         """Return the installed authoritative comparison artifact, if any."""
         return self.group_comparison_artifact
+
+    def clear_group_comparison_artifact(self) -> None:
+        """Take the comparison out of view, as when the analysis it came from is deleted.
+
+        The groups and their summaries stay, so the workspace is back to its groups'
+        activity; what read the comparison (enrichment, subsystem state, hover) is
+        cleared with it.
+        """
+        self._set_group_comparison_artifact(None)
+        self.subsystem_analysis.set_group_comparison(None)
+        self.hover_manager.update_group_comparison(None)
+        self.set_mode(
+            AnalysisWorkspaceMode.EXPERIMENT_ANALYSIS
+            if self.experiment_analysis is not None
+            else AnalysisWorkspaceMode.NO_EXPERIMENT
+        )
 
     def install_reaction_set_enrichment_artifact(
         self,

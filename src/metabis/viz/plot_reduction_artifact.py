@@ -777,7 +777,7 @@ def plot_reduction_artifact(
     title = f"{artifact.key.method} of {artifact.key.data_type.capitalize()} Data"
     if colouring is not None:
         # On a line of its own, so the title fits a map at half the page's width.
-        title += f"\ncoloured by {colouring.display_label}"
+        title += f"\ncolored by {colouring.display_label}"
     plot = apply_academic_style(
         figure(
             width=presentation.width,

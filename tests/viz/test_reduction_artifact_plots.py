@@ -474,7 +474,7 @@ def test_a_coloured_scatter_reads_on_the_sample_heatmaps_scale():
     assert list(points.data["sample_id"]) == ["s2", "s1", "s3", "s4"]
     np.testing.assert_allclose(points.data["z"], [0.0, -1.0, 1.0, 3.0])
     assert list(points.data["group"]) == ["Healthy", "Healthy", "Disease", "Unassigned"]
-    assert plot.title.text.endswith("coloured by Lactate dehydrogenase")
+    assert plot.title.text.endswith("colored by Lactate dehydrogenase")
     assert not plot.legend or not plot.legend[0].items
     (bar,) = [item for item in plot.right if type(item).__name__ == "ColorBar"]
     assert bar.title == "Standardized score"
