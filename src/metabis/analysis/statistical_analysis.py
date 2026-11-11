@@ -6,7 +6,7 @@ and significance determination for comparing groups of samples.
 
 import math
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Literal, Optional, Sequence, Tuple
 
 import numpy as np
 import pandas as pd
@@ -17,7 +17,9 @@ from statsmodels.stats.multitest import multipletests
 
 __all__ = [
     "CORRECTION_METHODS",
+    "FOLD_CHANGE_SCALES",
     "SUPPORTED_TESTS",
+    "FoldChangeScale",
     "StatisticalAnalysis",
     "ComparisonInputs",
     "ModeratedFit",
@@ -38,6 +40,15 @@ CORRECTION_METHODS = {
 # model per feature whose residual variance borrows strength from every feature
 # (Smyth 2004), and the only one that can adjust for sample-sheet columns.
 SUPPORTED_TESTS = ("wilcoxon", "ttest", "moderated_t")
+
+# The scale a family's values are on, which decides what its log2 fold change is.
+# Linear values (raw fluxes split into their directions, counts, CPM, TPM) give the
+# log2 ratio of the group means. Values already on a log scale give the difference
+# of the group means in log2 units, as limma's logFC is (Smyth 2004). Values on any
+# other scale (Compass activity scores, cube roots, ranks) have no fold change, and
+# None leaves it undefined: a ratio of their means describes nothing.
+FoldChangeScale = Literal["linear", "log2", "ln"]
+FOLD_CHANGE_SCALES: tuple[str, ...] = ("linear", "log2", "ln")
 
 
 def rank_sum_floor(n_target: int, n_baseline: int) -> float:
@@ -137,6 +148,7 @@ class StatisticalAnalysis:
         test_type: Optional[str] = None,
         correction_type: Optional[str] = None,
         covariates: Optional[pd.DataFrame] = None,
+        fold_change: Optional[FoldChangeScale] = "linear",
     ) -> pd.DataFrame:
         """Run statistical test between two groups.
 
@@ -147,6 +159,8 @@ class StatisticalAnalysis:
             test_type (str, optional): Override the default test type
             covariates (pd.DataFrame, optional): Numeric sample-sheet columns,
                 indexed by sample, to adjust for; only the moderated t-test accepts them
+            fold_change: The scale of the values (:data:`FoldChangeScale`), or
+                None when no log2 fold change is defined for them
 
         Returns:
             pd.DataFrame: Test results with statistical metrics
@@ -162,6 +176,7 @@ class StatisticalAnalysis:
             test=test,
             correction=correction,
             covariates=covariates,
+            fold_change=fold_change,
         )
 
         return self.attach_derived_metrics(results)
@@ -269,7 +284,8 @@ class StatisticalAnalysis:
             significant_mask &= cohens_d_mask
             threshold_info["applied_thresholds"]["cohens_d"] = cohens_d_threshold
 
-        if log2_fc_threshold is not None:
+        # A family with no log2 fold change (see FoldChangeScale) cannot be held to one.
+        if log2_fc_threshold is not None and results["log2_fc"].notna().any():
             if keep_reversed and "reversed" in results.columns:
                 # Keep reversed reactions or apply threshold to non-reversed
                 log2_fc_mask = results["reversed"] | (
@@ -512,6 +528,7 @@ def comparison_test(
     test="wilcoxon",
     correction="fdr_bh",
     covariates: pd.DataFrame | None = None,
+    fold_change: FoldChangeScale | None = "linear",
 ):
     """Perform a two-group comparison between groups.
 
@@ -525,6 +542,8 @@ def comparison_test(
         covariates (pd.DataFrame, optional): Numeric columns indexed by sample to
             adjust for. Only the moderated t-test accepts them; its effect is then
             the group coefficient at equal covariate values.
+        fold_change: The scale of the values (:data:`FoldChangeScale`); None
+            leaves the log2 fold change undefined (NaN).
 
     Returns:
                 pd.DataFrame: Test results including:
@@ -541,6 +560,8 @@ def comparison_test(
         raise ValueError(f"test must be one of {', '.join(SUPPORTED_TESTS)}")
     if covariates is not None and not covariates.empty and test != "moderated_t":
         raise ValueError("Only the moderated t-test can adjust for sample-sheet columns")
+    if fold_change is not None and fold_change not in FOLD_CHANGE_SCALES:
+        raise ValueError(f"fold_change must be one of {', '.join(FOLD_CHANGE_SCALES)}, or None")
     validated = validate_comparison_inputs(
         consistencies_matrix, group_A_cells, group_B_cells
     )
@@ -636,14 +657,21 @@ def comparison_test(
             cohens_d_values = mean_difference / pooled_std
         cohens_d_values[~np.isfinite(pooled_std) | (pooled_std == 0)] = np.nan
 
-    # Signed absolute-mean fold change, vectorizing ``_signed_log2_fold_change``.
     epsilon = 1e-10
-    target_magnitude = np.maximum(np.abs(mean_A), epsilon)
-    baseline_magnitude = np.maximum(np.abs(mean_B), epsilon)
-    magnitude = np.abs(np.log2(target_magnitude / baseline_magnitude))
-    log2_fc = np.where(
-        mean_difference == 0, 0.0, np.copysign(magnitude, mean_difference)
-    )
+    if fold_change == "linear":
+        # Signed absolute-mean fold change, vectorizing ``_signed_log2_fold_change``.
+        target_magnitude = np.maximum(np.abs(mean_A), epsilon)
+        baseline_magnitude = np.maximum(np.abs(mean_B), epsilon)
+        magnitude = np.abs(np.log2(target_magnitude / baseline_magnitude))
+        log2_fc = np.where(
+            mean_difference == 0, 0.0, np.copysign(magnitude, mean_difference)
+        )
+    elif fold_change is not None:
+        # On a log scale the difference of the means is the fold change; with
+        # adjustment columns it is the group coefficient, as limma's logFC is.
+        log2_fc = mean_difference / (1.0 if fold_change == "log2" else math.log(2.0))
+    else:
+        log2_fc = np.full(n_reactions, np.nan)
 
     reversed_flag = (
         ((mean_A * mean_B) < 0)
@@ -672,7 +700,8 @@ def comparison_test(
     test_stat[neutral] = 0.0
     pval[neutral] = 1.0
     cohens_d_values[neutral] = 0.0
-    log2_fc[neutral] = 0.0
+    if fold_change is not None:
+        log2_fc[neutral] = 0.0
     mean_difference[neutral] = 0.0
     reversed_flag[neutral] = False
     calculation_status[neutral] = "neutral_constant"

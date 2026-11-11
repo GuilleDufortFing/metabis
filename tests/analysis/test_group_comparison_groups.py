@@ -7,6 +7,9 @@ from metabis.managers.group_manager import GroupDefinition, GroupManager
 
 
 class _ReactionData:
+    # Raw values, so the comparison reads a log2 fold change as a ratio of means.
+    fold_change_scale = "linear"
+
     def __init__(self):
         self.frame = pd.DataFrame({"R1": [1.0, 2.0, 4.0, 5.0]}, index=["A1", "A2", "B1", "B2"])
     def get_sample_ids(self): return list(self.frame.index)

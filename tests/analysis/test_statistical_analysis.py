@@ -307,3 +307,41 @@ def test_rank_sum_floor_is_the_most_extreme_exact_p_value(n_target, n_baseline, 
             np.arange(n_target) + 100.0, np.arange(n_baseline), method="exact"
         ).pvalue
         assert exact == pytest.approx(floor)
+
+
+def test_the_log2_fold_change_follows_the_scale_of_the_values():
+    """Linear values give the log2 ratio of the means; logged values the difference
+    of the means in log2 units (limma's logFC); values on no such scale give none."""
+    import math
+
+    from metabis.analysis.statistical_analysis import StatisticalAnalysis
+    from metabis.domain.preprocessing import ExpressionPreprocessingConfig, ReactionPreprocessingConfig, ReactionTransform
+
+    frame = pd.DataFrame(
+        {"f": [4.0, 4.0, 4.5, 1.0, 1.0, 1.5]}, index=["a1", "a2", "a3", "b1", "b2", "b3"]
+    )
+    target, baseline = ["a1", "a2", "a3"], ["b1", "b2", "b3"]
+
+    def fold_change(scale):
+        return comparison_test(frame, target, baseline, test="ttest", fold_change=scale).loc["f", "log2_fc"]
+
+    assert fold_change("linear") == pytest.approx(math.log2((25 / 6) / (7 / 6)))
+    assert fold_change("log2") == pytest.approx(3.0)
+    assert fold_change("ln") == pytest.approx(3.0 / math.log(2))
+    assert math.isnan(fold_change(None))
+    with pytest.raises(ValueError, match="fold_change"):
+        fold_change("log10")
+
+    # A family with no fold change is not held to a fold-change threshold.
+    results = comparison_test(frame, target, baseline, test="ttest", fold_change=None)
+    significant, info = StatisticalAnalysis().determine_significant_elements(results, log2_fc_threshold=1.0)
+    assert significant["f"] and "log2_fc" not in info["applied_thresholds"]
+
+    # What each load leaves the values as.
+    assert ReactionPreprocessingConfig().fold_change_scale == "linear"
+    assert ReactionPreprocessingConfig(compass_activity=True).fold_change_scale is None
+    assert ReactionPreprocessingConfig(transform=ReactionTransform.SIGNED_CUBEROOT).fold_change_scale is None
+    assert ExpressionPreprocessingConfig(log1p=True).fold_change_scale == "ln"
+    assert ExpressionPreprocessingConfig(normalize_total=True).fold_change_scale == "linear"
+    assert ExpressionPreprocessingConfig(input_scale="log2").fold_change_scale == "log2"
+    assert ExpressionPreprocessingConfig().fold_change_scale is None

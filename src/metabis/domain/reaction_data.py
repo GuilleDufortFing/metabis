@@ -43,6 +43,25 @@ def _check_reaction_values(frame: pd.DataFrame) -> None:
         )
 
 
+def _zero_below(frame: pd.DataFrame, used: List[str], floor: float, warnings: List[str]) -> pd.DataFrame:
+    """``frame`` with the values of its ``used`` columns smaller than ``floor`` in
+    magnitude read as zero, and a warning saying how many there were."""
+    values = frame.loc[:, used].astype(float)
+    tiny = (values.abs() < floor) & (values != 0)
+    count = int(tiny.to_numpy().sum())
+    if not count:
+        return frame
+    frame = frame.copy()
+    frame[used] = values.mask(tiny, 0.0)
+    share = count / values.size
+    shown = f"{floor:g}".replace("e-0", "e-")
+    warnings.append(
+        f"{count:,} of the reactions' values ({share:.1%}) were smaller than {shown} in magnitude and were read as zero, "
+        "as a flux solver leaves values at its tolerance. Set the threshold to 0 to keep them."
+    )
+    return frame
+
+
 def no_reaction_matched_message(
     path: str, reaction_name_format: str, data_mode: str, csv_separator: str, samples_in: str
 ) -> str:
@@ -560,6 +579,8 @@ class ReactionData:
                     transform=ReactionTransform.SIGNED_CUBEROOT
                 )
             )
+        # Kept for what the values mean downstream, as their fold change does.
+        self.preprocessing_config = preprocessing
 
         # Load reaction data - Only CSV logic remains
         try:
@@ -652,6 +673,8 @@ class ReactionData:
                 )
             ]
             _check_reaction_values(original_df.loc[:, used])
+            if used and preprocessing.zero_below > 0:
+                original_df = _zero_below(original_df, used, preprocessing.zero_below, self.load_warnings)
             if used and not original_df.loc[:, used].to_numpy(dtype=float).any():
                 self.load_warnings.append(
                     "Every value of the reactions read is zero, so no reaction can differ between samples."
@@ -820,6 +843,12 @@ class ReactionData:
         if self.df_reaction_data is None:
             return []  # Return empty list if data not loaded
         return list(self.df_reaction_data.index)
+
+    @property
+    def fold_change_scale(self) -> Optional[str]:
+        """The scale of the loaded values for a log2 fold change, or None (see ReactionPreprocessingConfig)."""
+        config = getattr(self, "preprocessing_config", None)
+        return config.fold_change_scale if config is not None else None
 
     def get_alignment_report(self) -> Dict[str, Any]:
         """Generate an alignment report showing coverage statistics.

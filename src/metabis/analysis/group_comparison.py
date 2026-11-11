@@ -537,6 +537,10 @@ class GroupComparison:
             )
         else:
             data_df = data_manager.reaction_data.get_reaction_df()
+        # What the family's log2 fold change is depends on the scale it was loaded on;
+        # data that cannot say which have none.
+        source = data_manager.expression_data if for_genes else data_manager.reaction_data
+        fold_change = getattr(source, "fold_change_scale", None)
 
         # Use StatisticalAnalysis to perform the comparison
         results = self.stats_analyzer.run_statistical_test(
@@ -546,6 +550,7 @@ class GroupComparison:
             test_type=test,
             correction_type=correction,
             covariates=covariates,
+            fold_change=fold_change,
         )
 
         # Add group information

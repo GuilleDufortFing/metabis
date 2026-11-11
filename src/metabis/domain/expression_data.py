@@ -201,6 +201,8 @@ class ExpressionData:
         self.source_path = None
         self.preprocessing_report = None
         preprocessing = preprocessing or ExpressionPreprocessingConfig()
+        # Kept for what the values mean downstream, as their fold change does.
+        self.preprocessing_config = preprocessing
 
         self.dense_memory_budget_bytes = dense_memory_budget_bytes
 
@@ -564,6 +566,12 @@ class ExpressionData:
         estimated = estimate_dense_bytes(self.adata)
         if estimated > budget:
             raise DenseMaterializationError(estimated, budget)
+
+    @property
+    def fold_change_scale(self) -> Optional[str]:
+        """The scale of the loaded values for a log2 fold change, or None (see ExpressionPreprocessingConfig)."""
+        config = getattr(self, "preprocessing_config", None)
+        return config.fold_change_scale if config is not None else None
 
     def _apply_preprocessing(self, config: ExpressionPreprocessingConfig) -> None:
         """Apply a typed expression preprocessing configuration in order."""

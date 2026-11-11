@@ -180,3 +180,33 @@ def test_a_gene_named_twice_keeps_its_first_row_and_says_so(model, tmp_path):
 
     assert results["status"] == "success"
     assert results["warnings"] == ["1 gene appears more than once in the file (GCK): the first of each was kept."]
+
+
+def test_values_at_a_solver_tolerance_are_read_as_zero_before_the_directions_split(model, tmp_path):
+    from metabis.domain.preprocessing import ReactionPreprocessingConfig
+
+    # Hexokinase is irreversible: a -1e-9 left by a flux solver is not a reverse direction.
+    assert not model.is_reaction_reversible("MAR04394", input_format="mar_id")
+    path = _write(tmp_path, "r.tsv", "reaction\tS1\tS2\tS3\nMAR04394\t0.002\t-1e-9\t0.003\n")
+
+    def load(floor: float) -> ReactionData:
+        instance, results = ReactionData.create_with_validation(
+            path, "single", metabolic_model=model, reaction_name_format="mar_id", csv_separator="\t",
+            samples_in="columns", preprocessing=ReactionPreprocessingConfig(zero_below=floor),
+        )
+        assert results["status"] == "success"
+        return instance
+
+    floored = load(1e-6)
+    assert list(floored.get_reaction_df().columns) == ["MAR04394"]
+    assert floored.get_reaction_df()["MAR04394"].tolist() == [0.002, 0.0, 0.003]
+    assert floored.load_warnings == [
+        "1 of the reactions' values (33.3%) were smaller than 1e-6 in magnitude and were read as zero, "
+        "as a flux solver leaves values at its tolerance. Set the threshold to 0 to keep them."
+    ]
+    kept = load(0.0)
+    assert sorted(kept.get_reaction_df().columns) == ["MAR04394", "MAR04394_back"]
+    assert kept.load_warnings == []
+
+    with pytest.raises(ValueError, match="zero_below"):
+        ReactionPreprocessingConfig(zero_below=-1)

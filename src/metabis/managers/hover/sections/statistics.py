@@ -1,3 +1,4 @@
+import math
 from html import escape
 from typing import Any, Dict, List
 
@@ -63,7 +64,8 @@ class StatisticsSection(HoverSection):
             )
 
         log2_fc = values.get("log2_fc")
-        if log2_fc is not None:
+        # NaN where the values have no fold change (Compass scores, transforms).
+        if log2_fc is not None and math.isfinite(log2_fc):
             column_parts.append(f"<div>Log2 FC: {log2_fc:.3f}</div>")
 
         cohens_d = values.get("cohens_d")

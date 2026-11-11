@@ -17,6 +17,9 @@ deployed application read byte-identical inputs:
     - smillie_pseudobulk_reactions.tsv,
       smillie_pseudobulk_expression_cp10k.tsv, smillie_pseudobulk_metadata.tsv
       (the server's Smillie example: Compass's pseudobulk notebook rebuilt)
+    - metaflux_tcga_lung_reactions.tsv, metaflux_tcga_lung_expression.tsv,
+      metaflux_tcga_lung_metadata.tsv  (the server's METAFlux example: TCGA lung
+      tumours scored with METAFlux)
 
 The archive is the single source for these files, so the notebooks and the
 deployed application read byte-identical inputs.
@@ -47,7 +50,7 @@ from pathlib import Path, PurePosixPath
 DATA_DIR = Path(__file__).resolve().parent
 DOWNLOAD_URL = "https://nube.fing.edu.uy/index.php/s/FSRdpzGAiAAiyJF/download"
 ARCHIVE_NAME = "MetabisDatasets.zip"
-ARCHIVE_SHA256 = "f87fc820d0bd07fd6615ef6f8409f83a8e4b1db61c59c4c084dc6229d68ee1f8"
+ARCHIVE_SHA256 = "c09462d09bc3dd0689ddc538a9c1b9e51ac08e6b1586565b59bf1ff319a9a22e"
 CHUNK_SIZE = 1024 * 1024
 
 
