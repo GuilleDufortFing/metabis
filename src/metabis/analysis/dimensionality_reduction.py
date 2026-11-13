@@ -10,6 +10,8 @@ from sklearn.manifold import TSNE
 from ..analysis_workspace import WorkspaceProvenance
 from ..domain.expression_matrix import ExpressionMatrix
 from .artifacts import AnalysisArtifactMetadata, ArtifactDimension, ArtifactKind
+from .map_preparation import is_default as _is_default_preparation
+from .map_preparation import prepare_features
 
 __all__ = [
     "DimensionalityReduction",
@@ -34,6 +36,11 @@ def _reduction_parameters(key: "ReductionKey") -> Tuple[Tuple[str, object], ...]
         value = getattr(key, name)
         if value is not None:
             parameters[name] = value
+    # How the features were prepared, recorded only when they were not read as loaded.
+    if not _is_default_preparation(key.feature_transform, key.feature_selection, key.scale_features):
+        parameters["feature_transform"] = key.feature_transform
+        parameters["feature_selection"] = key.feature_selection
+        parameters["scale_features"] = key.scale_features
     return tuple(sorted(parameters.items()))
 
 
@@ -51,6 +58,10 @@ class ReductionKey:
     n_neighbors: int | None = None
     min_dist: float | None = None
     perplexity: float | None = None
+    # How the features were prepared before the fit (``map_preparation``).
+    feature_transform: str = "none"
+    feature_selection: str = "variance"
+    scale_features: bool = False
 
 
 @dataclass
@@ -215,26 +226,8 @@ class ReductionArtifact:
                 raise ValueError(
                     f"Reduction metadata scientific identity does not match {name}"
                 )
-        expected_parameters = {
-            "n_components": self.key.n_components,
-            "n_variable_features": self.key.n_variable_features,
-            "random_state": self.key.random_state,
-            **(
-                {"n_neighbors": self.key.n_neighbors}
-                if self.key.n_neighbors is not None
-                else {}
-            ),
-            **(
-                {"min_dist": self.key.min_dist}
-                if self.key.min_dist is not None
-                else {}
-            ),
-            **(
-                {"perplexity": self.key.perplexity}
-                if self.key.perplexity is not None
-                else {}
-            ),
-        }
+        # The same parameters the result recorded, from the one place that names them.
+        expected_parameters = dict(_reduction_parameters(self.key))
         expected_configuration = {
             "data_type": self.key.data_type,
             "parameters": expected_parameters,
@@ -422,6 +415,10 @@ class DimensionalityReduction:
         matrix: "ExpressionMatrix",
         n_variable_features: int,
         data_source_name: str,
+        *,
+        feature_transform: str = "none",
+        feature_selection: str = "variance",
+        scale_features: bool = False,
     ) -> Dict[str, Any]:
         """Prepare data for dimension reduction by selecting variable features.
 
@@ -457,6 +454,35 @@ class DimensionalityReduction:
                 "status": "error",
                 "messages": [f"No data available for {data_source_name}."],
             }
+
+        if not _is_default_preparation(feature_transform, feature_selection, scale_features):
+            # A prepared map (``map_preparation``) ranks the transformed values, so
+            # it reads the whole matrix dense: the reaction data it is for already is.
+            try:
+                data_matrix, top_features, how = prepare_features(
+                    matrix.to_dense_frame(),
+                    n_variable_features,
+                    transform=feature_transform,
+                    selection=feature_selection,
+                    scale=scale_features,
+                )
+            except ValueError as error:
+                return {"status": "error", "messages": [str(error)]}
+            if data_matrix.shape[0] < 2:
+                return {
+                    "status": "error",
+                    "messages": [f"Not enough samples ({data_matrix.shape[0]}) for reduction. Need at least 2."],
+                }
+            results["messages"].append(f"Selected top {len(top_features)} features by {how}.")
+            results.update(
+                {
+                    "data": data_matrix,
+                    "sample_ids": sample_ids,
+                    "feature_names": list(top_features),
+                    "data_source_name": data_source_name,
+                }
+            )
+            return results
 
         # Select most variable features -- ranking is sparse-native at the seam.
         variances = matrix.feature_variances().dropna()
@@ -516,6 +542,9 @@ class DimensionalityReduction:
         preprocessing_revision: str = "0",
         sample_revision: str = "0",
         force_recompute: bool = False,
+        feature_transform: str = "none",
+        feature_selection: str = "variance",
+        scale_features: bool = False,
     ) -> Dict[str, Any]:
         """Calculates PCA for the specified dataframe and stores the results.
 
@@ -529,7 +558,14 @@ class DimensionalityReduction:
         Returns:
             Dict[str, Any]: Results dictionary with status and messages.
         """
-        prep_result = self._prepare_data(matrix, n_variable_features, data_source_name)
+        prep_result = self._prepare_data(
+            matrix,
+            n_variable_features,
+            data_source_name,
+            feature_transform=feature_transform,
+            feature_selection=feature_selection,
+            scale_features=scale_features,
+        )
         if prep_result["status"] != "success":
             return prep_result
 
@@ -556,6 +592,9 @@ class DimensionalityReduction:
             random_state=random_state,
             preprocessing_revision=str(preprocessing_revision),
             sample_revision=str(sample_revision),
+            feature_transform=feature_transform,
+            feature_selection=feature_selection,
+            scale_features=scale_features,
         )
         if not force_recompute and (cached := self._reuse(key)):
             return cached
@@ -608,9 +647,19 @@ class DimensionalityReduction:
         preprocessing_revision: str = "0",
         sample_revision: str = "0",
         force_recompute: bool = False,
+        feature_transform: str = "none",
+        feature_selection: str = "variance",
+        scale_features: bool = False,
     ) -> Dict[str, Any]:
         """Calculates t-SNE for the specified dataframe and stores the results."""
-        prep_result = self._prepare_data(matrix, n_variable_features, data_source_name)
+        prep_result = self._prepare_data(
+            matrix,
+            n_variable_features,
+            data_source_name,
+            feature_transform=feature_transform,
+            feature_selection=feature_selection,
+            scale_features=scale_features,
+        )
         if prep_result["status"] != "success":
             return prep_result
 
@@ -635,6 +684,9 @@ class DimensionalityReduction:
             random_state=random_state,
             preprocessing_revision=str(preprocessing_revision),
             sample_revision=str(sample_revision),
+            feature_transform=feature_transform,
+            feature_selection=feature_selection,
+            scale_features=scale_features,
             perplexity=perplexity,
         )
         if not force_recompute and (cached := self._reuse(key)):
@@ -691,9 +743,19 @@ class DimensionalityReduction:
         preprocessing_revision: str = "0",
         sample_revision: str = "0",
         force_recompute: bool = False,
+        feature_transform: str = "none",
+        feature_selection: str = "variance",
+        scale_features: bool = False,
     ) -> Dict[str, Any]:
         """Calculates UMAP for the specified dataframe and stores the results."""
-        prep_result = self._prepare_data(matrix, n_variable_features, data_source_name)
+        prep_result = self._prepare_data(
+            matrix,
+            n_variable_features,
+            data_source_name,
+            feature_transform=feature_transform,
+            feature_selection=feature_selection,
+            scale_features=scale_features,
+        )
         if prep_result["status"] != "success":
             return prep_result
 
@@ -718,6 +780,9 @@ class DimensionalityReduction:
             random_state=random_state,
             preprocessing_revision=str(preprocessing_revision),
             sample_revision=str(sample_revision),
+            feature_transform=feature_transform,
+            feature_selection=feature_selection,
+            scale_features=scale_features,
             n_neighbors=n_neighbors,
             min_dist=min_dist,
         )
