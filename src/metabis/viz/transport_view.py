@@ -14,8 +14,10 @@ with the family's own score.
   at all, takes a row for those.
 * **Exchange and demand.** Their reactions each exchange one metabolite, so they
   take a row per metabolite.
-* **Size.** The families with the most measured reactions take rows of their
-  own; the rest share one.
+* **Size.** The families with the most measured and significant reactions take
+  rows of their own, and among equals the one whose significant change is
+  largest; the rest share one. Exchange reactions are one per metabolite, so
+  there it is the size of the change that picks the metabolites named.
 """
 
 from __future__ import annotations
@@ -139,13 +141,16 @@ def transport_rows(
     subsystem_id: str,
     measured: Optional[Iterable[str]] = None,
     significant: Iterable[str] = (),
+    strength: Optional[Mapping[str, float]] = None,
 ) -> List[TransportRow]:
     """The rows of a transport subsystem's view, the most measured first.
 
     ``measured`` holds the reactions (or genes) with data, and ``significant``
     those found significant, each counting twice: together they order the rows
     and decide which take a row of their own. Without ``measured``, every
-    reaction counts.
+    reaction counts. ``strength`` gives each element's effect size: among rows
+    of equal weight, the one whose largest significant effect is largest comes
+    first, so a tie is not settled by the alphabet.
     """
     rows: Dict[str, TransportRow] = {}
     for reaction_id in model.get_reactions_for_subsystem(subsystem_id) or []:
@@ -186,10 +191,16 @@ def transport_rows(
             for element in [*row.reactions, *row.genes]
         )
 
+    sizes = {str(element): abs(float(value)) for element, value in (strength or {}).items() if value == value}
+
+    def largest(row: TransportRow) -> float:
+        names = (name for element in [*row.reactions, *row.genes] for name in (element, f"{element}_back"))
+        return max((sizes[name] for name in names if name in flagged and name in sizes), default=0.0)
+
     special = (SEVERAL_FAMILIES, OTHER_GENES, NO_GENE)
     ordered = sorted(
         (row for row in rows.values() if row.key not in special and weight(row)),
-        key=lambda row: (-weight(row), row.key),
+        key=lambda row: (-weight(row), -largest(row), row.key),
     )
     kept, rest = ordered[:MOST_ROWS], ordered[MOST_ROWS:]
     if rest:
@@ -453,13 +464,19 @@ def _transport_layout(
             return list(reactions)
         return [source for base in reactions if (source := direction_map.source_column_for(base)) is not None]
 
+    options = dict(delta_options or {"metric": metric})
+    effect = options.get("metric", metric)
     rows = transport_rows(
         model,
         subsystem_id,
         measured=test_results.index if test_results is not None else None,
         significant=significant,
+        strength=(
+            test_results[effect].to_dict()
+            if test_results is not None and effect in test_results.columns
+            else None
+        ),
     )
-    options = dict(delta_options or {"metric": metric})
     groups = {}
     entries = []
     hovers: Dict[str, str] = {}

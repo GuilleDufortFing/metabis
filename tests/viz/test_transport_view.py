@@ -7,6 +7,7 @@ from metabis import MetabolicModel
 from metabis.viz.transport_view import (
     MOST_ROWS,
     NO_GENE,
+    _exchanged,
     group_delta_score,
     is_transport_subsystem,
     transport_rows,
@@ -47,6 +48,27 @@ def test_a_transport_subsystems_rows_are_its_families(model):
 def test_exchange_rows_are_metabolites(model):
     rows = transport_rows(model, "exchange_demand_reactions")
     assert all("[" not in row.name for row in rows)
+
+
+def test_among_rows_of_equal_weight_the_largest_change_takes_a_row_first(model):
+    reactions = list(model.get_reactions_for_subsystem("exchange_demand_reactions"))
+    # Every exchange measured and significant, as a large comparison makes them:
+    # by weight they all tie, and the last alphabetically changes most.
+    names = {reaction: _exchanged(model.reactions.get(reaction).equation) for reaction in reactions}
+    last = max(names, key=names.get)
+    strength = {reaction: 0.1 for reaction in reactions} | {f"{last}_back": -2.0}
+    rows = transport_rows(
+        model,
+        "exchange_demand_reactions",
+        measured=[f"{reaction}_back" for reaction in reactions],
+        significant=[f"{reaction}_back" for reaction in reactions],
+        strength=strength,
+    )
+
+    assert rows[0].key == names[last]
+    # Without effect sizes, a tie is still settled the same way every time.
+    tied = transport_rows(model, "exchange_demand_reactions", measured=reactions, significant=reactions)
+    assert tied[0].key == min(row.key for row in tied[:MOST_ROWS])
 
 
 def test_a_familys_delta_score_is_computed_as_a_subsystems():
