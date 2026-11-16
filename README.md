@@ -40,31 +40,21 @@ pip install .
 
 ## Get Started
 
-The recommended starting point is the staged demo notebook series under `demo/`:
+The demo notebooks under `demo/` follow the three tutorials of the Metabis server, one each, with the library calls the server makes, so the numbers they print are the app's:
 
-- `demo/01_metabolic_model_and_data_loading.ipynb`
-- `demo/02_groups_and_dimensionality_reduction.ipynb`
-- `demo/03_group_statistical_comparison.ipynb`
-- `demo/04_metabolic_graphs_and_subsystems.ipynb`
-- `demo/05_multi_group_comparisons_smillie.ipynb`
+- `demo/01_compass_th17.ipynb`: Compass scores of pathogenic and non-pathogenic Th17 cells (Wagner et al., Cell 2021). It introduces the library as it goes: loading and aligning the data, groups and reductions, a Target/Baseline comparison, the Delta score, over-representation analysis, pathway graphs, Metabolic Atlas maps, element details and adjustment for depth.
+- `demo/02_smillie_pseudobulk.ipynb`: Compass scores of seven colon cell types in healthy, non-inflamed and inflamed tissue (Smillie et al., Cell 2019): groups from two metadata columns, comparison sides joined from several groups, each group against the rest, and the analysis overview.
+- `demo/03_metaflux_tcga_lung.ipynb`: METAFlux fluxes of 1,017 TCGA lung tumours (Huang et al., Nat Commun 2023): a signed flux matrix, values at a solver's tolerance read as zero, expression already on a log2 scale, log2 fold change, and a reaction map prepared as the paper prepared its own.
 
-Each notebook is self-contained, but the series is ordered from basic object loading to pathway-level interpretation. Together, notebooks `01` to `04` guide you through the main Metabis workflow step by step.
+Read `01` first; `02` and `03` use what it introduces without introducing it again. When the notebooks are opened from this repository, they automatically add the local `src/` directory before importing `metabis`, so they can run directly from the checkout as long as the Python dependencies are installed.
 
-Notebook `05` then moves from the two-group Th17 example to the multi-group Smillie colon atlas, where the groups must be composed rather than simply named: Sample Groups over eight cell types with expression and reaction UMAPs, a Target built from several base groups, and base groups built from the intersection of two metadata columns.
-
-When the notebooks are opened from this repository, they automatically add the local `src/` directory before importing `metabis`, so they can run directly from the checkout as long as the Python dependencies are installed.
-
-If you prefer a single end-to-end case study, use
-[demo/case_study.ipynb](demo/case_study.ipynb). It applies the same ordered,
-artifact-first workflow to the Th17 example used in the Metabis server tutorial.
-
-The example files the demo notebooks load are installed rather than tracked: they are large, and `data/*.csv`, `data/*.tsv`, and `data/*.h5ad` are gitignored. Install the complete set with:
+The example files the notebooks load are installed rather than tracked: they are large, and `data/*.csv`, `data/*.tsv`, and `data/*.h5ad` are gitignored. Install the complete set with:
 
 ```bash
 python data/download_datasets.py
 ```
 
-That downloads the author-maintained archive the Metabis server deploys, verifies its recorded SHA-256 digest, and writes the Th17 Compass files (`data/Th17_Compass_reactions.tsv`, `data/Th17_Compass_expression.tsv`, and the `data/Th17_Compass_metadata.tsv` sample sheet) together with the Smillie files notebook `05` loads (`data/smillie_clusters_pool_reactions.tsv`, `data/smillie_clusters_pool_expression_cpm.tsv`, and `data/smillie_metadata.tsv`). All are tab-delimited, as their `.tsv` suffix says.
+That downloads the author-maintained archive the Metabis server deploys, verifies its recorded SHA-256 digest, and writes each example's reaction, expression and sample-sheet files into `data/`: `Th17_Compass_*.tsv` (notebook `01`), `smillie_pseudobulk_*.tsv` (notebook `02`) and `metaflux_tcga_lung_*.tsv` (notebook `03`). All are tab-delimited, as their `.tsv` suffix says.
 
 The archive is the single source for the example data, so the notebooks and the deployed Metabis server read byte-identical inputs.
 

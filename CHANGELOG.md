@@ -9,10 +9,10 @@ and releases follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
-- Demo notebook `05_multi_group_comparisons_smillie.ipynb`: multi-group Sample
-  Groups on the Smillie colon atlas, expression and reaction UMAPs, a Target
-  composed of several base groups, and base groups built from the intersection
-  of two metadata columns. The notebook execution gate now covers six notebooks.
+- Demo notebooks `01_compass_th17.ipynb`, `02_smillie_pseudobulk.ipynb` and
+  `03_metaflux_tcga_lung.ipynb`, one for each tutorial of the Metabis server:
+  each runs its tutorial's analysis with the library calls the server makes and
+  asserts the numbers the tutorial states. The execution gate runs the three.
 - `data/download_datasets.py` installs every bundled example matrix from the
   author-maintained archive, verifying its recorded SHA-256 digest.
 - Attribution and upstream terms for the Smillie example data in the README and
@@ -61,6 +61,11 @@ and releases follow [Semantic Versioning](https://semver.org/).
 
 ### Removed
 
+- The demo notebooks `01` to `05` and `case_study.ipynb`, replaced by the three
+  above, and the Smillie cluster-pool example files they read
+  (`smillie_clusters_pool_reactions.tsv`,
+  `smillie_clusters_pool_expression_cpm.tsv`, `smillie_metadata.tsv`), which the
+  dataset archive no longer holds.
 - `data/download_and_process_compass.py` and its `data/add_celltype_to_samples.py`
   helper. `data/download_datasets.py` is now the single documented route to the
   example data, so the notebooks and the deployed server cannot diverge on how

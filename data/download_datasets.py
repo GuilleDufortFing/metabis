@@ -10,13 +10,13 @@ It installs the same files the Metabis server ships, so a demo notebook and the
 deployed application read byte-identical inputs:
 
     - Th17_Compass_reactions.tsv, Th17_Compass_expression.tsv,
-      Th17_Compass_metadata.tsv  (notebooks 01 to 04 and the Th17 case study)
+      Th17_Compass_metadata.tsv  (notebook 01, the Compass Th17 example)
     - smillie_pseudobulk_reactions.tsv,
       smillie_pseudobulk_expression_cp10k.tsv, smillie_pseudobulk_metadata.tsv
-      (the server's Smillie example: Compass's pseudobulk notebook rebuilt)
+      (notebook 02, the Smillie example: Compass's pseudobulk notebook rebuilt)
     - metaflux_tcga_lung_reactions.tsv, metaflux_tcga_lung_expression.tsv,
-      metaflux_tcga_lung_metadata.tsv  (the server's METAFlux example: TCGA lung
-      tumours scored with METAFlux)
+      metaflux_tcga_lung_metadata.tsv  (notebook 03, the METAFlux example: TCGA
+      lung tumours scored with METAFlux)
 
 The archive is the single source for these files, so the notebooks and the
 deployed application read byte-identical inputs.
