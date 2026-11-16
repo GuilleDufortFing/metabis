@@ -1,0 +1,54 @@
+cff-version: 1.2.0
+message: "If you use Metabis, please cite it as below."
+type: software
+title: "Metabis"
+abstract: >-
+  Metabis is a Python library, and the analytical core of the Metabis web
+  server, for the statistical analysis and interactive visualization of human
+  metabolic flux scores inferred from transcriptomic data, alongside gene
+  expression, on the Human1 genome-scale metabolic model.
+authors:
+  - family-names: "Dufort y Álvarez"
+    given-names: "Guillermo"
+    affiliation: "Tecnun School of Engineering, DATAI, University of Navarra, Spain; Instituto de Computación, Facultad de Ingeniería, Universidad de la República, Montevideo, Uruguay"
+    orcid: "https://orcid.org/0000-0001-6125-5603"
+  - family-names: "Alonso"
+    given-names: "Luis"
+    affiliation: "Tecnun School of Engineering, DATAI, University of Navarra, Spain; CIMA, DATAI, IdiSNA, University of Navarra, Spain"
+    orcid: "https://orcid.org/0009-0000-8201-6302"
+  - family-names: "González"
+    given-names: "Tomás"
+    affiliation: "Instituto de Computación, Facultad de Ingeniería, Universidad de la República, Montevideo, Uruguay"
+  - family-names: "Rodriguez-Flores"
+    given-names: "Carlos"
+    affiliation: "Tecnun School of Engineering, DATAI, University of Navarra, Spain"
+    orcid: "https://orcid.org/0009-0001-9048-4795"
+  - family-names: "Planes"
+    given-names: "Francisco"
+    affiliation: "Tecnun School of Engineering, DATAI, University of Navarra, Spain"
+    orcid: "https://orcid.org/0000-0003-1155-3105"
+  - family-names: "Hernaez"
+    given-names: "Mikel"
+    affiliation: "CIMA, DATAI, IdiSNA, University of Navarra, Spain"
+    orcid: "https://orcid.org/0000-0003-0443-2305"
+  - family-names: "Martín"
+    given-names: "Álvaro"
+    affiliation: "Instituto de Computación, Facultad de Ingeniería, Universidad de la República, Montevideo, Uruguay; Departamento de Genómica, Instituto de Investigaciones Biológicas Clemente Estable, Montevideo, Uruguay"
+    orcid: "https://orcid.org/0000-0001-8601-1242"
+  - family-names: "Ochoa"
+    given-names: "Idoia"
+    affiliation: "Tecnun School of Engineering, DATAI, University of Navarra, Spain"
+    orcid: "https://orcid.org/0000-0003-1864-7868"
+version: "1.1.0"
+date-released: "2026-11-16"
+doi: "10.5281/zenodo.22049960"
+license: MIT
+repository-code: "https://github.com/GuilleDufortFing/metabis"
+url: "https://metabis.unav.edu"
+keywords:
+  - metabolic flux analysis
+  - flux balance analysis
+  - Human1
+  - genome-scale metabolic model
+  - transcriptomics
+  - pathway visualization
