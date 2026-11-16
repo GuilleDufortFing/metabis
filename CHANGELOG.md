@@ -7,6 +7,8 @@ and releases follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-11-16
+
 ### Added
 
 - Demo notebooks `01_compass_th17.ipynb`, `02_smillie_pseudobulk.ipynb` and
@@ -143,4 +145,5 @@ This is the first stable release of the supported public interface.
   handling, imported-embedding identity, graph layout quality, and plot/export
   consistency across the supported workflows.
 
+[1.1.0]: https://github.com/GuilleDufortFing/metabis/releases/tag/v1.1.0
 [1.0.0]: https://github.com/GuilleDufortFing/metabis/releases/tag/v1.0.0

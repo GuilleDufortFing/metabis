@@ -60,8 +60,9 @@ The archive is the single source for the example data, so the notebooks and the 
 
 ## Public interface and versioning
 
-Metabis follows [semantic versioning](https://semver.org/), and the first
-stable public-interface release is `1.0.0`. Stability is promised for the
+Metabis follows [semantic versioning](https://semver.org/), from the first
+stable public-interface release, `1.0.0`. Its current
+stable public-interface release is `1.1.0`. Stability is promised for the
 supported namespaces only; everything else is implementation that may change
 without notice.
 

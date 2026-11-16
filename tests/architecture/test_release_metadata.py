@@ -14,7 +14,7 @@ def test_version_source_matches_release_documentation():
     changelog = (PROJECT_ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
     readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
 
-    assert version == "1.0.0"
+    assert version == "1.1.0"
     assert f"## [{version}] - " in changelog
     assert f"stable public-interface release is `{version}`" in readme
 
