@@ -44,6 +44,13 @@ and releases follow [Semantic Versioning](https://semver.org/).
   writes the other way; `MetabolicModel.reverse_reactions(ids)` reverses them.
   `ReactionData.reaction_mapping` gives each kept source's Human1 reaction, and
   `MetabolicModel.get_alignment_values(name)` a model's per-reaction file.
+- `fit_view_at_one_scale(plot)` fits the metabolic network's view to what it
+  draws at one scale, whatever room its frame leaves, so a colour bar or the
+  category key below no longer squeezes the categories into each other; the
+  server's overview and the demo notebooks use it. `keep_map_scale` takes a
+  keyword-only `fit_whole`: an untouched view is fitted whole again when only
+  its width changes, as a notebook's output settles, instead of keeping the
+  scale of its first layout. Existing calls are unchanged.
 
 ### Changed
 

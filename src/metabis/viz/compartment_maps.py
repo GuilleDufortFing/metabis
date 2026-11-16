@@ -29,7 +29,8 @@ draws, and leads between a subsystem's graph and the maps that draw it:
   graph takes the same find.
 * **Scale.** :func:`keep_map_scale` fits a map, or a subsystem's graph, to its plot
   at one scale across and down, and keeps that scale whatever its plot's size: a
-  narrower map shows less of itself, never squeezed.
+  narrower map shows less of itself, never squeezed. :func:`fit_view_at_one_scale`
+  fits the metabolic network the same way, at one scale whatever room its frame leaves.
 * **Subsystems.** :func:`add_map_bands` lays Metabolic Atlas's band under one
   subsystem's links at a time, as a soft yellow glow: the subsystem the map was
   opened from, or one the page names: one chosen, or a tapped reaction's.
@@ -41,13 +42,14 @@ and its names as Metabolic Atlas sets them, in map units (rendering.map_labels).
 from __future__ import annotations
 
 import json
+import math
 import weakref
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 from typing import Dict, Iterable, List, Mapping, Optional, Tuple
 
-from bokeh.models import ColumnDataSource, CustomJS, TapTool
+from bokeh.models import ColumnDataSource, CustomJS, DataRange1d, TapTool
 
 from .atlas_paths import atlas_paths
 from .brand import GRADIENT_JS
@@ -444,7 +446,7 @@ def add_map_links(
         )
 
 
-def keep_map_scale(plot) -> None:
+def keep_map_scale(plot, *, fit_whole: bool = False) -> None:
     """A map shows its view whole at one scale, then less of itself as its frame narrows, never squeezed.
 
     The view it was drawn with, the whole map or a subsystem's part of it, is
@@ -460,10 +462,15 @@ def keep_map_scale(plot) -> None:
     its scale the same way. An element just tapped, whose details the sidebar
     opens, is not cut away with it: the view moves across, at its scale, just
     enough to keep the element in, if it was in view before.
+
+    With ``fit_whole``, a change of width alone also fits the view whole again,
+    until the reader moves it: a notebook's output settles its width after its
+    first layout, and has no sidebar to make room for.
     """
     keep = CustomJS(
         args=dict(plot=plot),
-        code="""
+        code=f"const fitWhole = {'true' if fit_whole else 'false'}\n"
+        + """
         let width, height
         try { width = plot.inner_width; height = plot.inner_height } catch { return }
         const xr = plot.x_range
@@ -484,7 +491,7 @@ def keep_map_scale(plot) -> None:
         plot.metabis_view ??= now
         const set = plot.metabis_set
         const untouched = set !== undefined && set.every((end, i) => Math.abs(end - now[i]) <= 1e-9 * Math.abs(set[i % 2 === 0 ? i + 1 : i - 1] - set[i]))
-        if (!before || (untouched && height !== before[1])) {
+        if (!before || (untouched && (fitWhole || height !== before[1]))) {
           const [x0, x1, y0, y1] = plot.metabis_view
           const scale = Math.min(width / Math.abs(x1 - x0), height / Math.abs(y1 - y0))
           const x = (x0 + x1) / 2
@@ -516,6 +523,38 @@ def keep_map_scale(plot) -> None:
     )
     plot.js_on_change("inner_width", keep)
     plot.js_on_change("inner_height", keep)
+
+
+# The network's padding around what it draws, as a share of the drawn span: a small
+# margin keeps the outermost circles, and the numbers on their rims, off the edges.
+NETWORK_RANGE_PADDING = 0.06
+
+
+def fit_view_at_one_scale(plot, *, padding: float = NETWORK_RANGE_PADDING):
+    """The metabolic network's view, fitted to what it draws with both axes at one scale.
+
+    The renderer fixes the view's corners, and fixed corners ignore match_aspect:
+    in a frame of any other shape, as when a colour bar or the category key below
+    takes some of the plot's height, the axes scale differently, so the category
+    circles, sized along x, crowd each other along y. Automatic ranges fit
+    everything drawn, padded for the labels, at one scale, whatever the frame's
+    size; y stays flipped, as the layout runs down. The range objects are kept,
+    since the label fading listens to them. The plot keeps its sizing mode, so
+    the network sits in the middle of whatever room its frame leaves. A view
+    framed on part of a graph, as highlight_reactions frames one, is kept at one
+    scale by keep_map_scale instead. Returns the plot.
+    """
+    for axis in (plot.x_range, plot.y_range):
+        if isinstance(axis, DataRange1d):
+            # NaN is DataRange1d's own "compute from the data" value.
+            axis.start = math.nan
+            axis.end = math.nan
+            axis.range_padding = padding
+    if isinstance(plot.y_range, DataRange1d):
+        plot.y_range.flipped = True
+    plot.match_aspect = True
+    plot.aspect_ratio = None
+    return plot
 
 
 def _shape(renderer) -> Optional[dict]:

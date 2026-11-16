@@ -1,6 +1,7 @@
 """The compartment maps: their names, their reactions, and the links into and out of them."""
 
 import json
+import math
 import shutil
 import subprocess
 
@@ -25,6 +26,7 @@ from metabis.viz.compartment_maps import (
     add_map_find,
     add_map_links,
     band_name,
+    fit_view_at_one_scale,
     highlight_reactions,
     keep_map_scale,
     map_bands,
@@ -421,6 +423,25 @@ def _resized(plot, frames, x=(0.0, 2000.0), y=(1000.0, 0.0)) -> list:
     return json.loads(result.stdout)
 
 
+def test_the_network_fits_its_frame_at_one_scale_whatever_room_is_left():
+    # Drawn with fixed corners for a 1.5 frame; a key below would leave it another shape.
+    plot = figure(width=975, height=650, match_aspect=False, aspect_ratio=1.5, sizing_mode="stretch_width")
+    plot.circle(x=[0, 2000], y=[0, 1000], radius=50)
+    plot.x_range.start, plot.x_range.end = 0, 2000
+    plot.y_range.start, plot.y_range.end = 1000, 0
+
+    assert fit_view_at_one_scale(plot) is plot
+
+    # The ranges fit what is drawn, padded, at one scale; y still runs down; the
+    # sizing mode is the caller's.
+    for axis in (plot.x_range, plot.y_range):
+        assert math.isnan(axis.start) and math.isnan(axis.end)
+        assert axis.range_padding == 0.06
+    assert plot.y_range.flipped
+    assert plot.match_aspect and plot.aspect_ratio is None
+    assert plot.sizing_mode == "stretch_width"
+
+
 def test_a_map_fits_its_plot_then_is_cut_never_squeezed():
     plot = _map_plot()[0]
     keep_map_scale(plot)
@@ -450,3 +471,15 @@ def test_a_map_fits_its_plot_then_is_cut_never_squeezed():
     assert _resized(plot, [(1000, 500), {"tap": [300, 500]}, {"x": [1000, 3000]}, (600, 500)])[3][:2] == [1800, 3000]
     # A data range without its span yet is left to fit itself.
     assert _resized(plot, [(600, 500)], x=(None, None))[0][:2] == [None, None]
+
+
+def test_a_notebooks_map_fits_whole_again_as_its_output_settles_its_width():
+    plot = _map_plot()[0]
+    keep_map_scale(plot, fit_whole=True)
+
+    # Laid out at 1,000 px, then settled at 600: shown whole again, 0.3 pixels a unit.
+    first, settled = _resized(plot, [(1000, 500), (600, 500)])
+    assert first == [0, 2000, 1000, 0]
+    assert settled == pytest.approx([0, 2000, 500 + 500 / 0.6, 500 - 500 / 0.6])
+    # Once panned, it keeps its scale as any map does, its right edge kept.
+    assert _resized(plot, [(1000, 500), {"x": [100, 2100]}, (600, 500)])[2] == [900, 2100, 1000, 0]

@@ -137,6 +137,7 @@ EXPECTED_ROOT_ALL = frozenset(
         "apply_academic_style",
         "band_name",
         "category_numbers",
+        "fit_view_at_one_scale",
         "highlight_reactions",
         "is_transport_subsystem",
         "keep_map_scale",
