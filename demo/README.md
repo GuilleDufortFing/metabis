@@ -1,41 +1,36 @@
 # Demo Notebooks
 
-This folder contains the staged Metabis demo series plus a direct case study built around the generated Th17 Compass example dataset.
+Three notebooks, one for each tutorial of the Metabis server. Each runs its
+tutorial's analysis with the library calls the server makes, so the numbers it
+prints are the app's, and asserts them as it goes.
 
-All notebooks are self-contained. You can run them independently, but notebooks `01` to `04` are designed to be read in order.
+## Notebooks
 
-## Order
+1. `01_compass_th17.ipynb`
+   Compass scores of pathogenic (Th17p) and non-pathogenic (Th17n) Th17 cells,
+   from [Wagner et al., Cell 2021](https://doi.org/10.1016/j.cell.2021.05.045).
+   It introduces the library as it goes: the model and the source model's
+   reaction table, reaction and expression data, the sample sheet and the
+   `AnalysisWorkspace`, groups and reductions, a Target/Baseline comparison,
+   the Delta score, over-representation analysis, the network and pathway
+   graphs, Metabolic Atlas maps, element details, single-group activity and
+   adjustment for depth.
 
-1. `01_metabolic_model_and_data_loading.ipynb`
-   Introduces the Metabolic Dataset inputs (`MetabolicModel`, `ReactionData`,
-   `ExpressionData`, and `SampleMetadata`) and the minimal `AnalysisWorkspace`.
+2. `02_smillie_pseudobulk.ipynb`
+   Compass scores of seven colon cell types in healthy, non-inflamed and
+   inflamed tissue, from [Smillie et al., Cell 2019](https://doi.org/10.1016/j.cell.2019.06.029):
+   groups from two metadata columns, comparison sides joined from several
+   groups, each group against the rest, the analysis overview and the maps.
 
-2. `02_groups_and_dimensionality_reduction.ipynb`
-   Defines metadata-driven Sample Groups, creates an `ExperimentAnalysis`, and
-   installs and plots PCA, t-SNE, and UMAP Analysis Artifacts.
+3. `03_metaflux_tcga_lung.ipynb`
+   METAFlux fluxes of 1,017 TCGA lung tumours, from
+   [Huang et al., Nat Commun 2023](https://doi.org/10.1038/s41467-023-40457-w):
+   a signed flux matrix read in single direction, values at a solver's
+   tolerance read as zero, expression already on a log2 scale, log2 fold
+   change, and a reaction map prepared as the paper prepared its own.
 
-3. `03_group_statistical_comparison.ipynb`
-   Resolves an explicit Target/Baseline Comparison Membership, installs the
-   comparison Analysis Artifact, and walks through reaction and gene results,
-   significance thresholds, histograms, and scatter plots.
-
-4. `04_metabolic_graphs_and_subsystems.ipynb`
-   Uses subsystem ranking, renderer-independent Graph Artifacts, and the Bokeh
-   rendering adapter to move from global results to pathway-level interpretation.
-
-5. `05_multi_group_comparisons_smillie.ipynb`
-   Moves to the multi-group Smillie colon atlas: Sample Groups over eight cell
-   types with an expression UMAP, a Target composed of several base groups
-   against a single-group Baseline, and base groups built from the intersection
-   of two metadata columns.
-
-## Case Study
-
-`case_study.ipynb`
-Applies the same ordered workflow directly to the Th17 example used in the
-Metabis server tutorial. Unlike notebooks `01` to `04`, it assumes that
-background and does not re-introduce the main library functionality step by
-step.
+Read `01` first: `02` and `03` use what it introduces without introducing it
+again.
 
 ## Prerequisites
 
@@ -47,19 +42,14 @@ The notebooks automatically add the local `src/` directory when they are run fro
 
 ## Example Data
 
-All notebooks in this folder load their example files from `metabis/data`.
+All notebooks in this folder load their example files from `metabis/data`:
 
-Notebooks `01` to `04` and the case study use the Th17 Compass example:
-
-- `Th17_Compass_reactions.tsv`
-- `Th17_Compass_expression.tsv`
-- `Th17_Compass_metadata.tsv`
-
-Notebook `05` uses the Smillie colon atlas subset:
-
-- `smillie_clusters_pool_reactions.tsv`
-- `smillie_clusters_pool_expression_cpm.tsv`
-- `smillie_metadata.tsv`
+- `Th17_Compass_reactions.tsv`, `Th17_Compass_expression.tsv` and
+  `Th17_Compass_metadata.tsv` (notebook `01`)
+- `smillie_pseudobulk_reactions.tsv`, `smillie_pseudobulk_expression_cp10k.tsv`
+  and `smillie_pseudobulk_metadata.tsv` (notebook `02`)
+- `metaflux_tcga_lung_reactions.tsv`, `metaflux_tcga_lung_expression.tsv` and
+  `metaflux_tcga_lung_metadata.tsv` (notebook `03`)
 
 Install every example file with:
 
@@ -72,14 +62,8 @@ verifies its recorded SHA-256 digest, and extracts the files into `metabis/data`
 so the notebooks and the application read byte-identical inputs.
 
 The archive is the single source for the example data, and the notebooks load
-these files only from `metabis/data`.
-
-The Smillie expression subset and metadata are derived from the processed data
-that [Smillie et al.](https://doi.org/10.1016/j.cell.2019.06.029) deposited as
-the public [Single Cell Portal study SCP259](https://singlecell.broadinstitute.org/single_cell/study/SCP259/intra-and-inter-cellular-rewiring-);
-the reaction matrix is Compass output computed from that subset. The Single Cell
-Portal terms permit public-study data to be redistributed and reused, and limit
-it to research use: not for medical, clinical, or diagnostic decisions.
+these files only from `metabis/data`. `THIRD_PARTY_NOTICES.md` gives each
+example's source and terms.
 
 ## Execution gate
 
@@ -90,9 +74,7 @@ python scripts/execute_demo_notebooks.py
 ```
 
 The gate executes each notebook from the repository root in a fresh Jupyter
-kernel, fails on the first cell error, and leaves the source notebooks
-unchanged. Use `--output-dir PATH` to retain executed copies for visual review,
-or pass one or more notebook filenames to run a focused subset.
-
-If you want the single-notebook case study instead of the staged learning path,
-use [`case_study.ipynb`](case_study.ipynb) in this folder.
+kernel, fails on the first cell error or failed assertion, and leaves the
+source notebooks unchanged. Use `--output-dir PATH` to retain executed copies
+for visual review, or pass one or more notebook filenames to run a focused
+subset.

@@ -13,7 +13,11 @@ from .color_distributions import (
     rgb_to_hex,
 )
 from .color_lookup import GraphColorLookup
+from .group_palettes import group_palette
 from .workspace_mode import AnalysisWorkspaceMode
+
+# The group palette used unless another is asked for (see group_palettes).
+DEFAULT_GROUP_PALETTE = "default"
 
 
 class ColorManager:
@@ -229,6 +233,30 @@ class ColorManager:
             mode, element_type, element_id, metric_name
         )
 
+    def get_color_for_value(
+        self,
+        mode: AnalysisWorkspaceMode,
+        element_type: str,
+        metric_name: str,
+        value: float,
+    ) -> str:
+        """Colour a value as a registered distribution colours an element of it.
+
+        For a value no element holds, such as a transporter family's Delta score
+        on its subsystems' scale.
+        """
+        return self.color_lookup().get_color_for_value(mode, element_type, metric_name, value)
+
+    def has_value(
+        self,
+        mode: AnalysisWorkspaceMode,
+        element_type: str,
+        element_id: str,
+        metric_name: str = "default",
+    ) -> bool:
+        """Whether the registered distribution holds a finite value for this element."""
+        return self.color_lookup().has_value(mode, element_type, element_id, metric_name)
+
     def get_color_limit(
         self,
         mode: AnalysisWorkspaceMode,
@@ -241,6 +269,18 @@ class ColorManager:
         rather than implicit.
         """
         return self.color_lookup().get_color_limit(mode, element_type, metric_name)
+
+    def get_distribution_values(
+        self,
+        mode: AnalysisWorkspaceMode,
+        element_type: str,
+        metric_name: str = "default",
+    ):
+        """Every element's value of a registered distribution, by element ID; None when none is registered.
+
+        What an element's value is set among, as the details beside a graph show it.
+        """
+        return self.color_lookup().get_distribution_values(mode, element_type, metric_name)
 
     def get_distribution_details(
         self,
@@ -435,15 +475,15 @@ class ColorManager:
     def generate_group_colors(
         self,
         group_ids: List[str],
-        palette_name: str = "turbo",
+        palette_name: str = DEFAULT_GROUP_PALETTE,
         custom_colors: Dict[str, str] = None,
     ) -> Dict[str, str]:
         """Generate colors for a list of group IDs.
 
         Args:
             group_ids: List of group identifiers to generate colors for
-            palette_name: Name of the color palette to use ('turbo', 'viridis',
-                'Category20', 'Set1', 'Set3')
+            palette_name: Name of the color palette to use ('default', 'turbo',
+                'viridis', 'Category20', 'Set1', 'Set3')
             custom_colors: Optional dictionary of custom colors to override
                 generated ones
 
@@ -480,7 +520,7 @@ class ColorManager:
 
         Args:
             group_ids: List of group identifiers. If None, uses existing groups
-            palette_name: Name of the color palette. If None, uses 'turbo'
+            palette_name: Name of the color palette. If None, uses the default
             custom_colors: Optional custom color overrides
 
         Returns:
@@ -492,7 +532,7 @@ class ColorManager:
 
         # Use default palette if none specified
         if palette_name is None:
-            palette_name = "turbo"
+            palette_name = DEFAULT_GROUP_PALETTE
 
         return self.generate_group_colors(group_ids, palette_name, custom_colors)
 
@@ -516,6 +556,8 @@ class ColorManager:
         # Define available palettes with dynamic imports
         def get_palette_colors(palette_name: str, n: int) -> List[str]:
             """Get colors from specified palette using dynamic imports."""
+            if palette_name == DEFAULT_GROUP_PALETTE:
+                return group_palette(n)
             if palette_name == "turbo":
                 from bokeh.palettes import turbo
 
@@ -552,7 +594,7 @@ class ColorManager:
             else:
                 raise ValueError(f"Unknown palette: {palette_name}")
 
-        available_palettes = ["turbo", "viridis", "Category20", "Set1", "Set3"]
+        available_palettes = self.get_available_palettes()
 
         if palette_name not in available_palettes:
             raise ValueError(
@@ -574,13 +616,13 @@ class ColorManager:
             return dict(zip(group_ids, colors))
 
         except Exception as e:
-            # Fallback to turbo if specific palette fails
-            if palette_name != "turbo":
+            # Fall back to the default palette if a specific palette fails
+            if palette_name != DEFAULT_GROUP_PALETTE:
                 print(
                     f"Warning: {palette_name} palette failed ({e}), "
-                    f"falling back to turbo"
+                    f"falling back to the default"
                 )
-                return self._generate_palette_colors(group_ids, "turbo")
+                return self._generate_palette_colors(group_ids, DEFAULT_GROUP_PALETTE)
             else:
                 raise ValueError(f"Failed to generate colors: {e}")
 
@@ -590,7 +632,7 @@ class ColorManager:
         Returns:
             List of available palette names
         """
-        return ["turbo", "viridis", "Category20", "Set1", "Set3"]
+        return [DEFAULT_GROUP_PALETTE, "turbo", "viridis", "Category20", "Set1", "Set3"]
 
     def set_custom_group_color(self, group_id: str, color: str) -> None:
         """Override generated color for specific group.

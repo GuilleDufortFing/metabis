@@ -171,9 +171,10 @@ def enrich_compartment_glyph(
             else VisualizationConstants.DEFAULT_LINE_COLOR
         )
 
-    # Calculate label positions
-    x_label = base_glyph["x"] - base_glyph["width"] / 2 + 100
-    y_label = base_glyph["y"] - base_glyph["height"] / 2 + 100
+    # The name hangs from the compartment's top-left corner, inside it (the
+    # renderer offsets it a few pixels), so neighbouring names never meet.
+    x_label = base_glyph["x"] - base_glyph["width"] / 2
+    y_label = base_glyph["y"] - base_glyph["height"] / 2
 
     enriched = base_glyph.copy()
     enriched.update(

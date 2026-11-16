@@ -10,6 +10,7 @@ from bokeh.models import ColumnDataSource, HoverTool, Span
 from bokeh.plotting import figure
 
 from ..analysis.comparison_artifact import GroupComparisonArtifact
+from ..managers.hover import panel as hover_panel
 from ..visual_config import theme
 
 ComparisonFeature = Literal["reaction", "gene"]
@@ -133,10 +134,10 @@ def plot_comparison_histogram(
         line_color="white",
     )
     plot.select_one(HoverTool).renderers = [renderer]
-    plot.select_one(HoverTool).tooltips = [
-        ("Range", "@left{0.000} – @right{0.000}"),
-        ("Count", "@top"),
-    ]
+    plot.select_one(HoverTool).tooltips = hover_panel.panel(
+        hover_panel.row(label, "@left{0.000} to @right{0.000}"),
+        hover_panel.row(f"{feature_type.capitalize()}s", "@top"),
+    )
     threshold = _threshold(artifact, feature_type, metric)
     if show_threshold and threshold is not None and threshold != 0:
         plot.add_layout(
@@ -237,15 +238,18 @@ def plot_comparison_scatter(
         name="comparison_scatter_points",
     )
     plot.select_one(HoverTool).renderers = [renderer]
-    plot.select_one(HoverTool).tooltips = [
-        (feature_type.capitalize(), "@display_label"),
-        ("Canonical ID", "@feature_id"),
-        ("Adjusted p", "@adjusted_pval{0.000e}"),
-        ("Cohen's d", "@cohens_d{0.000}"),
-        ("Log2 fold change", "@log2_fc{0.000}"),
-        ("Mean difference", "@mean_difference{0.000}"),
-        ("Significant", "@is_significant"),
-    ]
+    plot.select_one(HoverTool).tooltips = hover_panel.panel(
+        hover_panel.row("ID", "@feature_id"),
+        hover_panel.row(feature_type.capitalize(), "@display_label"),
+        hover_panel.section(
+            hover_panel.row("Adjusted p-value", "@adjusted_pval{0.000e}"),
+            hover_panel.row("Cohen's d", "@cohens_d{0.000}"),
+            hover_panel.row("Log2 FC", "@log2_fc{0.000}"),
+            hover_panel.row("Mean difference", "@mean_difference{0.000}"),
+            hover_panel.row("Significant", "@is_significant"),
+            title="Statistical Comparison",
+        ),
+    )
     if show_thresholds:
         for metric, dimension in ((x_metric, "height"), (y_metric, "width")):
             threshold = _threshold(artifact, feature_type, metric)

@@ -1210,7 +1210,13 @@ class ExperimentAnalysis:
         Returns:
             Dict[str, Any]: Results dictionary with status and messages
         """
-        results: Dict[str, Any] = {"status": "success", "messages": []}
+        # ``messages`` logs every step; ``problems`` holds only what went wrong, for a reader.
+        results: Dict[str, Any] = {"status": "success", "messages": [], "problems": []}
+
+        def problem(status: str, message: str) -> None:
+            results["status"] = status
+            results["messages"].append(message)
+            results["problems"].append(message)
 
         if pca_data_types is None:
             pca_data_types = ["reactions"]
@@ -1223,10 +1229,7 @@ class ExperimentAnalysis:
                     f"Group reaction averages calculated: {group_avgs.shape}"
                 )
             else:
-                results["status"] = "error"
-                results["messages"].append(
-                    "Failed to calculate group reaction averages"
-                )
+                problem("error", "Failed to calculate group reaction averages")
                 return results
 
             # Step 3: Calculate reaction directions
@@ -1236,8 +1239,7 @@ class ExperimentAnalysis:
                     f"Reaction directions calculated: {reaction_directions.shape}"
                 )
             else:
-                results["status"] = "warning"
-                results["messages"].append("Failed to calculate reaction directions")
+                problem("warning", "Failed to calculate reaction directions")
 
             # Step 4: Calculate subsystem averages
             subsystem_avgs = self._calculate_subsystem_avgs()
@@ -1246,8 +1248,7 @@ class ExperimentAnalysis:
                     f"Subsystem averages calculated: {subsystem_avgs.shape}"
                 )
             else:
-                results["status"] = "warning"
-                results["messages"].append("Failed to calculate subsystem averages")
+                problem("warning", "Failed to calculate subsystem averages")
 
             # Step 6: Calculate group gene averages
             if getattr(self.data_manager, "expression_data", None):
@@ -1257,10 +1258,7 @@ class ExperimentAnalysis:
                         f"Group gene expression averages calculated: {gene_group_avgs.shape}"
                     )
                 else:
-                    results["status"] = "warning"
-                    results["messages"].append(
-                        "Failed to calculate group gene averages"
-                    )
+                    problem("warning", "Failed to calculate group gene averages")
 
             # Step 7: Calculate PCA if requested
             if include_pca:
@@ -1275,10 +1273,8 @@ class ExperimentAnalysis:
                         self._pca_completed[data_type] = True
                         results["messages"].append(f"PCA completed for {data_type}")
                     else:
-                        results["status"] = "warning"
-                        results["messages"].append(
-                            f"PCA failed for {data_type}: {pca_results.get('messages', [])}"
-                        )
+                        reasons = "; ".join(map(str, pca_results.get("messages", [])))
+                        problem("warning", f"PCA failed for {data_type}: {reasons}")
                         print(f"   ⚠ PCA failed for {data_type}")
 
             # Mark analysis as completed
@@ -1286,10 +1282,8 @@ class ExperimentAnalysis:
 
         except Exception as e:
             self._analysis_completed = False
-            results["status"] = "error"
-            error_msg = f"Error during analysis execution: {str(e)}"
-            results["messages"].append(error_msg)
-            print(f"\n✗ {error_msg}")
+            problem("error", f"The group analysis failed: {e}")
+            print(f"\n✗ The group analysis failed: {e}")
 
         return results
 

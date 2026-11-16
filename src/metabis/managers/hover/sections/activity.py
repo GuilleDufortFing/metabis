@@ -92,7 +92,7 @@ class ActivitySection(HoverSection):
             )
             parts.append(
                 "<div style='font-size:11px; color:#555;'>forward "
-                f"{_format_number(stats.get('forward_activity_score'))} &middot; "
+                f"{_format_number(stats.get('forward_activity_score'))}, "
                 f"backward {_format_number(stats.get('backward_activity_score'))}</div>"
             )
 

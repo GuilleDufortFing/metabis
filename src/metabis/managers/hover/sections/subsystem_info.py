@@ -1,6 +1,39 @@
+from typing import Any, Mapping
+
 from ...workspace_mode import AnalysisWorkspaceMode
 from ..interfaces import HoverSection
 from ..models import HoverContext, HoverData
+
+
+def subsystem_hover_data(
+    statistics: Mapping[str, Any], *, subsystem_name: str, display_name: str, metric: str
+) -> dict[str, Any]:
+    """A subsystem's statistics (SubsystemAnalysis.get_subsystem_statistics) as its hover reads them."""
+    data = dict(statistics)
+    data["subsystem_display_name"] = display_name
+    data["subsystem_name"] = subsystem_name
+    data["impact_score"] = data.get("impact_score", 0.0)
+    data["n_significant"] = data.get("significant_elements", 0)
+    data["n_total"] = data.get("total_elements", 0)
+    data["net_direction_score"] = data.get("net_direction_scores", {}).get(metric, 0.0)
+    data["total_metric_value"] = data.get("total_metric_values", {}).get(metric, 0.0)
+    return data
+
+
+def subsystem_facts(
+    statistics: Mapping[str, Any], *, subsystem_name: str, display_name: str, metric: str, for_genes: bool = False
+) -> str:
+    """A subsystem's facts as its node's hover in the network gives them, without the colour reference."""
+    context = HoverContext(
+        mode=AnalysisWorkspaceMode.GROUP_COMPARISON,
+        hover_type="subsystem",
+        element_type="subsystem",
+        subsystem_metric=metric,
+        color_metric=metric,
+        for_genes=for_genes,
+    )
+    data = subsystem_hover_data(statistics, subsystem_name=subsystem_name, display_name=display_name, metric=metric)
+    return SubsystemSection().build(data, context)
 
 
 class SubsystemSection(HoverSection):
@@ -65,44 +98,7 @@ class SubsystemSection(HoverSection):
         delta_meta = data.get("delta_subsystem_meta", {})
 
         if delta_score is not None and delta_meta.get("computed", False):
-            # Get delta configuration details
-            delta_metric = delta_meta.get("metric", metric)
-            transform = delta_meta.get("transform", "sign")
-            numerator_filter = delta_meta.get("numerator_filter", "all")
-            denominator_filter = delta_meta.get("denominator_filter", "all")
-
-            # Short metric name for equation
-            metric_short_names = {
-                "cohens_d": "Cohen's d",
-                "log2_fc": "Log Fold Change",
-                "mean_difference": "Mean dif.",
-                "pval": "p",
-                "neg_log_pval": "-log(p)",
-                "neg_log_adj_pval": "-log(padj)"
-            }
-            m_sym = metric_short_names.get(delta_metric, delta_metric)
-
-            # Transform notation
-            if transform == "sign":
-                term = f"sgn({m_sym})"
-            elif transform == "abs":
-                term = f"|{m_sym}|"
-            else:
-                term = f"({m_sym})"
-
-            # Summation notation
-            if numerator_filter == "significant":
-                numerator_str = f"Σ_{{sig}} {term}"
-            else:
-                numerator_str = f"Σ {term}"
-
-            # Denominator notation
-            if denominator_filter == "significant":
-                denom_str = "N_sig"
-            else:
-                denom_str = "N_total"
-
-            equation = f"{numerator_str} / {denom_str}"
+            equation = delta_equation(delta_meta, metric)
 
             parts.append(
                 "<div style='margin-top:4px;'><strong>Delta Score (ΔS):</strong></div>"
@@ -119,3 +115,27 @@ class SubsystemSection(HoverSection):
             )
 
         return "".join(parts)
+
+
+def delta_equation(delta_meta: dict, metric: str = "log2_fc") -> str:
+    """How a Delta score was computed, as a hover writes it: ``Σ_{sig} sgn(Cohen's d) / N_total``."""
+    delta_metric = delta_meta.get("metric", metric)
+    transform = delta_meta.get("transform", "sign")
+    metric_short_names = {
+        "cohens_d": "Cohen's d",
+        "log2_fc": "Log Fold Change",
+        "mean_difference": "Mean dif.",
+        "pval": "p",
+        "neg_log_pval": "-log(p)",
+        "neg_log_adj_pval": "-log(padj)",
+    }
+    m_sym = metric_short_names.get(delta_metric, delta_metric)
+    if transform == "sign":
+        term = f"sgn({m_sym})"
+    elif transform == "abs":
+        term = f"|{m_sym}|"
+    else:
+        term = f"({m_sym})"
+    numerator = f"Σ_{{sig}} {term}" if delta_meta.get("numerator_filter", "all") == "significant" else f"Σ {term}"
+    denominator = "N_sig" if delta_meta.get("denominator_filter", "all") == "significant" else "N_total"
+    return f"{numerator} / {denominator}"

@@ -304,15 +304,15 @@ def activity_legend_text(
     """The color meaning for activity mode.
 
     Deliberately never says "up-regulated"/"down-regulated": nothing is being
-    compared, so there is no regulation to report. The ramp is sequential
-    because activity is a magnitude, not a direction.
+    compared, so there is no regulation to report. The ramp runs from low
+    through typical to high, a level against the family's typical value.
     """
     family = ActivityOverlay(overlay)
     element = "reactions" if family is ActivityOverlay.REACTION else "genes"
     return (
         f"Coloring {element} by their normalized {config.summary.value} in "
-        f"'{config.group_id}'. Purple = high, amber = typical, white = low within "
-        f"this {element[:-1]} family."
+        f"'{config.group_id}'. Gold = high, gray = typical, purple = low within "
+        f"this {element[:-1]} family; white and dashed = no data."
     )
 
 

@@ -2,7 +2,7 @@
 """Download and install the bundled Metabis example datasets.
 
 The dataset matrices are too large for Git. This script downloads the author-
-maintained archive from the FING cloud share and extracts it beside this file:
+maintained archive from Google Drive and extracts it beside this file:
 
     python data/download_datasets.py
 
@@ -10,16 +10,21 @@ It installs the same files the Metabis server ships, so a demo notebook and the
 deployed application read byte-identical inputs:
 
     - Th17_Compass_reactions.tsv, Th17_Compass_expression.tsv,
-      Th17_Compass_metadata.tsv  (notebooks 01 to 04 and the Th17 case study)
-    - smillie_clusters_pool_reactions.tsv,
-      smillie_clusters_pool_expression_cpm.tsv, smillie_metadata.tsv
-      (the Smillie multi-group notebook)
+      Th17_Compass_metadata.tsv  (notebook 01, the Compass Th17 example)
+    - smillie_pseudobulk_reactions.tsv,
+      smillie_pseudobulk_expression_cp10k.tsv, smillie_pseudobulk_metadata.tsv
+      (notebook 02, the Smillie example: Compass's pseudobulk notebook rebuilt)
+    - metaflux_tcga_lung_reactions.tsv, metaflux_tcga_lung_expression.tsv,
+      metaflux_tcga_lung_metadata.tsv  (notebook 03, the METAFlux example: TCGA
+      lung tumours scored with METAFlux)
 
 The archive is the single source for these files, so the notebooks and the
 deployed application read byte-identical inputs.
 
-The public share page itself returns HTML. ``DOWNLOAD_URL`` therefore uses the
-Nextcloud ``/download`` endpoint, which currently serves ``MetabisDatasets.zip``.
+The archive is shared from Google Drive, whose sharing page returns HTML.
+``DOWNLOAD_URL`` therefore uses Drive's direct download endpoint, which serves
+``MetabisDatasets.zip`` itself; ``confirm=t`` skips the page Drive shows before a
+file too large for its virus scan.
 The archive is downloaded to a temporary file, checked against the recorded
 SHA-256 digest, safely extracted, and then removed.
 
@@ -42,9 +47,12 @@ import zipfile
 from pathlib import Path, PurePosixPath
 
 DATA_DIR = Path(__file__).resolve().parent
-DOWNLOAD_URL = "https://nube.fing.edu.uy/index.php/s/FSRdpzGAiAAiyJF/download"
+DOWNLOAD_URL = (
+    "https://drive.usercontent.google.com/download"
+    "?id=19vWkUXUSRDrA-o58l9s3Xt8V3oR2lJbS&export=download&confirm=t"
+)
 ARCHIVE_NAME = "MetabisDatasets.zip"
-ARCHIVE_SHA256 = "b19ea4caae08379611a6368cf7280584f8d0ac79528a854e31d4096829d2cbf7"
+ARCHIVE_SHA256 = "6076dc99b1f89ed8ae329e5240d8db9c7eb9c4426572d393ffc5919ee8a8c043"
 CHUNK_SIZE = 1024 * 1024
 
 

@@ -29,145 +29,15 @@ class ColorExplanationSection(HoverSection):
         return bool(show_color_reference and context.color_manager and has_stats)
 
     def build(self, data: HoverData, context: HoverContext) -> str:
-        # Call-time import: the histogram is a matplotlib PNG, but it lives
-        # beside Bokeh plot builders, and hover generation runs on the graph
-        # worker, which must import without Bokeh (ADR-0006, AM10).
-        from ....viz.plot_histograms import create_color_reference_histogram
-
         try:
-            data_provider = context.data_provider
-            color_manager = context.color_manager
-            if not data_provider or not color_manager:
+            histograms = self.histograms(data, context)
+            if not histograms:
                 return ""
 
-            # Determine element ID and Type
-            element_type = context.element_type
-            element_id = None
-
-            if element_type == "reaction":
-                element_id = data.get("reaction_id")
-            elif element_type == "gene":
-                element_id = data.get("gene_id")
-            elif "subsystem" in element_type: # subsystem or subsystem_genes
-                element_id = data.get("subsystem_name")
-
-            if not element_id:
-                return ""
-
-            # Determine metrics to show
-            metrics_to_show = []
-
-            if context.mode == AnalysisWorkspaceMode.GROUP_COMPARISON:
-                if element_type in ["reaction", "gene"]:
-                    metrics_to_show.append("neg_log_pval")
-                    metrics_to_show.append(context.color_metric or "log2_fc")
-                    if element_type == "reaction":
-                        # Point the histogram at the direction that was actually
-                        # colored, exactly as the activity branch below does.
-                        # `data["reaction_id"]` is the base ID, so a reaction
-                        # displayed backward marked its *forward* p-value and
-                        # effect size on the reference and labelled them "Used for
-                        # coloring" -- the one panel whose whole job is to say what
-                        # the colour means was describing the other direction
-                        # (WP10/D-71). Comparison distributions are registered per
-                        # exact column, so the `_back` key resolves.
-                        if context.main_direction == "backward":
-                            base_id = (
-                                element_id[:-5]
-                                if element_id.endswith("_back")
-                                else element_id
-                            )
-                            element_id = f"{base_id}_back"
-                elif "subsystem" in element_type:
-                    # Try to get metric from delta meta
-                    metric = data.get("delta_subsystem_meta", {}).get("metric")
-                    if not metric:
-                        metric = context.color_metric or "default"
-                    metrics_to_show.append(metric)
-
-            elif context.mode == AnalysisWorkspaceMode.EXPERIMENT_ANALYSIS:
-                # The color reference must show the distribution the element was
-                # actually colored from, which is the selected activity context, not
-                # whatever color metric the comparison controls last held.
-                activity_artifact = getattr(data_provider, "activity_artifact", None)
-                if activity_artifact is None:
-                    return ""
-                overlay = data_provider.activity_overlay_for_element(element_type)
-                if not activity_artifact.colors_element_type(overlay, element_type):
-                    return ""
-                metrics_to_show.append(activity_artifact.metric_key_for(overlay))
-                if element_type == "reaction":
-                    # Point the histogram at the direction that was actually colored.
-                    from ....analysis.activity_analysis import displayed_feature_id
-
-                    element_id = displayed_feature_id(
-                        activity_artifact.reaction_feature_result.activity_score,
-                        element_id,
-                    )
-
-            if not metrics_to_show:
-                return ""
-
-            # Build histograms
-            histograms = []
-
-            # Get thresholds for p-val if needed
-            thresholds = {}
-            if context.mode == AnalysisWorkspaceMode.GROUP_COMPARISON and data_provider.group_comparison_artifact:
-                for_genes = (element_type == "gene")
-                thresholds = data_provider.group_comparison_artifact.get_thresholds(for_genes=for_genes)
-
-            # Adjust element_type for ColorManager (e.g. subsystem_genes)
-            cm_element_type = element_type
-            if element_type == "subsystem" and context.for_genes:
-                cm_element_type = "subsystem_genes"
-            if context.mode == AnalysisWorkspaceMode.EXPERIMENT_ANALYSIS and "subsystem" in element_type:
-                # Activity registers one subsystem distribution per context; the
-                # overlay already says whether it aggregates reactions or genes.
-                cm_element_type = "subsystem"
-
-            for metric in metrics_to_show:
-                hist_html = ""
-                extra_text = ""
-
-                details = color_manager.get_distribution_details(
-                    mode=context.mode,
-                    element_type=cm_element_type,
-                    element_id=element_id,
-                    metric_name=metric
-                )
-
-                if not details["histogram"]:
-                    continue
-
-                symmetric_threshold = True
-                if "pval" in metric.lower():
-                    symmetric_threshold = False
-
-                # Use "Delta S" as label for subsystem histograms
-                display_metric_name = metric
-                if "subsystem" in element_type:
-                    display_metric_name = "ΔS"
-                if context.mode == AnalysisWorkspaceMode.EXPERIMENT_ANALYSIS:
-                    display_metric_name = "Activity score"
-
-                hist_html = create_color_reference_histogram(
-                    histogram_data=details["histogram"],
-                    current_value=details["element_value"],
-                    metric_name=display_metric_name,
-                    width=250,
-                    height=150,
-                    threshold=thresholds.get(metric),
-                    symmetric_threshold=symmetric_threshold,
-                )
-
+            parts = []
+            for histogram in histograms:
                 # Add "Used for coloring" text if applicable
-                is_coloring_metric = (metric == context.color_metric) or (len(metrics_to_show) == 1)
-                # For subsystems, the metric IS the color metric usually
-                if "subsystem" in element_type:
-                     is_coloring_metric = True
-
-                if is_coloring_metric:
+                if histogram["colours"]:
                     extra_text = (
                         "<div style='text-align:center; font-size:9px; "
                         "font-weight:bold; color:#555; margin-top:-5px; margin-bottom:4px;'>"
@@ -175,11 +45,7 @@ class ColorExplanationSection(HoverSection):
                     )
                 else:
                     extra_text = "<div style='margin-bottom:4px;'></div>"
-
-                histograms.append(f"<div>{hist_html}{extra_text}</div>")
-
-            if not histograms:
-                return ""
+                parts.append(f"<div>{histogram['html']}{extra_text}</div>")
 
             # Container style
             border_color = "transparent"
@@ -194,7 +60,7 @@ class ColorExplanationSection(HoverSection):
                 "gap:4px; justify-content:center;"
             )
 
-            panel_html = f"<div style='{container_style}'>{''.join(histograms)}</div>"
+            panel_html = f"<div style='{container_style}'>{''.join(parts)}</div>"
 
             return (
                 "<div style='margin-top:8px; border-top:1px solid #ddd; padding-top:8px;'>"
@@ -209,3 +75,147 @@ class ColorExplanationSection(HoverSection):
                 f"<div style='color: red; font-size: 10px;'>"
                 f"Color reference error: {str(e)}</div>"
             )
+
+    def histograms(self, data: HoverData, context: HoverContext) -> list[dict]:
+        """The histograms :meth:`build` sets side by side, one per metric shown.
+
+        Each is ``{"metric", "value", "html", "colours"}``: the metric, the
+        element's value of it, its histogram as SVG with that value marked, and
+        whether the element is coloured by it. Empty when there is nothing to show.
+        """
+        # Call-time import: the histogram is a matplotlib PNG, but it lives
+        # beside Bokeh plot builders, and hover generation runs on the graph
+        # worker, which must import without Bokeh (ADR-0006, AM10).
+        from ....viz.plot_histograms import create_color_reference_histogram
+
+        data_provider = context.data_provider
+        color_manager = context.color_manager
+        if not data_provider or not color_manager:
+            return []
+
+        # Determine element ID and Type
+        element_type = context.element_type
+        element_id = None
+
+        if element_type == "reaction":
+            element_id = data.get("reaction_id")
+        elif element_type == "gene":
+            element_id = data.get("gene_id")
+        elif "subsystem" in element_type: # subsystem or subsystem_genes
+            element_id = data.get("subsystem_name")
+
+        if not element_id:
+            return []
+
+        # Determine metrics to show
+        metrics_to_show = []
+
+        if context.mode == AnalysisWorkspaceMode.GROUP_COMPARISON:
+            if element_type in ["reaction", "gene"]:
+                metrics_to_show.append("neg_log_pval")
+                metrics_to_show.append(context.color_metric or "log2_fc")
+                if element_type == "reaction":
+                    # Point the histogram at the direction that was actually
+                    # colored, exactly as the activity branch below does.
+                    # `data["reaction_id"]` is the base ID, so a reaction
+                    # displayed backward marked its *forward* p-value and
+                    # effect size on the reference and labelled them "Used for
+                    # coloring" -- the one panel whose whole job is to say what
+                    # the colour means was describing the other direction
+                    # (WP10/D-71). Comparison distributions are registered per
+                    # exact column, so the `_back` key resolves.
+                    if context.main_direction == "backward":
+                        base_id = (
+                            element_id[:-5]
+                            if element_id.endswith("_back")
+                            else element_id
+                        )
+                        element_id = f"{base_id}_back"
+            elif "subsystem" in element_type:
+                # Try to get metric from delta meta
+                metric = data.get("delta_subsystem_meta", {}).get("metric")
+                if not metric:
+                    metric = context.color_metric or "default"
+                metrics_to_show.append(metric)
+
+        elif context.mode == AnalysisWorkspaceMode.EXPERIMENT_ANALYSIS:
+            # The color reference must show the distribution the element was
+            # actually colored from, which is the selected activity context, not
+            # whatever color metric the comparison controls last held.
+            activity_artifact = getattr(data_provider, "activity_artifact", None)
+            if activity_artifact is None:
+                return []
+            overlay = data_provider.activity_overlay_for_element(element_type)
+            if not activity_artifact.colors_element_type(overlay, element_type):
+                return []
+            metrics_to_show.append(activity_artifact.metric_key_for(overlay))
+            if element_type == "reaction":
+                # Point the histogram at the direction that was actually colored.
+                from ....analysis.activity_analysis import displayed_feature_id
+
+                element_id = displayed_feature_id(
+                    activity_artifact.reaction_feature_result.activity_score,
+                    element_id,
+                )
+
+        if not metrics_to_show:
+            return []
+
+        # Get thresholds for p-val if needed
+        thresholds = {}
+        if context.mode == AnalysisWorkspaceMode.GROUP_COMPARISON and data_provider.group_comparison_artifact:
+            for_genes = (element_type == "gene")
+            thresholds = data_provider.group_comparison_artifact.get_thresholds(for_genes=for_genes)
+
+        # Adjust element_type for ColorManager (e.g. subsystem_genes)
+        cm_element_type = element_type
+        if element_type == "subsystem" and context.for_genes:
+            cm_element_type = "subsystem_genes"
+        if context.mode == AnalysisWorkspaceMode.EXPERIMENT_ANALYSIS and "subsystem" in element_type:
+            # Activity registers one subsystem distribution per context; the
+            # overlay already says whether it aggregates reactions or genes.
+            cm_element_type = "subsystem"
+
+        histograms = []
+        for metric in metrics_to_show:
+            details = color_manager.get_distribution_details(
+                mode=context.mode,
+                element_type=cm_element_type,
+                element_id=element_id,
+                metric_name=metric
+            )
+
+            if not details["histogram"]:
+                continue
+
+            symmetric_threshold = True
+            if "pval" in metric.lower():
+                symmetric_threshold = False
+
+            # Use "Delta S" as label for subsystem histograms
+            display_metric_name = metric
+            if "subsystem" in element_type:
+                display_metric_name = "ΔS"
+            if context.mode == AnalysisWorkspaceMode.EXPERIMENT_ANALYSIS:
+                display_metric_name = "Activity score"
+
+            hist_html = create_color_reference_histogram(
+                histogram_data=details["histogram"],
+                current_value=details["element_value"],
+                metric_name=display_metric_name,
+                width=250,
+                height=150,
+                threshold=thresholds.get(metric),
+                symmetric_threshold=symmetric_threshold,
+            )
+
+            is_coloring_metric = (metric == context.color_metric) or (len(metrics_to_show) == 1)
+            # For subsystems, the metric IS the color metric usually
+            if "subsystem" in element_type:
+                 is_coloring_metric = True
+
+            histograms.append(
+                {"metric": metric, "value": details["element_value"], "html": hist_html, "colours": is_coloring_metric}
+            )
+
+        return histograms

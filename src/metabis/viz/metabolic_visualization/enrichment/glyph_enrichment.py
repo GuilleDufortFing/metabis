@@ -6,7 +6,11 @@ visualization properties like colors, alphas, hover text, and styling.
 """
 
 import math
+import re
+from html import escape
 
+from ....managers.hover import panel as hover_panel
+from ....visual_config import theme
 from ...click_behavior import get_external_reference_data
 from ..generation.data_structures.constants import VisualizationConstants
 from ..generation.data_structures.core_types import GlyphClass
@@ -115,6 +119,7 @@ def enrich_single_glyph(
     show_hover_color_reference=True,
     focus_instance=None,
     graph_type=None,
+    subsystem_family="reaction",
 ):
     """Enrich a single glyph with visualization fields.
 
@@ -135,6 +140,8 @@ def enrich_single_glyph(
         show_hover_color_reference: Whether to include color-reference hover blocks
         focus_instance: object that retrieves the IDs of the elements being visualized
         graph_type: Type of graph being generated ("subsystem", "compartment", etc.)
+        subsystem_family: The family a subsystem node reads in a comparison,
+            "reaction" or "gene"
 
     Returns:
         dict: Enriched glyph dictionary with visualization properties
@@ -215,6 +222,7 @@ def enrich_single_glyph(
             show_hover_color_reference=show_hover_color_reference,
             focus_instance=focus_instance,
             graph_type=graph_type,
+            family=subsystem_family,
         )
     elif glyph_class == GlyphClass.SUBSYSTEM_CATEGORY:
         return enrich_subsystem_category_glyph_with_data(
@@ -440,6 +448,8 @@ def enrich_gene_glyph_with_data(
             line_dash = VisualizationConstants.MISSING_DATA_LINE_DASH
         else:
             color = data_manager.get_element_color(gene_id, "gene", color_metric)
+            if _unscored_activity(data_manager, color):
+                line_dash = VisualizationConstants.MISSING_DATA_LINE_DASH
     else:
         # Fallback when no data manager
         if missing_reason in {"no_experimental_data", "no_metadata"}:
@@ -525,6 +535,8 @@ def enrich_reaction_glyph_with_data(
             color = data_manager.get_element_color(
                 reaction_id, "reaction", color_metric, use_main_direction=True
             )
+            if _unscored_activity(data_manager, color):
+                line_dash = VisualizationConstants.MISSING_DATA_LINE_DASH
     else:
         # Fallback when no data manager
         if missing_reason in {"no_experimental_data", "no_metadata"}:
@@ -599,6 +611,40 @@ def enrich_enzyme_group_glyph_with_data(glyph, alpha, missing_reason=None):
     )
 
 
+def _without_data(data_manager, subsystem_id, element_type, delta_options, color) -> bool:
+    """Whether a subsystem has no measured feature of its family.
+
+    In a comparison, the subsystem statistics count its measured features, under
+    either summary; in single-group activity, the unavailable grey says so.
+    """
+    if data_manager is None:
+        return False
+    mode = getattr(getattr(data_manager, "mode", None), "value", None)
+    if mode == "group_comparison":
+        try:
+            stats = data_manager.data_provider.get_subsystem_data(
+                subsystem_id,
+                for_genes=element_type == "subsystem_genes",
+                delta_config=delta_options,
+            )
+        except Exception:
+            return False
+        return not (stats or {}).get("total_elements")
+    if mode == "experiment_analysis":
+        return _unscored_activity(data_manager, color)
+    return False
+
+
+def _unscored_activity(data_manager, color) -> bool:
+    """Whether single-group activity drew an element as having no data.
+
+    It is then white with a dashed edge, as a subsystem with no measured
+    feature is; in a comparison white is a measured change of zero instead.
+    """
+    mode = getattr(getattr(data_manager, "mode", None), "value", None)
+    return mode == "experiment_analysis" and str(color).lower() == str(theme.ACTIVITY_UNAVAILABLE).lower()
+
+
 def enrich_subsystem_glyph_with_data(
     glyph,
     alpha,
@@ -612,6 +658,7 @@ def enrich_subsystem_glyph_with_data(
     show_hover_color_reference=True,
     focus_instance=None,
     graph_type=None,
+    family="reaction",
 ):
     """Enrich a subsystem glyph with experimental data and visualization properties.
 
@@ -624,11 +671,17 @@ def enrich_subsystem_glyph_with_data(
         missing_reason: Reason for the missing data, if any
         focus_instance: object that retrieves the IDs of the elements being visualized
         graph_type: Type of graph being generated ("subsystem", "compartment", etc.)
+        family: In a comparison, the feature family the node reads: its reactions'
+            Delta score, or with "gene" its genes', as the overview's data overlay.
 
     Returns:
         dict: Enriched subsystem glyph with visualization properties
     """
     subsystem_id = glyph.get("subsystem_name", glyph.get("label", "Unknown"))
+    mode = getattr(getattr(data_manager, "mode", None), "value", None)
+    comparison = mode == "group_comparison"
+    # Single-group activity resolves the overlay through its provider.
+    element_type = "subsystem_genes" if comparison and family == "gene" else "subsystem"
 
     is_missing_data = missing_reason is not None
 
@@ -674,7 +727,7 @@ def enrich_subsystem_glyph_with_data(
         # Build hover via AnalysisWorkspace; determine colour from missing_reason.
         hover_text = data_manager.get_element_hover(
             subsystem_id,
-            "subsystem",
+            element_type,
             color_metric=color_metric,
             delta_options=delta_options,
             missing_reason=missing_reason,
@@ -683,11 +736,11 @@ def enrich_subsystem_glyph_with_data(
             show_color_reference=show_hover_color_reference,
         )
         if missing_reason in {"no_experimental_data", "no_metadata"}:
-            subsystem_color = VisualizationConstants.MISSING_DATA_COLOR
+            subsystem_color = VisualizationConstants.SUBSYSTEM_NO_DATA_COLOR
         else:
             subsystem_color = data_manager.get_element_color(
                 subsystem_id,
-                "subsystem",
+                element_type,
                 color_metric,
                 delta_options=delta_options,
             )
@@ -700,7 +753,9 @@ def enrich_subsystem_glyph_with_data(
     if not subsystem_color or subsystem_color == "white":
         subsystem_color = "lightblue"
 
-    # Calculate dynamic radius based on reaction and metabolite counts
+    # The overview's layout sizes each node by its reactions (spaced_network) and
+    # places it by that size, so its radius is kept. Otherwise the radius grows
+    # with the reaction and metabolite counts.
     reaction_count = glyph.get("reaction_count", 0)
     metabolite_count = glyph.get("metabolite_count", 0)
 
@@ -708,7 +763,9 @@ def enrich_subsystem_glyph_with_data(
     total_elements = reaction_count + metabolite_count
 
     # Calculate radius with configurable scaling
-    if total_elements > 0:
+    if glyph.get("radius"):
+        radius = float(glyph["radius"])
+    elif total_elements > 0:
         # Apply scaling based on the configured method
         scaling_method = VisualizationConstants.SUBSYSTEM_SCALING_METHOD
 
@@ -745,6 +802,20 @@ def enrich_subsystem_glyph_with_data(
     else:
         radius = VisualizationConstants.SUBSYSTEM_MIN_RADIUS
 
+    # A subsystem with no measured feature of the family is white and dashed,
+    # told apart from a measured score near zero by its edge.
+    no_data = missing_reason in {"no_experimental_data", "no_metadata"} or _without_data(
+        data_manager, subsystem_id, element_type, delta_options, subsystem_color
+    )
+    line_dash = "solid"
+    if no_data:
+        subsystem_color = VisualizationConstants.SUBSYSTEM_NO_DATA_COLOR
+        line_dash = VisualizationConstants.SUBSYSTEM_NO_DATA_LINE_DASH
+    # A subsystem with nothing measured has no statistics: its hover says so, rather
+    # than opening an empty box over its name.
+    if not re.sub(r"<[^>]*>", "", hover_text or "").strip():
+        hover_text = _unmeasured_hover(display_name, element_type, int(glyph.get("reaction_count", 0) or 0))
+
     # Create enriched subsystem glyph
     border_color = (
         VisualizationConstants.GLOBAL_BORDER_COLOR
@@ -771,17 +842,20 @@ def enrich_subsystem_glyph_with_data(
     enriched.update(
         {
             "display_label": wrapped_display_name,
+            "name": display_name,
             "is_missing_data": is_missing_data,
             "enrichment_applied": True,
             "is_subsystem": True,
             "radius": radius,  # Add calculated radius for dynamic sizing
+            "line_dash": line_dash,
+            "has_data": not no_data,
         }
     )
     enriched.update(
         _audit_scientific_values(
             data_manager,
             subsystem_id,
-            "subsystem",
+            element_type,
             color_metric,
             missing_reason,
             delta_options,
@@ -823,8 +897,9 @@ def enrich_subsystem_category_glyph_with_data(
         line_dash = VisualizationConstants.MISSING_DATA_LINE_DASH
         fill_alpha = VisualizationConstants.MISSING_DATA_ALPHA
     else:
-        # Use CategoryManager for dynamic color lookup based on category file order
-        line_color = focus_instance.model.get_category_color(category_name)
+        # Categories carry no hue: their place and name identify them, and the
+        # colour is left to the subsystems' scores.
+        line_color = VisualizationConstants.DEFAULT_CATEGORY_LINE_COLOR
         line_dash = VisualizationConstants.DEFAULT_CATEGORY_LINE_DASH
         fill_alpha = VisualizationConstants.DEFAULT_CATEGORY_FILL_ALPHA
 
@@ -840,6 +915,7 @@ def enrich_subsystem_category_glyph_with_data(
         alpha=alpha,
         display_label=display_label,
         line_color=line_color,
+        text_color=VisualizationConstants.CATEGORY_LABEL_COLOR,
         line_dash=line_dash,
         fill_alpha=fill_alpha,
         font_size=VisualizationConstants.FONT_SIZE_CATEGORY,
@@ -855,3 +931,17 @@ def enrich_subsystem_category_glyph_with_data(
     )
 
     return enriched
+
+
+def _unmeasured_hover(display_name: str, element_type: str, reactions: int) -> str:
+    """The hover of a subsystem none of whose reactions or genes was measured."""
+    noun = "gene" if element_type == "gene" else "reaction"
+    in_model = f" It has {reactions:,} reaction{'s' if reactions != 1 else ''} in Human1." if reactions else ""
+    return hover_panel.panel(
+        hover_panel.row("Subsystem", escape(str(display_name))),
+        hover_panel.section(
+            hover_panel.note(
+                f"No {noun} of it was measured, so it has no score: drawn white with a dashed edge.{in_model}"
+            )
+        ),
+    )

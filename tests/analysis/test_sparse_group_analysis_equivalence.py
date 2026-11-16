@@ -67,6 +67,8 @@ class _DenseRoutedExpression:
 
     def __init__(self, expression: ExpressionData) -> None:
         self._frame = expression.get_expression_df()
+        # The same values on the same scale, so the same fold change.
+        self.fold_change_scale = expression.fold_change_scale
 
     def get_expression_df(self) -> pd.DataFrame:
         return self._frame

@@ -153,7 +153,8 @@ def test_each_declared_revision_dependency_rejects_a_change(kind):
 
     marker()
 
-    with pytest.raises(StaleAnalysisResultError, match=kind.value):
+    changed = {"dataset": "data", "metadata": "sample sheet", "thresholds": "significance", "visualization": "display settings"}
+    with pytest.raises(StaleAnalysisResultError, match=f"The {changed.get(kind.value, kind.value)} changed while"):
         manager.require_current(provenance)
 
 

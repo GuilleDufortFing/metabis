@@ -34,8 +34,8 @@ def _resolve_zoom_alpha_parameters(alpha_min, alpha_max, zoom_min, zoom_max):
 
 def _calculate_zoom_based_alpha(plot, alpha_min, alpha_max, zoom_min, zoom_max):
     """Compute the current label alpha from the plot viewport."""
-    x_span = plot.x_range.end - plot.x_range.start
-    y_span = plot.y_range.end - plot.y_range.start
+    x_span = abs(plot.x_range.end - plot.x_range.start)
+    y_span = abs(plot.y_range.end - plot.y_range.start)
     zoom_level = min(1.0, max(0.1, 1000.0 / max(x_span, y_span, 1e-9)))
 
     if zoom_level <= zoom_min:
@@ -55,6 +55,7 @@ def _apply_initial_zoom_alpha(
     alpha_max,
     zoom_min,
     zoom_max,
+    labels=None,
 ):
     """Seed label alpha from the initial plot ranges before JS callbacks run."""
     data = dict(label_source.data)
@@ -75,6 +76,8 @@ def _apply_initial_zoom_alpha(
         for index in range(point_count)
     ]
     label_source.data = data
+    if labels is not None:
+        labels.visible = alpha > 0
 
 
 def add_zoom_based_alpha_callback(
@@ -85,6 +88,7 @@ def add_zoom_based_alpha_callback(
     alpha_max=None,
     zoom_min=None,
     zoom_max=None,
+    labels=None,
 ):
     """Add JavaScript callback to dynamically adjust label alpha based on zoom level.
 
@@ -96,6 +100,8 @@ def add_zoom_based_alpha_callback(
         alpha_max: Maximum alpha value (defaults to subsystem settings)
         zoom_min: Zoom level for minimum alpha (defaults to subsystem settings)
         zoom_max: Zoom level for maximum alpha (defaults to subsystem settings)
+        labels: The LabelSet drawing ``label_source``, hidden while its labels are
+            fully transparent: BokehJS draws every label of a set, seen or not.
     """
     alpha_min, alpha_max, zoom_min, zoom_max = _resolve_zoom_alpha_parameters(
         alpha_min,
@@ -111,11 +117,13 @@ def add_zoom_based_alpha_callback(
         alpha_max=alpha_max,
         zoom_min=zoom_min,
         zoom_max=zoom_max,
+        labels=labels,
     )
 
     callback = CustomJS(
         args=dict(
             source=label_source,
+            labels=labels,
             plot=plot,
             glyph_type=glyph_type,
             alpha_min=alpha_min,
@@ -131,8 +139,9 @@ def add_zoom_based_alpha_callback(
 
         // Calculate zoom level based on the range span
         // Smaller range = more zoomed in, larger range = more zoomed out
-        const x_span = x_range.end - x_range.start;
-        const y_span = y_range.end - y_range.start;
+        // A map's y-range runs downwards, so its span is negative.
+        const x_span = Math.abs(x_range.end - x_range.start);
+        const y_span = Math.abs(y_range.end - y_range.start);
         const zoom_level = Math.min(1.0, Math.max(0.1,
             1000.0 / Math.max(x_span, y_span, 1e-9)));
 
@@ -148,6 +157,11 @@ def add_zoom_based_alpha_callback(
             alpha = alpha_min + t * (alpha_max - alpha_min);
         }
 
+        // A view that only moved, or zoomed past the thresholds, keeps its alpha:
+        // nothing to redraw.
+        if (source.__metabis_alpha === alpha) return;
+        source.__metabis_alpha = alpha;
+
         // Update all label alphas, factoring in base_alpha if provided
         const data = source.data;
         const n = data.x.length;
@@ -157,17 +171,51 @@ def add_zoom_based_alpha_callback(
             const base_alpha = base[i] != null ? base[i] : 1.0;
             data.text_alpha[i] = alpha * base_alpha;
         }
+        if (labels !== null) labels.visible = alpha > 0;
 
         // Trigger data source change to update the plot
         source.change.emit();
         """,
     )
 
-    # Attach the callback to the plot's range changes
+    # Attach the callback to the plot's range changes, and to its first layout,
+    # for a view set after the labels were (compartment_maps.highlight_reactions).
     plot.x_range.js_on_change("start", callback)
     plot.x_range.js_on_change("end", callback)
     plot.y_range.js_on_change("start", callback)
     plot.y_range.js_on_change("end", callback)
+    plot.js_on_change("inner_width", callback)
+
+
+def add_map_label_scale(plot, labels, units, shown_from):
+    """Draw a map's ``labels`` ``units`` map units tall, as the map's own shapes are.
+
+    The labels are hidden while a map unit takes fewer than ``shown_from`` pixels:
+    every kind of name on a map appears at once (map_labels.MAP_NAMES_SHOWN_FROM).
+    A map keeps one scale across and down (compartment_maps.keep_map_scale), so its
+    height says how many pixels a map unit takes. Seen first, before the map is laid
+    out, the labels are hidden; its first layout sizes them.
+    """
+    labels.visible = False
+    callback = CustomJS(
+        args=dict(plot=plot, labels=labels, units=float(units), shown_from=float(shown_from)),
+        code="""
+        let height
+        try { height = plot.inner_height } catch { return }
+        const span = Math.abs(plot.y_range.end - plot.y_range.start)
+        if (!(height > 0 && span > 0)) return
+        const scale = height / span
+        const shown = scale >= shown_from
+        if (labels.visible !== shown) labels.visible = shown
+        // A view that only moved keeps its size: nothing to redraw.
+        const size = `${(units * scale).toFixed(1)}px`
+        if (shown && labels.text_font_size?.value !== size) labels.text_font_size = {value: size}
+        """,
+    )
+    plot.y_range.js_on_change("start", callback)
+    plot.y_range.js_on_change("end", callback)
+    plot.js_on_change("inner_width", callback)
+    plot.js_on_change("inner_height", callback)
 
 
 def add_factor_range_zoom_alpha_callback(
@@ -312,3 +360,82 @@ def add_factor_range_zoom_alpha_callback(
     # Attach callback to y_range changes (start/end for FactorRange)
     plot.y_range.js_on_change("start", callback)
     plot.y_range.js_on_change("end", callback)
+
+
+# The network's subsystem names (bokeh_plotting._draw_enriched_subsystems): about
+# how wide a character, and how tall a line, of their 8 pt bold Arial is, in pixels.
+NETWORK_LABEL_CHARACTER_WIDTH = 6.2
+NETWORK_LABEL_LINE_HEIGHT = 12.0
+# A search naming more subsystems than this rings them without naming them.
+NETWORK_NAMED_MATCHES = 10
+
+
+def add_fitting_label_callback(plot, label_source, focus):
+    """Name a node only where its name fits inside it, or when the page points at it.
+
+    A name fits when its lines take at most 90% of the node's width on screen, so
+    the names that show never meet; zooming in names more nodes. The subsystem in
+    ``focus`` (the page's shared selection, :mod:`metabis.viz.subsystem_link`), and
+    a search's few matches, are named whatever their size; near either side of the
+    view, such a name starts or ends at its node's edge, so the frame does not cut
+    it. While a category is selected, every one of its
+    subsystems is named, centred on its node, and no other subsystem is.
+    """
+    callback = CustomJS(
+        args=dict(
+            plot=plot,
+            labels=label_source,
+            focus=focus,
+            named_matches=NETWORK_NAMED_MATCHES,
+        ),
+        code="""
+        // The frame's width is unset until the plot is first laid out.
+        let width
+        try { width = plot.inner_width } catch { return }
+        const scale = width / Math.abs(plot.x_range.end - plot.x_range.start)
+        if (!Number.isFinite(scale) || scale <= 0) return
+        const data = labels.data
+        const kinds = focus.data.kind
+        const matches = focus.data.id.filter((id, i) => kinds[i] === 'match')
+        const named = new Set(focus.data.id.filter((id, i) => kinds[i] === 'focus' || kinds[i] === 'hover'))
+        if (matches.length <= named_matches) matches.forEach((id) => named.add(id))
+        const category = focus.data.id.find((id, i) => kinds[i] === 'category') ?? null
+        const alpha = []
+        const align = []
+        const offset = []
+        const start = Math.min(plot.x_range.start, plot.x_range.end)
+        for (let i = 0; i < data.element_id.length; i++) {
+          const room = 2 * data.radius[i] * scale * 0.9
+          const fits = data.label_width[i] <= room && data.label_height[i] <= room
+          const member = category !== null && data.category[i] === category
+          const shown = named.has(data.element_id[i]) || member
+          alpha.push(shown || (fits && category === null) ? 1 : 0)
+          // Where the node sits across the view, from 0 at the left to 1 at the right.
+          const across = (data.x[i] - start) * scale / width
+          const edge = data.radius[i] * scale
+          if (member) {
+            align.push('center')
+            offset.push(0)
+          } else if (shown && !fits && across < 0.3) {
+            align.push('left')
+            offset.push(-edge)
+          } else if (shown && !fits && across > 0.7) {
+            align.push('right')
+            offset.push(edge)
+          } else {
+            align.push('center')
+            offset.push(0)
+          }
+        }
+        data.text_alpha = alpha
+        data.text_align = align
+        data.x_offset = offset
+        labels.change.emit()
+        """,
+    )
+    for attribute in ("start", "end"):
+        plot.x_range.js_on_change(attribute, callback)
+        plot.y_range.js_on_change(attribute, callback)
+    plot.js_on_change("inner_width", callback)
+    focus.js_on_change("data", callback)
+    return callback

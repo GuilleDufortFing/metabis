@@ -1,183 +1,185 @@
 {
   "glyphs": [
     {
-      "id": "ID1",
+      "id": "compartment1",
       "glyph_class": "compartment",
       "label": "Endoplasmic reticulum",
-      "x": 5125.521335347477,
-      "y": 273.88509188242494,
-      "width": 1144.0526761987458,
-      "height": 547.7701837648499
+      "x": 842.0,
+      "y": 741.5,
+      "width": 1144.1,
+      "height": 547.8
     },
     {
-      "id": "pecgon_r",
-      "glyph_class": "reaction",
-      "label": "pecgon_r",
-      "x": 5125.037114484154,
-      "y": 385.7960190641611,
-      "width": 60.0,
-      "height": 40.0,
-      "original_id": "ID2"
-    },
-    {
-      "id": "ID3",
+      "id": "met1",
       "glyph_class": "metabolite",
-      "label": "MAM01766r",
-      "x": 5557.835709217663,
-      "y": 385.7960190641611,
+      "label": "MAM03849r",
+      "x": 841.5,
+      "y": 853.4,
       "width": 60.0,
       "height": 40.0,
-      "original_id": "ID3",
+      "original_id": "met1",
       "subtype": "main"
     },
     {
-      "id": "ID4",
+      "id": "met2",
       "glyph_class": "metabolite",
       "label": "MAM01597r",
-      "x": 5085.314114484152,
-      "y": 295.7960190641611,
-      "width": 60.0,
-      "height": 40.0,
-      "original_id": "ID4",
+      "x": 801.8,
+      "y": 763.4,
+      "width": 14.0,
+      "height": 14.0,
+      "original_id": "met2",
       "subtype": "intermediate"
     },
     {
-      "id": "ID5",
-      "glyph_class": "metabolite",
-      "label": "MAM01334r",
-      "x": 4745.314114484152,
-      "y": 295.7960190641611,
-      "width": 60.0,
-      "height": 40.0,
-      "original_id": "ID5",
-      "subtype": "intermediate"
-    },
-    {
-      "id": "pecgoncoa_r",
-      "glyph_class": "reaction",
-      "label": "pecgoncoa_r",
-      "x": 4707.129114484154,
-      "y": 385.7960190641611,
-      "width": 60.0,
-      "height": 40.0,
-      "original_id": "ID6"
-    },
-    {
-      "id": "ID7",
+      "id": "met3",
       "glyph_class": "metabolite",
       "label": "MAM01371r",
-      "x": 5165.314114484152,
-      "y": 295.7960190641611,
-      "width": 60.0,
-      "height": 40.0,
-      "original_id": "ID7",
+      "x": 881.8,
+      "y": 763.4,
+      "width": 14.0,
+      "height": 14.0,
+      "original_id": "met3",
       "subtype": "intermediate"
     },
     {
-      "id": "ID8",
+      "id": "met4",
       "glyph_class": "metabolite",
       "label": "MAM02039r",
-      "x": 5005.314114484152,
-      "y": 295.7960190641611,
-      "width": 60.0,
-      "height": 40.0,
-      "original_id": "ID8",
+      "x": 721.8,
+      "y": 763.4,
+      "width": 14.0,
+      "height": 14.0,
+      "original_id": "met4",
       "subtype": "intermediate"
     },
     {
-      "id": "ID9",
+      "id": "met5",
       "glyph_class": "metabolite",
-      "label": "MAM02759r",
-      "x": 4825.314114484152,
-      "y": 295.7960190641611,
+      "label": "MAM01334r",
+      "x": 461.8,
+      "y": 763.4,
+      "width": 14.0,
+      "height": 14.0,
+      "original_id": "met5",
+      "subtype": "intermediate"
+    },
+    {
+      "id": "met6",
+      "glyph_class": "metabolite",
+      "label": "MAM03850r",
+      "x": 423.6,
+      "y": 853.4,
       "width": 60.0,
       "height": 40.0,
-      "original_id": "ID9",
+      "original_id": "met6",
+      "subtype": "main"
+    },
+    {
+      "id": "met7",
+      "glyph_class": "metabolite",
+      "label": "MAM02759r",
+      "x": 541.8,
+      "y": 763.4,
+      "width": 14.0,
+      "height": 14.0,
+      "original_id": "met7",
       "subtype": "intermediate"
+    },
+    {
+      "id": "met8",
+      "glyph_class": "metabolite",
+      "label": "MAM01766r",
+      "x": 1274.3,
+      "y": 853.4,
+      "width": 60.0,
+      "height": 40.0,
+      "original_id": "met8",
+      "subtype": "main"
     },
     {
       "id": "MAR01591",
       "glyph_class": "reaction",
       "label": "MAR01591",
-      "x": 4915.314114484152,
-      "y": 385.7960190641611,
+      "x": 631.8,
+      "y": 853.4,
       "width": 50.0,
       "height": 50.0,
-      "original_id": "ID10"
+      "original_id": "process_MAR01591"
     },
     {
       "id": "MAR00447",
       "glyph_class": "reaction",
       "label": "MAR00447",
-      "x": 5341.4364118509075,
-      "y": 385.7960190641611,
+      "x": 1057.9,
+      "y": 853.4,
       "width": 50.0,
       "height": 50.0,
-      "original_id": "ID18"
+      "original_id": "process_MAR00447"
     }
   ],
   "connections": [
     {
-      "id": "ID11",
+      "id": "process_MAR01591_c0",
       "connection_class": "metabolic",
-      "source": "pecgon_r",
+      "source": "met1",
       "target": "MAR01591",
       "stoichiometry": null
     },
     {
-      "id": "ID12",
+      "id": "process_MAR01591_c1",
       "connection_class": "metabolic",
-      "source": "ID4",
+      "source": "met2",
       "target": "MAR01591",
       "stoichiometry": null
     },
     {
-      "id": "ID13",
+      "id": "process_MAR01591_c2",
       "connection_class": "metabolic",
-      "source": "ID7",
+      "source": "met3",
       "target": "MAR01591",
       "stoichiometry": null
     },
     {
-      "id": "ID14",
+      "id": "process_MAR01591_c3",
       "connection_class": "metabolic",
-      "source": "ID8",
+      "source": "met4",
       "target": "MAR01591",
       "stoichiometry": null
     },
     {
-      "id": "ID15",
+      "id": "process_MAR01591_p4",
       "connection_class": "metabolic",
       "source": "MAR01591",
-      "target": "ID5",
+      "target": "met5",
       "stoichiometry": null
     },
     {
-      "id": "ID16",
+      "id": "process_MAR01591_p5",
       "connection_class": "metabolic",
       "source": "MAR01591",
-      "target": "pecgoncoa_r",
+      "target": "met6",
       "stoichiometry": null
     },
     {
-      "id": "ID17",
+      "id": "process_MAR01591_p6",
       "connection_class": "metabolic",
       "source": "MAR01591",
-      "target": "ID9",
+      "target": "met7",
       "stoichiometry": null
     },
     {
-      "id": "ID19",
+      "id": "process_MAR00447_c0",
       "connection_class": "metabolic",
-      "source": "ID3",
+      "source": "met8",
       "target": "MAR00447",
       "stoichiometry": null
     },
     {
-      "id": "ID20",
+      "id": "process_MAR00447_p1",
       "connection_class": "metabolic",
       "source": "MAR00447",
-      "target": "pecgon_r",
+      "target": "met1",
       "stoichiometry": null
     }
   ]

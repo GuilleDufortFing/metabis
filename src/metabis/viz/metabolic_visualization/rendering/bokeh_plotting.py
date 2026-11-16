@@ -1,13 +1,50 @@
 """Utilities for creating Bokeh visualizations."""
 
 import math
+import textwrap
 
-from bokeh.models import ColumnDataSource, HoverTool, LabelSet
+from bokeh.core.properties import value
+from bokeh.models import ColumnDataSource, CustomJS, HoverTool, LabelSet
 from bokeh.plotting import figure
 
+from ....managers.hover import panel as hover_panel
+from ....visual_config import theme
+from ...brand import SELECTED_HEXAGON_SIZE
+from ...subsystem_link import (
+    CATEGORY_BADGE,
+    CATEGORY_CIRCLES,
+    CATEGORY_HEXES,
+    attach,
+    focus_source,
+)
+
 # Import visualization constants
+from ..enrichment.utilities import (
+    calculate_arrowhead_vertices,
+    get_connection_coordinates,
+)
 from ..generation.data_structures.constants import VisualizationConstants
-from .js_callbacks import add_zoom_based_alpha_callback
+from .js_callbacks import (
+    NETWORK_LABEL_CHARACTER_WIDTH,
+    NETWORK_LABEL_LINE_HEIGHT,
+    add_fitting_label_callback,
+    add_map_label_scale,
+    add_zoom_based_alpha_callback,
+)
+from .map_labels import (
+    MAP_LABEL_LINE_HEIGHT,
+    MAP_LABEL_UNITS,
+    MAP_NAMES_SHOWN_FROM,
+    gene_label_units,
+    map_label_columns,
+)
+
+# The network's subsystem names, which the page's shared selection also names.
+NETWORK_LABELS = "metabis-network-labels"
+# An element's hover where the graph has none of its own: its identifier and name.
+_FALLBACK_TOOLTIP = hover_panel.panel(hover_panel.row("ID", "@id"), hover_panel.row("Name", "@display_label"))
+# A diamond's width over its height, as Bokeh's diamond marker draws it.
+REACTION_DIAMOND_WIDTH = 2 / 3
 
 
 def _include_point(bounds, x_value, y_value):
@@ -235,6 +272,11 @@ def create_bokeh_plot(
     plot.axis.visible = False
     plot.grid.visible = False
     plot.min_width = 0
+    # Every link and node stays drawn while the view is dragged or zoomed. Past
+    # 2,000 rows a glyph would otherwise be thinned to every tenth row, in a faint
+    # grey, until the pointer is released: a compartment map's links (up to 8,500
+    # rows in Mitochondria) and a large subsystem's would all but vanish.
+    plot.lod_threshold = None
 
     if use_bounds_viewport and bounds is not None:
         _apply_plot_bounds(plot, bounds)
@@ -275,13 +317,29 @@ def draw_graph_elements(
         enriched_connections: List of enriched connection dictionaries
         auxiliary_data: Dict with influence_lines, influence_circles, etc.
     """
+    # A Human1 map draws its links as Metabolic Atlas does: along its paths, and to
+    # a nearby copy of a far node rather than across the map.
+    atlas = auxiliary_data.get("atlas")
+    if atlas:
+        enriched_glyphs, enriched_connections = _local_copies(
+            enriched_glyphs, enriched_connections, atlas
+        )
+
     # Group glyphs by type for efficient processing
     grouped_glyphs = _group_glyphs_by_type(enriched_glyphs)
 
-    # Draw all glyph types
-    _draw_enriched_nodes(plot, grouped_glyphs, auxiliary_data.get("influence_circles"))
+    # Draw all glyph types; a compartment map's names as Metabolic Atlas sets them.
+    _draw_enriched_nodes(
+        plot,
+        grouped_glyphs,
+        auxiliary_data.get("influence_circles"),
+        placed=(atlas or {}).get("labels"),
+    )
 
-    # Draw all connection types
+    # Draw all connection types; where Metabolic Atlas routes a reaction's links,
+    # along its paths.
+    if atlas:
+        enriched_connections = _draw_atlas_links(plot, atlas, enriched_connections)
     _draw_enriched_connections(plot, enriched_connections)
 
     # Draw auxiliary visualizations
@@ -319,8 +377,12 @@ def _group_glyphs_by_type(enriched_glyphs):
     return grouped
 
 
-def _draw_enriched_nodes(plot, grouped_glyphs, influence_circles):
-    """Draw different types of nodes using enriched glyph data."""
+def _draw_enriched_nodes(plot, grouped_glyphs, influence_circles, placed=None):
+    """Draw different types of nodes using enriched glyph data.
+
+    ``placed``, a compartment map's metabolite names as Metabolic Atlas sets them,
+    draws its names in map units (:func:`_draw_map_labels`).
+    """
     renderers = {}
 
     # Draw subsystem categories first (as background boundaries)
@@ -332,23 +394,23 @@ def _draw_enriched_nodes(plot, grouped_glyphs, influence_circles):
     # Draw main metabolites
     if grouped_glyphs["main_metabolite"]:
         renderers["main_metabolites"] = _draw_enriched_main_metabolites(
-            plot, grouped_glyphs["main_metabolite"]
+            plot, grouped_glyphs["main_metabolite"], placed
         )
 
     # Draw intermediate metabolites
     if grouped_glyphs["intermediate_metabolite"]:
         renderers["intermediate_metabolites"] = _draw_enriched_intermediate_metabolites(
-            plot, grouped_glyphs["intermediate_metabolite"]
+            plot, grouped_glyphs["intermediate_metabolite"], placed
         )
 
     # Draw genes
     if grouped_glyphs["gene"]:
-        renderers["genes"] = _draw_enriched_genes(plot, grouped_glyphs["gene"])
+        renderers["genes"] = _draw_enriched_genes(plot, grouped_glyphs["gene"], placed)
 
     # Draw reactions
     if grouped_glyphs["reaction"]:
         renderers["reactions"] = _draw_enriched_reactions(
-            plot, grouped_glyphs["reaction"]
+            plot, grouped_glyphs["reaction"], placed
         )
 
     # Draw compartments
@@ -378,12 +440,53 @@ def _draw_enriched_nodes(plot, grouped_glyphs, influence_circles):
     return renderers
 
 
+def _draw_map_labels(plot, glyphs, kind, placed):
+    """A compartment map's names of one kind, in map units, where Metabolic Atlas sets them.
+
+    A metabolite's name takes Metabolic Atlas's place and lines (``placed``);
+    reactions' and genes' are centred on them. Each kind is drawn in Metabolic
+    Atlas's size for it, a gene's as large as its box takes, one label set to a
+    size, and all are hidden while a metabolite's is too small to read (map_labels).
+    The label source holds only what the labels draw: a map's sources hold
+    thousands of rows.
+    """
+    columns = map_label_columns(glyphs, placed, metabolites=kind == "metabolite")
+    columns["text_alpha"] = [glyph["alpha"] for glyph in glyphs]
+    if kind == "gene":
+        sizes = [
+            gene_label_units(str(glyph["display_label"]), glyph.get("width", 60), glyph.get("height", 30))
+            for glyph in glyphs
+        ]
+    else:
+        sizes = [MAP_LABEL_UNITS[kind]] * len(glyphs)
+    drawn = []
+    for units in sorted(set(sizes)):
+        rows = [index for index, size in enumerate(sizes) if size == units]
+        labels = LabelSet(
+            x="label_x",
+            y="label_y",
+            text="label_text",
+            text_color="black",
+            text_font_style="bold",
+            text_align="center",
+            text_baseline="middle",
+            text_line_height=MAP_LABEL_LINE_HEIGHT,
+            text_alpha="text_alpha",
+            level="annotation",
+            source=ColumnDataSource({key: [values[index] for index in rows] for key, values in columns.items()}),
+        )
+        plot.add_layout(labels)
+        add_map_label_scale(plot, labels, units, MAP_NAMES_SHOWN_FROM)
+        drawn.append(labels)
+    return drawn
+
+
 def _label_only_data(data):
     """Project glyph data to fields labels use, excluding rich hover HTML."""
     return {key: value for key, value in data.items() if key != "hover"}
 
 
-def _draw_enriched_main_metabolites(plot, metabolite_glyphs):
+def _draw_enriched_main_metabolites(plot, metabolite_glyphs, placed=None):
     """Draw main metabolites using enriched glyph data."""
     # Convert enriched glyphs to ColumnDataSource format
     data = _convert_glyphs_to_bokeh_data(metabolite_glyphs)
@@ -408,9 +511,13 @@ def _draw_enriched_main_metabolites(plot, metabolite_glyphs):
         renderers=[renderer],
         tooltips="@hover{safe}"
         if any(g.get("hover") for g in metabolite_glyphs)
-        else [("ID", "@id"), ("Label", "@display_label")],
+        else _FALLBACK_TOOLTIP,
     )
     plot.add_tools(hover)
+
+    if placed is not None:
+        _draw_map_labels(plot, metabolite_glyphs, "metabolite", placed)
+        return renderer
 
     # Add labels
     # Initialize label alpha based on current zoom level
@@ -447,12 +554,13 @@ def _draw_enriched_main_metabolites(plot, metabolite_glyphs):
         alpha_max=VisualizationConstants.METABOLITE_LABEL_ALPHA_MAX,
         zoom_min=VisualizationConstants.METABOLITE_LABEL_ZOOM_THRESHOLD_MIN,
         zoom_max=VisualizationConstants.METABOLITE_LABEL_ZOOM_THRESHOLD_MAX,
+        labels=labels,
     )
 
     return renderer
 
 
-def _draw_enriched_intermediate_metabolites(plot, metabolite_glyphs):
+def _draw_enriched_intermediate_metabolites(plot, metabolite_glyphs, placed=None):
     """Draw intermediate metabolites using enriched glyph data."""
     data = _convert_glyphs_to_bokeh_data(metabolite_glyphs)
 
@@ -475,9 +583,13 @@ def _draw_enriched_intermediate_metabolites(plot, metabolite_glyphs):
         renderers=[renderer],
         tooltips="@hover{safe}"
         if any(g.get("hover") for g in metabolite_glyphs)
-        else [("ID", "@id"), ("Label", "@display_label")],
+        else _FALLBACK_TOOLTIP,
     )
     plot.add_tools(hover)
+
+    if placed is not None:
+        _draw_map_labels(plot, metabolite_glyphs, "metabolite", placed)
+        return renderer
 
     # Add labels
     # Initialize label alpha based on current zoom level
@@ -513,12 +625,13 @@ def _draw_enriched_intermediate_metabolites(plot, metabolite_glyphs):
         alpha_max=VisualizationConstants.METABOLITE_LABEL_ALPHA_MAX,
         zoom_min=VisualizationConstants.METABOLITE_LABEL_ZOOM_THRESHOLD_MIN,
         zoom_max=VisualizationConstants.METABOLITE_LABEL_ZOOM_THRESHOLD_MAX,
+        labels=labels,
     )
 
     return renderer
 
 
-def _draw_enriched_genes(plot, gene_glyphs):
+def _draw_enriched_genes(plot, gene_glyphs, placed=None):
     """Draw genes using enriched glyph data."""
     data = _convert_glyphs_to_bokeh_data(gene_glyphs)
 
@@ -533,7 +646,9 @@ def _draw_enriched_genes(plot, gene_glyphs):
         line_color=VisualizationConstants.GLOBAL_BORDER_COLOR,
         line_alpha="alpha",
         line_dash="line_dash",
-        level="annotation",
+        # The glyph level, which the frame clips: on the annotation level a gene
+        # beyond the frame was drawn over the key beside it.
+        level="glyph",
         source=source,
     )
 
@@ -542,9 +657,13 @@ def _draw_enriched_genes(plot, gene_glyphs):
         renderers=[renderer],
         tooltips="@hover{safe}"
         if any(g.get("hover") for g in gene_glyphs)
-        else [("ID", "@id"), ("Label", "@display_label")],
+        else _FALLBACK_TOOLTIP,
     )
     plot.add_tools(hover)
+
+    if placed is not None:
+        _draw_map_labels(plot, gene_glyphs, "gene", placed)
+        return renderer
 
     # Add labels
     # Initialize label alpha based on current zoom level
@@ -580,24 +699,30 @@ def _draw_enriched_genes(plot, gene_glyphs):
         alpha_max=VisualizationConstants.GENE_LABEL_ALPHA_MAX,
         zoom_min=VisualizationConstants.GENE_LABEL_ZOOM_THRESHOLD_MIN,
         zoom_max=VisualizationConstants.GENE_LABEL_ZOOM_THRESHOLD_MAX,
+        labels=labels,
     )
 
     return renderer
 
 
-def _draw_enriched_reactions(plot, reaction_glyphs):
-    """Draw reactions using enriched glyph data."""
+def _draw_enriched_reactions(plot, reaction_glyphs, placed=None):
+    """Draw reactions using enriched glyph data.
+
+    A reaction is a diamond, taller than wide as the key's and the rankings' are,
+    as tall as the square on its point it was drawn as before.
+    """
     data = _convert_glyphs_to_bokeh_data(reaction_glyphs)
+    half_heights = [float(size) / math.sqrt(2) for size in data["size"]]
+    data["xs"] = [
+        [x, x + h * REACTION_DIAMOND_WIDTH, x, x - h * REACTION_DIAMOND_WIDTH]
+        for x, h in zip(data["x"], half_heights)
+    ]
+    data["ys"] = [[y - h, y, y + h, y] for y, h in zip(data["y"], half_heights)]
 
     source = ColumnDataSource(data)
-    renderer = plot.rect(
-        x="x",
-        y="y",
-        height="size",
-        width="size",
-        height_units="data",
-        width_units="data",
-        angle="angle",
+    renderer = plot.patches(
+        xs="xs",
+        ys="ys",
         fill_color="color",
         fill_alpha="alpha",
         line_color=VisualizationConstants.GLOBAL_BORDER_COLOR,
@@ -612,9 +737,13 @@ def _draw_enriched_reactions(plot, reaction_glyphs):
         renderers=[renderer],
         tooltips="@hover{safe}"
         if any(g.get("hover") for g in reaction_glyphs)
-        else [("ID", "@id"), ("Label", "@display_label")],
+        else _FALLBACK_TOOLTIP,
     )
     plot.add_tools(hover)
+
+    if placed is not None:
+        _draw_map_labels(plot, reaction_glyphs, "reaction", placed)
+        return renderer
 
     # Add labels
     # Initialize label alpha based on current zoom level
@@ -650,6 +779,7 @@ def _draw_enriched_reactions(plot, reaction_glyphs):
         alpha_max=VisualizationConstants.REACTION_LABEL_ALPHA_MAX,
         zoom_min=VisualizationConstants.REACTION_LABEL_ZOOM_THRESHOLD_MIN,
         zoom_max=VisualizationConstants.REACTION_LABEL_ZOOM_THRESHOLD_MAX,
+        labels=labels,
     )
 
     return renderer
@@ -685,15 +815,28 @@ def _draw_enriched_compartments(plot, compartment_glyphs):
     label_data = _label_only_data(data)
     label_data["base_alpha"] = label_data.get("alpha", [1.0] * len(label_data["x"]))
     label_data["text_alpha"] = [a * initial_alpha for a in label_data["base_alpha"]]
+    # A long name takes two lines, so a narrow compartment's name keeps near its width.
+    label_data["display_label"] = [
+        "\n".join(textwrap.wrap(str(name), 12, break_long_words=False))
+        for name in label_data["display_label"]
+    ]
     label_source = ColumnDataSource(label_data)
 
+    # Each name inside its compartment's top-left corner, on a white backing.
     labels = LabelSet(
         x="x_label",
         y="y_label",
         text="display_label",
-        text_color="black",
+        text_color=VisualizationConstants.CATEGORY_LABEL_COLOR,
+        text_font=value(VisualizationConstants.FONT_FAMILY),
         text_font_size=VisualizationConstants.FONT_SIZE_COMPARTMENT,
         text_font_style="bold",
+        text_align="left",
+        text_baseline="top",
+        x_offset=8,
+        y_offset=-6,
+        background_fill_color="#ffffff",
+        background_fill_alpha=0.85,
         level="underlay",
         text_alpha="text_alpha",  # Use dynamic alpha from data source
         source=label_source,
@@ -709,6 +852,7 @@ def _draw_enriched_compartments(plot, compartment_glyphs):
         alpha_max=VisualizationConstants.COMPARTMENT_LABEL_ALPHA_MAX,
         zoom_min=VisualizationConstants.COMPARTMENT_LABEL_ZOOM_THRESHOLD_MIN,
         zoom_max=VisualizationConstants.COMPARTMENT_LABEL_ZOOM_THRESHOLD_MAX,
+        labels=labels,
     )
 
     return renderer
@@ -744,6 +888,11 @@ def _draw_enriched_subsystems(plot, subsystem_glyphs):
 
     # Convert enriched glyphs to ColumnDataSource format
     data = _convert_glyphs_to_bokeh_data(subsystem_glyphs)
+    # A node with no data is white with a dashed edge, drawn a little heavier
+    # so the dashes read at the overview's size.
+    data["line_width"] = [
+        1.0 if dash == "solid" else VisualizationConstants.NO_DATA_LINE_WIDTH for dash in data["line_dash"]
+    ]
     source = ColumnDataSource(data)
     renderer = plot.circle(
         x="x",
@@ -753,6 +902,7 @@ def _draw_enriched_subsystems(plot, subsystem_glyphs):
         fill_alpha="alpha",
         line_color=VisualizationConstants.GLOBAL_BORDER_COLOR,
         line_alpha="alpha",
+        line_width="line_width",
         line_dash="line_dash",
         level="glyph",
         source=source,
@@ -763,43 +913,65 @@ def _draw_enriched_subsystems(plot, subsystem_glyphs):
         renderers=[renderer],
         tooltips="@hover{safe}"  # Use rich hover from enriched data
         if any(g.get("hover") for g in subsystem_glyphs)
-        else [
-            ("ID", "@id"),
-            ("Label", "@display_label"),
-            ("Reactions", "@reaction_count"),
-            ("Metabolites", "@metabolite_count"),
-        ],
+        else hover_panel.panel(
+            hover_panel.row("ID", "@id"),
+            hover_panel.row("Subsystem", "@display_label"),
+            hover_panel.row("Reactions", "@reaction_count"),
+            hover_panel.row("Metabolites", "@metabolite_count"),
+        ),
     )
     plot.add_tools(hover)
 
-    # Add labels with size proportional to subsystem radius
-    # Initialize label alpha based on current zoom level
-    initial_alpha = VisualizationConstants.SUBSYSTEM_LABEL_ALPHA_MIN
+    # Each name is drawn only where it fits inside its node, or for the subsystem
+    # the page points at (js_callbacks.add_fitting_label_callback). The labels'
+    # source holds only what they draw, so a page looking for the subsystems'
+    # own source by its fields never takes it for that.
+    label_data = {key: data[key] for key in ("x", "y", "element_id", "radius", "category")}
+    lines = [
+        textwrap.wrap(
+            str(name),
+            VisualizationConstants.NETWORK_LABEL_LINE_LENGTH,
+            break_long_words=False,
+        )
+        or [""]
+        for name in data["name"]
+    ]
+    label_data["label_text"] = ["\n".join(name) for name in lines]
+    label_data["label_width"] = [
+        max(len(line) for line in name) * NETWORK_LABEL_CHARACTER_WIDTH for name in lines
+    ]
+    label_data["label_height"] = [len(name) * NETWORK_LABEL_LINE_HEIGHT for name in lines]
+    label_data["text_alpha"] = [0.0] * len(lines)
+    label_data["text_align"] = ["center"] * len(lines)
+    label_data["x_offset"] = [0.0] * len(lines)
+    label_source = ColumnDataSource(label_data, name=NETWORK_LABELS)
 
-    # Add alpha values to the data source for labels
-    label_data = _label_only_data(data)
-    label_data["text_alpha"] = [initial_alpha] * len(label_data["x"])
-    label_source = ColumnDataSource(label_data)
-
-    labels = LabelSet(
-        x="x",
-        y="y",
-        text="display_label",
-        text_color="black",
-        text_font_size=(
-            VisualizationConstants.FONT_SIZE_SUBSYSTEM
-        ),  # Use consistent size for readability
-        text_font_style="bold",
-        text_align="center",
-        text_baseline="middle",
-        text_alpha="text_alpha",  # Use dynamic alpha from data source
-        level="glyph",
-        source=label_source,
-    )
-    plot.add_layout(labels)
-
-    # Add JavaScript callback to dynamically adjust label alpha based on zoom
-    add_zoom_based_alpha_callback(plot, label_source, glyph_type="subsystem")
+    # A name has no box behind it, which would hide its node's colour, but a thin
+    # white outline round its letters: the same names drawn first in white, each
+    # letter stroked a little wider, so the dark letters over them keep their
+    # full weight (BokehJS strokes text after filling it).
+    for color, outline in (("#ffffff", "#ffffff"), (VisualizationConstants.CATEGORY_LABEL_COLOR, None)):
+        plot.add_layout(
+            LabelSet(
+                x="x",
+                y="y",
+                text="label_text",
+                text_color=color,
+                text_outline_color=outline,
+                text_font=value(VisualizationConstants.FONT_FAMILY),
+                text_font_size=VisualizationConstants.FONT_SIZE_SUBSYSTEM,
+                text_font_style="bold",
+                text_align="text_align",
+                text_baseline="middle",
+                x_offset="x_offset",
+                text_alpha="text_alpha",
+                level="glyph",
+                source=label_source,
+            )
+        )
+    focus = focus_source()
+    attach(plot, focus)
+    add_fitting_label_callback(plot, label_source, focus)
 
     return renderer
 
@@ -1032,6 +1204,301 @@ def _draw_metabolic_connections_with_arrowheads(plot, metabolic_connections):
     return renderers
 
 
+def _local_copies(glyphs, connections, atlas):
+    """A far node's copy beside each node it links to across a map, as Metabolic Atlas draws.
+
+    Metabolic Atlas draws a metabolite again beside each reaction far from it; a
+    layout that draws it once links it across the map. A straight link longer than
+    ``LOCAL_COPY_DISTANCE`` that no Atlas path routes ends instead at a copy of
+    its far node: the one of its two ends with more such links, or else its
+    metabolite. The copy keeps the node's identifier, colour, name and hover, and
+    stands ``LOCAL_COPY_STUB`` from the near node, towards the far one.
+    """
+    links = atlas.get("links") or {}
+    far = VisualizationConstants.LOCAL_COPY_DISTANCE
+    by_id = {}
+    for glyph in glyphs:
+        by_id.setdefault(glyph["id"], glyph)
+
+    def length(connection):
+        return math.hypot(connection["x1"] - connection["x0"], connection["y1"] - connection["y0"])
+
+    long_links = [
+        index
+        for index, connection in enumerate(connections)
+        if connection.get("connection_class", "metabolic") == "metabolic"
+        and "x0" in connection
+        and connection.get("source") not in links
+        and connection.get("target") not in links
+        and connection.get("source") in by_id
+        and connection.get("target") in by_id
+        and length(connection) > far
+    ]
+    if not long_links:
+        return glyphs, connections
+    counts = {}
+    for index in long_links:
+        for end in ("source", "target"):
+            counts[connections[index][end]] = counts.get(connections[index][end], 0) + 1
+
+    glyphs = list(glyphs)
+    connections = list(connections)
+    for index in long_links:
+        connection = dict(connections[index])
+        source, target = connection["source"], connection["target"]
+        if counts[source] != counts[target]:
+            hub = source if counts[source] > counts[target] else target
+        else:
+            hub = source if by_id[source]["glyph_class"] == "metabolite" else target
+        near = target if hub == source else source
+        hub_glyph, near_glyph = by_id[hub], by_id[near]
+        dx, dy = hub_glyph["x"] - near_glyph["x"], hub_glyph["y"] - near_glyph["y"]
+        distance = math.hypot(dx, dy)
+        stub = VisualizationConstants.LOCAL_COPY_STUB / distance
+        copy = {
+            **hub_glyph,
+            "x": near_glyph["x"] + dx * stub,
+            "y": near_glyph["y"] + dy * stub,
+            "is_local_copy": True,
+        }
+        glyphs.append(copy)
+        # The end at the far node moves to its copy; an arrowhead there moves with it.
+        (x0, y0), (x1, y1) = (connection["x0"], connection["y0"]), (connection["x1"], connection["y1"])
+        hub_at_end = math.hypot(x1 - hub_glyph["x"], y1 - hub_glyph["y"]) < math.hypot(
+            x0 - hub_glyph["x"], y0 - hub_glyph["y"]
+        )
+        if hub_at_end:
+            (connection["x0"], connection["y0"]), (connection["x1"], connection["y1"]) = (
+                get_connection_coordinates(near_glyph, copy)
+            )
+            xs, ys = calculate_arrowhead_vertices(
+                connection["x0"], connection["y0"], connection["x1"], connection["y1"]
+            )
+            connection["arrowhead_xs"], connection["arrowhead_ys"] = xs, ys
+        else:
+            (connection["x0"], connection["y0"]), (connection["x1"], connection["y1"]) = (
+                get_connection_coordinates(copy, near_glyph)
+            )
+            if connection.get("arrowhead_xs"):
+                xs, ys = calculate_arrowhead_vertices(
+                    connection["x0"], connection["y0"], connection["x1"], connection["y1"]
+                )
+                connection["arrowhead_xs"], connection["arrowhead_ys"] = xs, ys
+        connections[index] = connection
+    return glyphs, connections
+
+
+def _draw_atlas_links(plot, atlas, connections):
+    """Each reaction Metabolic Atlas routes, along its own paths, styled as its links.
+
+    A reaction's paths take the colour, fading and dash its straight links had
+    (the glow in its colour under a grey line, as
+    :func:`_draw_metabolic_connections_with_arrowheads` draws them). Its
+    arrowheads stand where Metabolic Atlas's do, pointing the same way, but are
+    drawn as the straight links' are: a filled grey triangle over a halo in the
+    reaction's colour. A reversible reaction's arrowheads point both ways; those
+    pointing against the direction its colour reads (``shown_direction``) are
+    drawn hollow, a white triangle outlined in grey with no halo, as Escher draws a
+    reversible reaction's arrowheads against its flux (Draw.js, update_segment).
+    The paths and arrowheads of every reaction sharing a style
+    are drawn as one line broken by gaps, rather than one each: a map has
+    thousands, and a few dozen lines repaint faster while the view is dragged.
+    The arrowheads (8,500 in Mitochondria) are one triangle each, so only those
+    in view are drawn, and none while they would be under
+    ``ARROWHEAD_MIN_PIXELS`` long on screen, when a map is seen whole. Returns the
+    connections left to draw straight: every one but a routed reaction's
+    metabolic links.
+    """
+    links = atlas.get("links") or {}
+    heads = atlas.get("heads") or {}
+    styles = {}
+    # A reversible reaction's links, each from its start to its end as the
+    # direction its colour reads runs.
+    reads = {}
+    remaining = []
+    for connection in connections:
+        source, target = connection.get("source"), connection.get("target")
+        reaction = source if source in links else target if target in links else None
+        if reaction is None or connection.get("connection_class", "metabolic") != "metabolic":
+            remaining.append(connection)
+            continue
+        styles.setdefault(reaction, connection)
+        if connection.get("shown_direction") and "x0" in connection:
+            reads.setdefault(reaction, []).append(
+                (connection["x0"], connection["y0"], connection["x1"], connection["y1"])
+            )
+    if not styles:
+        return remaining
+
+    def dash_key(dash):
+        return tuple(dash) if isinstance(dash, list) else dash
+
+    # (colour, opacity, dash) -> the paths drawn in it, gapped by NaN; and each
+    # arrowhead, with its halo, as a triangle of its own.
+    glows = {}
+    overlays = {}
+    halos = {"xs": [], "ys": [], "color": []}
+    tips = {"xs": [], "ys": [], "alpha": []}
+    hollows = {"xs": [], "ys": [], "alpha": []}
+
+    def add(groups, key, flat):
+        xs, ys = groups.setdefault(key, ([], []))
+        if xs:
+            xs.append(math.nan)
+            ys.append(math.nan)
+        xs.extend(flat[0::2])
+        ys.extend(flat[1::2])
+
+    for reaction, style in styles.items():
+        dash = dash_key(style.get("line_dash", "solid"))
+        for flat in links[reaction]:
+            if not style.get("is_missing_connection", False):
+                add(glows, (style["color"], VisualizationConstants.EDGE_GLOW_ALPHA, dash), flat)
+            add(overlays, (VisualizationConstants.EDGE_OVERLAY_COLOR, style["line_alpha"], dash), flat)
+        for flat in heads.get(reaction, ()):
+            xs, ys = _arrowhead(flat)
+            if reaction in reads and _points_against(xs, ys, reads[reaction]):
+                hollows["xs"].append(xs)
+                hollows["ys"].append(ys)
+                hollows["alpha"].append(style["line_alpha"])
+                continue
+            tips["xs"].append(xs)
+            tips["ys"].append(ys)
+            tips["alpha"].append(style.get("fill_alpha", style["line_alpha"]))
+            if not style.get("is_missing_connection", False):
+                # The halo, as the straight links' arrowheads have it: the head
+                # grown round its tip, in the reaction's colour.
+                tip_x, tip_y = xs[0], ys[0]
+                halos["xs"].append([tip_x + (x - tip_x) * 1.4 for x in xs])
+                halos["ys"].append([tip_y + (y - tip_y) * 1.4 for y in ys])
+                halos["color"].append(style["color"])
+
+    def draw(groups, **style):
+        for (color, alpha, dash), (xs, ys) in groups.items():
+            plot.line(
+                x="x",
+                y="y",
+                source=ColumnDataSource({"x": xs, "y": ys}),
+                line_color=color,
+                line_alpha=alpha,
+                line_dash=list(dash) if isinstance(dash, tuple) else dash,
+                level="image",
+                **style,
+            )
+
+    width = VisualizationConstants.DEFAULT_LINE_WIDTH
+    if VisualizationConstants.EDGE_GLOW_ENABLED:
+        draw(
+            glows,
+            line_width=width + VisualizationConstants.EDGE_GLOW_WIDTH_DELTA,
+            line_cap="round",
+            line_join="round",
+        )
+    draw(overlays, line_width=width, line_join="round")
+    arrowheads = []
+    if VisualizationConstants.EDGE_GLOW_ENABLED and halos["xs"]:
+        arrowheads.append(
+            plot.patches(
+                xs="xs",
+                ys="ys",
+                source=ColumnDataSource(halos),
+                fill_color="color",
+                fill_alpha=VisualizationConstants.EDGE_GLOW_ALPHA,
+                line_color=None,
+                level="image",
+            )
+        )
+    if tips["xs"]:
+        arrowheads.append(
+            plot.patches(
+                xs="xs",
+                ys="ys",
+                source=ColumnDataSource(tips),
+                fill_color=VisualizationConstants.EDGE_OVERLAY_COLOR,
+                fill_alpha="alpha",
+                line_color=None,
+                level="image",
+            )
+        )
+    if hollows["xs"]:
+        arrowheads.append(
+            plot.patches(
+                xs="xs",
+                ys="ys",
+                source=ColumnDataSource(hollows),
+                fill_color="#ffffff",
+                line_color=VisualizationConstants.EDGE_OVERLAY_COLOR,
+                line_alpha="alpha",
+                line_width=VisualizationConstants.DEFAULT_LINE_WIDTH,
+                level="image",
+            )
+        )
+    if arrowheads:
+        _hide_while_too_small(plot, arrowheads)
+    return remaining
+
+
+def _hide_while_too_small(plot, renderers):
+    """Show ``renderers`` only once an arrowhead would be long enough on screen to read."""
+    callback = CustomJS(
+        args=dict(
+            plot=plot,
+            renderers=renderers,
+            length=VisualizationConstants.ARROWHEAD_SIZE,
+            least=VisualizationConstants.ARROWHEAD_MIN_PIXELS,
+        ),
+        code="""
+        let width
+        try { width = plot.inner_width } catch { return }
+        const span = Math.abs(plot.x_range.end - plot.x_range.start)
+        if (!(width > 0 && span > 0)) return
+        const shown = length * width / span >= least
+        for (const renderer of renderers) {
+          if (renderer.visible !== shown) renderer.visible = shown
+        }
+        """,
+    )
+    for attribute in ("start", "end"):
+        plot.x_range.js_on_change(attribute, callback)
+    plot.js_on_change("inner_width", callback)
+
+
+def _arrowhead(flat):
+    """The straight links' arrowhead where Metabolic Atlas draws one, pointing the same way.
+
+    Each of Metabolic Atlas's arrowheads is a triangle on a short base; its tip
+    is the corner across from that base.
+    """
+    points = list(zip(flat[0::2], flat[1::2]))[:3]
+    tip = min(range(3), key=lambda i: math.dist(points[(i + 1) % 3], points[(i + 2) % 3]))
+    base = [points[(tip + 1) % 3], points[(tip + 2) % 3]]
+    middle = ((base[0][0] + base[1][0]) / 2, (base[0][1] + base[1][1]) / 2)
+    return calculate_arrowhead_vertices(middle[0], middle[1], points[tip][0], points[tip][1])
+
+
+def _points_against(xs, ys, reads):
+    """Whether an arrowhead points against the direction its reaction's links run.
+
+    ``xs`` and ``ys`` are the arrowhead, its tip first (:func:`_arrowhead`);
+    ``reads``, the reaction's links, each ``(x0, y0, x1, y1)`` from its start to
+    its end. Metabolic Atlas sets a reversible reaction's arrowheads at both ends
+    of each link: one points along the link into its end, the other against it
+    into its start. The link end nearest the tip, of those the head points into,
+    decides; a head farther than ``ATLAS_HEAD_REACH`` from every such end is not
+    read as pointing either way.
+    """
+    tip_x, tip_y = xs[0], ys[0]
+    dx, dy = tip_x - (xs[1] + xs[2]) / 2, tip_y - (ys[1] + ys[2]) / 2
+    nearest, against = VisualizationConstants.ATLAS_HEAD_REACH, False
+    for x0, y0, x1, y1 in reads:
+        along = dx * (x1 - x0) + dy * (y1 - y0)
+        for end_x, end_y, points_into, is_against in ((x1, y1, along > 0, False), (x0, y0, along < 0, True)):
+            distance = math.hypot(tip_x - end_x, tip_y - end_y)
+            if points_into and distance <= nearest:
+                nearest, against = distance, is_against
+    return against
+
+
 def _draw_simple_connections(plot, connections):
     """Draw simple connections without arrowheads."""
     line_data = {
@@ -1228,21 +1695,79 @@ def _draw_enriched_subsystem_categories(plot, category_glyphs):
         source=source,
     )
 
-    # Add labels for category names
-    labels = LabelSet(
+    # Each category's number on its rim, up and to the left, in the logo's hexagon as
+    # the side menu numbers the steps; the rankings head the category with the same
+    # number. Pointing at it names the category; clicking it, or the circle's
+    # background, selects the category (subsystem_link.add_network_focus_link).
+    hexes = ColumnDataSource(
+        {
+            "x": data["x_badge"],
+            "y": data["y_badge"],
+            "badge": data["badge"],
+            "category": data["category"],
+            "name": data["display_label"],
+            "count": data["subsystem_count"],
+            "fill": [theme.INK_NODE] * len(data["x"]),
+            "text": ["#ffffff"] * len(data["x"]),
+            "alpha": [1.0] * len(data["x"]),
+            "text_alpha": [1.0] * len(data["x"]),
+        },
+        name=CATEGORY_HEXES,
+    )
+    marks = plot.scatter(
         x="x",
-        y="y_label",  # Use offset position above the circle
-        text="display_label",
-        text_color="text_color",  # Use category-specific color
-        text_font_size="font_size",  # Use dynamic font size from enriched data
+        y="y",
+        source=hexes,
+        marker="hex",
+        angle=math.pi / 6,
+        size=VisualizationConstants.CATEGORY_HEXAGON_SIZE,
+        fill_color="fill",
+        fill_alpha="alpha",
+        line_color=theme.SELECTED,
+        line_alpha="alpha",
+        line_width=1.5,
+        level="annotation",
+    )
+    # A selected category's number takes the logo's own hexagon, stroked in its
+    # gradient, under the number (subsystem_link.add_network_focus_link fills it).
+    plot.image_url(
+        url="url",
+        x="x",
+        y="y",
+        w=SELECTED_HEXAGON_SIZE,
+        h=SELECTED_HEXAGON_SIZE,
+        w_units="screen",
+        h_units="screen",
+        anchor="center",
+        source=ColumnDataSource({"url": [], "x": [], "y": []}, name=CATEGORY_BADGE),
+        level="annotation",
+    )
+    plot.text(
+        x="x",
+        y="y",
+        text="badge",
+        source=hexes,
+        text_color="text",
+        text_alpha="text_alpha",
+        text_font=value(VisualizationConstants.FONT_FAMILY),
+        text_font_size=VisualizationConstants.FONT_SIZE_CATEGORY_NUMBER,
         text_font_style="bold",
         text_align="center",
         text_baseline="middle",
-        text_alpha="label_alpha",  # Use separate alpha for labels
-        level="annotation",  # Draw on top for visibility
-        source=source,
+        level="annotation",
     )
-    plot.add_layout(labels)
+    plot.add_tools(
+        HoverTool(
+            renderers=[marks],
+            tooltips=hover_panel.panel(
+                hover_panel.row("Category @badge", "@name"),
+                hover_panel.row("Subsystems", "@count"),
+                hover_panel.note("Click it to select the category."),
+            ),
+            attachment="right",
+        )
+    )
+    source.name = CATEGORY_CIRCLES
 
     return renderer
 
@@ -1268,6 +1793,13 @@ def _convert_glyphs_to_bokeh_data(glyphs):
     # Add type-specific fields if they exist
     sample_glyph = glyphs[0]
     glyph_class = sample_glyph["glyph_class"]
+
+    # The model's own identifier of what a glyph draws (a gene's Ensembl identifier, a
+    # metabolite's, under a map's own glyph IDs and display labels): what a click asks
+    # the element's details by, and finds it on a map by
+    # (metabis.managers.element_details).
+    if glyph_class in ("metabolite", "gene", "reaction"):
+        data["model_id"] = [str(g.get("label") or g["id"]) for g in glyphs]
 
     if glyph_class == "metabolite":
         data["size"] = [g.get("size", 20) for g in glyphs]
@@ -1296,6 +1828,8 @@ def _convert_glyphs_to_bokeh_data(glyphs):
         data["reaction_count"] = [g.get("reaction_count", 0) for g in glyphs]
         data["metabolite_count"] = [g.get("metabolite_count", 0) for g in glyphs]
         data["is_subsystem"] = [g.get("is_subsystem", False) for g in glyphs]
+        data["name"] = [str(g.get("name") or g["display_label"]) for g in glyphs]
+        data["category"] = [str(g.get("category", "")) for g in glyphs]
         # Add radius for dynamic sizing
         data["radius"] = [g.get("radius", 20) for g in glyphs]
         # Add hover text
@@ -1308,10 +1842,12 @@ def _convert_glyphs_to_bokeh_data(glyphs):
         data["line_width"] = [g.get("line_width", 1) for g in glyphs]
         data["font_size"] = [g.get("font_size", "10pt") for g in glyphs]
         data["label_alpha"] = [g.get("label_alpha", 1.0) for g in glyphs]
-        # Calculate label position above the circle
-        data["y_label"] = [
-            g["y"] - g["radius"] + 50 for g in glyphs
-        ]  # Position above circle
+        # The number sits on the rim at 135 degrees, up and to the left (the
+        # y-range is flipped, so up is -y).
+        data["x_badge"] = [g["x"] - g["radius"] * math.sqrt(0.5) for g in glyphs]
+        data["y_badge"] = [g["y"] - g["radius"] * math.sqrt(0.5) for g in glyphs]
+        data["badge"] = [str(g.get("number", "")) for g in glyphs]
+        data["category"] = [str(g.get("label") or g["display_label"]) for g in glyphs]
         # Add hover text
         data["hover"] = [
             g.get("hover", f"Category: {g['display_label']}") for g in glyphs

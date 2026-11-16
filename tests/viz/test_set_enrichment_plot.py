@@ -2,7 +2,7 @@
 
 from dataclasses import replace
 
-from bokeh.models import BoxAnnotation, HoverTool, LabelSet
+from bokeh.models import HoverTool, Text
 
 from metabis.analysis.artifacts import (
     AnalysisArtifactMetadata,
@@ -24,10 +24,13 @@ from metabis.analysis.set_enrichment import (
     run_set_enrichment,
 )
 from metabis.analysis_workspace import RevisionKind, WorkspaceRevisions
+from metabis.managers.hover import panel as panel_module
 from metabis.viz.plot_set_enrichment import (
     NOT_SIGNIFICANT_COLOR,
     plot_set_enrichment_category,
+    set_enrichment_rows,
 )
+from metabis.viz.ranking_layout import RANKING_NAMES, RANKING_PLOT
 
 
 def _artifact(*, minimum_size=1) -> SetEnrichmentArtifact:
@@ -97,14 +100,15 @@ def test_category_plot_uses_one_dot_per_subsystem_without_recomputing(monkeypatc
         ),
     )
 
-    plot = plot_set_enrichment_category(artifact)
+    layout = plot_set_enrichment_category(artifact)
+    plot = layout.select_one({"name": RANKING_PLOT})
     points = plot.select_one({"name": "set_enrichment_subsystem_points"})
     frame = points.data_source.data
 
     # A single dot per subsystem replaces the earlier paired points; the old
     # Target-higher/Target-lower glyphs no longer exist.
-    assert not plot.select({"name": "set_enrichment_target_points"})
-    assert not plot.select({"name": "set_enrichment_baseline_points"})
+    assert not list(layout.select({"name": "set_enrichment_target_points"}))
+    assert not list(layout.select({"name": "set_enrichment_baseline_points"}))
     assert set(frame["subsystem_id"]) == {"s1", "s2"}
     assert len(frame["subsystem_id"]) == 2
     # Each dot sits at the larger-magnitude direction, sign preserved.
@@ -121,8 +125,8 @@ def test_category_plot_uses_one_dot_per_subsystem_without_recomputing(monkeypatc
     # not a single flat red/blue; the plot exposes no legend.
     assert all(str(color).startswith("#") for color in frame["dominant_color"])
     assert len(plot.legend) == 0
-    assert all(factor[0] == "Metabolism" for factor in plot.y_range.factors)
-    assert plot.tags[-1] == {
+    assert "heading:1:0" in plot.y_range.factors
+    assert layout.tags[-1] == {
         "artifact_id": artifact.metadata.artifact_id,
         "artifact_kind": "set_enrichment",
         "feature_type": "gene",
@@ -138,29 +142,40 @@ def test_rows_are_ordered_within_category_by_largest_directional_magnitude():
     assert magnitudes == sorted(magnitudes, reverse=True)
 
 
-def test_category_plot_uses_distribution_plot_category_structure():
-    category_color = "#2A9D8F"
-
-    plot = plot_set_enrichment_category(
-        _artifact(), category_colors={"Metabolism": category_color}
+def test_category_plot_uses_the_rankings_rows():
+    """Names in a panel, a numbered heading per category, and no category hue."""
+    layout = plot_set_enrichment_category(
+        _artifact(),
+        category_colors={"Metabolism": "#2A9D8F"},
+        category_numbers={"Lipids": 1, "Metabolism": 2},
     )
+    names = layout.select_one({"name": RANKING_NAMES})
+    plot = layout.select_one({"name": RANKING_PLOT})
 
-    category_bands = [
-        annotation
-        for annotation in plot.select({"type": BoxAnnotation})
-        if annotation.fill_color == category_color
-    ]
-    label_sets = list(plot.select({"type": LabelSet}))
-    label_text = {
-        text
-        for label_set in label_sets
-        for text in label_set.source.data.get("text", [])
-    }
-
-    assert len(category_bands) == 1
-    assert {"Metabolism", "First pathway", "Second pathway"} <= label_text
-    assert not plot.yaxis[0].visible
+    # Bokeh lists factors bottom up; read top down, the heading opens its category,
+    # under the network's number for it.
+    rows = list(reversed(plot.y_range.factors))
+    assert rows[0] == "heading:2:0"
+    assert set(rows[1:]) == {"First pathway", "Second pathway"}
+    assert names.y_range is plot.y_range
+    texts = [r.data_source.data for r in names.renderers if isinstance(r.glyph, Text)]
+    assert any(data.get("text") == ["Metabolism"] and data.get("number") == ["2"] for data in texts)
     assert plot.ygrid[0].grid_line_color is None
+    fills = {
+        renderer.glyph.fill_color
+        for panel in (names, plot)
+        for renderer in panel.renderers
+        if renderer.glyph.__class__.__name__ == "HBar"
+    }
+    assert "#2A9D8F" not in fills
+
+
+def _points_hover(plot):
+    points = plot.select_one({"name": "set_enrichment_subsystem_points"})
+    (hover,) = [
+        tool for tool in plot.select({"type": HoverTool}) if points in (tool.renderers or [])
+    ]
+    return hover
 
 
 def test_nonsignificant_subsystem_is_gray_and_hover_reports_both_results():
@@ -175,20 +190,23 @@ def test_nonsignificant_subsystem_is_gray_and_hover_reports_both_results():
     renderer = plot.select_one({"name": "set_enrichment_subsystem_points"})
     source = renderer.data_source.data
     index = list(source["subsystem_id"]).index("s1")
-    hover = plot.select_one(HoverTool)
+    hover = _points_hover(plot)
     html = source["hover_html"][index]
 
     assert source["dominant_color"][index] == NOT_SIGNIFICANT_COLOR
     assert not source["significant"][index]
-    assert hover.tooltips.startswith("@hover_html{safe}")
-    assert "<strong>Color Reference:</strong>" in hover.tooltips
+    # One panel round the subsystem's facts and the colour reference under them.
+    assert hover.tooltips.startswith(f"<div style='{panel_module.PANEL_STYLE}'>")
+    assert hover.tooltips.index("@hover_html{safe}") < hover.tooltips.index("<strong>Color Reference:</strong>")
     assert "Target-higher" in html
     assert "Target-lower" in html
-    assert "Adjusted p" in html
+    assert "Adjusted p-value" in html
     assert "Overlap" in html
-    assert "query" in html
-    assert "Background N=5" in html
-    assert "Not applicable to gene-set enrichment" in html
+    assert "Query" in html
+    assert "background of 5" in html
+    # The reaction direction criterion is said of reactions only.
+    assert "Reaction direction criterion" not in html
+    assert "·" not in html
 
 
 def test_every_dot_carries_the_gradient_color_reference_it_was_painted_from():
@@ -201,7 +219,7 @@ def test_every_dot_carries_the_gradient_color_reference_it_was_painted_from():
     """
     plot = plot_set_enrichment_category(_artifact())
     source = plot.select_one({"name": "set_enrichment_subsystem_points"}).data_source
-    hover = plot.select_one(HoverTool)
+    hover = _points_hover(plot)
     values = list(source.data["dominant_visual"])
 
     assert len(source.data["hover_html"]) > 0
@@ -224,3 +242,17 @@ def test_empty_eligible_artifact_and_wrong_input_remain_structural():
         assert "SetEnrichmentArtifact" in str(exc)
     else:
         raise AssertionError("non-artifact input was accepted")
+
+
+def test_the_rows_step_3_reads_are_the_ones_the_ranking_draws():
+    """Step 3's ORA rows sit, colour and hover as step 4's ranking draws them."""
+    artifact = _artifact()
+    rows = set_enrichment_rows(artifact).set_index("subsystem_id")
+    layout = plot_set_enrichment_category(artifact)
+    drawn = layout.select_one({"name": "set_enrichment_subsystem_points"}).data_source.data
+
+    for sid, x, color, hover in zip(drawn["subsystem_id"], drawn["dominant_visual"], drawn["dominant_color"], drawn["hover_html"]):
+        assert (rows.at[sid, "dominant_visual"], rows.at[sid, "dominant_color"], rows.at[sid, "hover_html"]) == (x, color, hover)
+    # Both directions in each hover, whichever is drawn.
+    assert all("Target-higher" in hover and "Target-lower" in hover for hover in rows["hover_html"])
+    assert set_enrichment_rows(artifact).attrs["color_reference"] is not None

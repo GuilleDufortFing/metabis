@@ -456,7 +456,7 @@ def test_stale_enrichment_install_is_rejected_without_state_change():
     manager, provenance = _manager_with_comparison(comparison)
     manager.mark_thresholds_changed()
 
-    with pytest.raises(StaleAnalysisResultError, match="thresholds revision"):
+    with pytest.raises(StaleAnalysisResultError, match="The significance changed while"):
         manager.install_reaction_set_enrichment_artifact(provenance, artifact)
 
     assert manager.get_reaction_set_enrichment_artifact() is None
@@ -519,7 +519,7 @@ def test_public_enrichment_path_from_loaded_workspace_to_export(human1_model):
     assert glycolysis.reaction_ids == tuple(
         sorted(human1_model.get_reactions_for_subsystem(glycolysis.subsystem_id))
     )
-    assert len(glycolysis.reaction_ids) == 44
+    assert len(glycolysis.reaction_ids) == 43
 
     source_annotation = next(
         annotation for annotation in annotations if len(annotation.reaction_ids) >= 3

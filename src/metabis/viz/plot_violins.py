@@ -1,8 +1,8 @@
 import base64
 import io
+from html import escape
 from typing import Optional, Tuple
 
-import matplotlib.pyplot as plt
 import numpy as np
 from bokeh.layouts import gridplot
 from bokeh.models import ColumnDataSource, HoverTool
@@ -612,13 +612,13 @@ def create_html_violin_for_hover(
     }" text-anchor="middle"
                   font-size="12" fill="#333" transform="rotate(-30 {scale_x(1.0)} {
         margin_top + plot_area_height + 25
-    })">{group1_name}</text>
+    })">{escape(str(group1_name))}</text>
             <text x="{scale_x(2.0)}" y="{
         margin_top + plot_area_height + 25
     }" text-anchor="middle"
                   font-size="12" fill="#333" transform="rotate(-30 {scale_x(2.0)} {
         margin_top + plot_area_height + 25
-    })">{group2_name}</text>
+    })">{escape(str(group2_name))}</text>
 
             <!-- Y-axis labels (simplified) -->
             <text x="{margin_left - 5}" y="{
@@ -775,6 +775,9 @@ def create_matplotlib_violin_for_hover(
     Returns:
         str: HTML img tag containing the plot as a base64-encoded SVG
     """
+    # Matplotlib is needed only for these violins, drawn at full hover detail.
+    import matplotlib.pyplot as plt
+
     plt.style.use("seaborn-v0_8-whitegrid")
     fig, ax = plt.subplots(figsize=(3, 2.5), dpi=800)
 

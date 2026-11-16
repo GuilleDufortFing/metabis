@@ -444,7 +444,7 @@
       "glyph_class": "reaction",
       "label": "MAR00073",
       "x": 25.0,
-      "y": 1140.0,
+      "y": 1135.0,
       "width": 50.0,
       "height": 50.0,
       "original_id": "MAR00073"
@@ -490,17 +490,6 @@
       "original_id": "MAR00092"
     },
     {
-      "id": "m_mitochondria_MAM02426m",
-      "glyph_class": "metabolite",
-      "label": "MAM02426m",
-      "x": 828.0,
-      "y": 1124.0,
-      "width": 60.0,
-      "height": 40.0,
-      "original_id": "MAM02426m",
-      "subtype": "main"
-    },
-    {
       "id": "m_mitochondria_MAM00185m",
       "glyph_class": "metabolite",
       "label": "MAM00185m",
@@ -512,11 +501,33 @@
       "subtype": "main"
     },
     {
+      "id": "m_mitochondria_MAM02426m",
+      "glyph_class": "metabolite",
+      "label": "MAM02426m",
+      "x": 828.0,
+      "y": 1124.0,
+      "width": 60.0,
+      "height": 40.0,
+      "original_id": "MAM02426m",
+      "subtype": "main"
+    },
+    {
+      "id": "m_mitochondria_MAM01356m",
+      "glyph_class": "metabolite",
+      "label": "MAM01356m",
+      "x": 134.0,
+      "y": 1277.0,
+      "width": 60.0,
+      "height": 40.0,
+      "original_id": "MAM01356m",
+      "subtype": "main"
+    },
+    {
       "id": "m_MAR00073_MAM02039m",
       "glyph_class": "metabolite",
       "label": "MAM02039m",
       "x": 134.0,
-      "y": 1277.0,
+      "y": 1201.0,
       "width": 40.0,
       "height": 30.0,
       "original_id": "MAM02039m",
@@ -549,7 +560,7 @@
       "glyph_class": "metabolite",
       "label": "MAM02040m",
       "x": 134.0,
-      "y": 1211.0,
+      "y": 1135.0,
       "width": 40.0,
       "height": 30.0,
       "original_id": "MAM02040m",
@@ -576,17 +587,6 @@
       "height": 30.0,
       "original_id": "MAM02040m",
       "subtype": "intermediate"
-    },
-    {
-      "id": "m_mitochondria_MAM01356m",
-      "glyph_class": "metabolite",
-      "label": "MAM01356m",
-      "x": 134.0,
-      "y": 1140.0,
-      "width": 60.0,
-      "height": 40.0,
-      "original_id": "MAM01356m",
-      "subtype": "main"
     },
     {
       "id": "m_mitochondria_MAM01357m",
@@ -633,17 +633,6 @@
       "subtype": "main"
     },
     {
-      "id": "m_mitochondria_MAM02759m",
-      "glyph_class": "metabolite",
-      "label": "MAM02759m",
-      "x": 1066.0,
-      "y": 1127.0,
-      "width": 60.0,
-      "height": 40.0,
-      "original_id": "MAM02759m",
-      "subtype": "main"
-    },
-    {
       "id": "m_mitochondria_MAM01402m",
       "glyph_class": "metabolite",
       "label": "MAM01402m",
@@ -652,6 +641,17 @@
       "width": 60.0,
       "height": 40.0,
       "original_id": "MAM01402m",
+      "subtype": "main"
+    },
+    {
+      "id": "m_mitochondria_MAM02759m",
+      "glyph_class": "metabolite",
+      "label": "MAM02759m",
+      "x": 1066.0,
+      "y": 1127.0,
+      "width": 60.0,
+      "height": 40.0,
+      "original_id": "MAM02759m",
       "subtype": "main"
     },
     {
@@ -1080,6 +1080,20 @@
       "stoichiometry": null
     },
     {
+      "id": "conn_m_mitochondria_MAM00185m_to_r_MAR00073",
+      "connection_class": "metabolic",
+      "source": "m_mitochondria_MAM00185m",
+      "target": "r_MAR00073",
+      "stoichiometry": null
+    },
+    {
+      "id": "conn_r_MAR00074_to_m_mitochondria_MAM00185m",
+      "connection_class": "metabolic",
+      "source": "r_MAR00074",
+      "target": "m_mitochondria_MAM00185m",
+      "stoichiometry": null
+    },
+    {
       "id": "conn_m_mitochondria_MAM02426m_to_r_MAR00073",
       "connection_class": "metabolic",
       "source": "m_mitochondria_MAM02426m",
@@ -1094,17 +1108,17 @@
       "stoichiometry": null
     },
     {
-      "id": "conn_m_mitochondria_MAM00185m_to_r_MAR00073",
+      "id": "conn_r_MAR00073_to_m_mitochondria_MAM01356m",
       "connection_class": "metabolic",
-      "source": "m_mitochondria_MAM00185m",
-      "target": "r_MAR00073",
+      "source": "r_MAR00073",
+      "target": "m_mitochondria_MAM01356m",
       "stoichiometry": null
     },
     {
-      "id": "conn_r_MAR00074_to_m_mitochondria_MAM00185m",
+      "id": "conn_m_mitochondria_MAM01356m_to_r_MAR00092",
       "connection_class": "metabolic",
-      "source": "r_MAR00074",
-      "target": "m_mitochondria_MAM00185m",
+      "source": "m_mitochondria_MAM01356m",
+      "target": "r_MAR00092",
       "stoichiometry": null
     },
     {
@@ -1147,20 +1161,6 @@
       "connection_class": "metabolic",
       "source": "m_MAR00091_MAM02040m",
       "target": "r_MAR00091",
-      "stoichiometry": null
-    },
-    {
-      "id": "conn_r_MAR00073_to_m_mitochondria_MAM01356m",
-      "connection_class": "metabolic",
-      "source": "r_MAR00073",
-      "target": "m_mitochondria_MAM01356m",
-      "stoichiometry": null
-    },
-    {
-      "id": "conn_m_mitochondria_MAM01356m_to_r_MAR00092",
-      "connection_class": "metabolic",
-      "source": "m_mitochondria_MAM01356m",
-      "target": "r_MAR00092",
       "stoichiometry": null
     },
     {
@@ -1213,13 +1213,6 @@
       "stoichiometry": null
     },
     {
-      "id": "conn_r_MAR00086_to_m_mitochondria_MAM02759m",
-      "connection_class": "metabolic",
-      "source": "r_MAR00086",
-      "target": "m_mitochondria_MAM02759m",
-      "stoichiometry": null
-    },
-    {
       "id": "conn_r_MAR00086_to_m_mitochondria_MAM01402m",
       "connection_class": "metabolic",
       "source": "r_MAR00086",
@@ -1231,6 +1224,13 @@
       "connection_class": "metabolic",
       "source": "m_mitochondria_MAM01402m",
       "target": "r_MAR00092",
+      "stoichiometry": null
+    },
+    {
+      "id": "conn_r_MAR00086_to_m_mitochondria_MAM02759m",
+      "connection_class": "metabolic",
+      "source": "r_MAR00086",
+      "target": "m_mitochondria_MAM02759m",
       "stoichiometry": null
     },
     {

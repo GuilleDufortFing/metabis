@@ -14,8 +14,7 @@ from html import escape
 from typing import Mapping
 
 import pandas as pd
-from bokeh.models import ColumnDataSource, FactorRange, HoverTool, Range1d, Span
-from bokeh.plotting import figure
+from bokeh.models import ColumnDataSource, HoverTool, Range1d
 
 from ..analysis.reaction_direction import ReactionDirectionCriterion
 from ..analysis.set_enrichment import (
@@ -23,16 +22,21 @@ from ..analysis.set_enrichment import (
     SetEnrichmentDirection,
     SetEnrichmentFeatureType,
 )
+from ..managers.hover import panel as hover_panel
 from ..visual_config import theme
-from .metabolic_visualization.generation.data_structures.constants import (
-    VisualizationConstants,
+from .ranking_layout import (
+    RankedSubsystem,
+    add_focus_link,
+    names_panel,
+    order_rows,
+    ranking_figure,
+    ranking_layout,
 )
-from .plot_subsystem_ranking import (
-    _add_category_decorations_horizontal,
-    _create_zoom_dependent_labels,
+from .set_enrichment_overview import (
+    ora_family_label,
+    ora_hover_facts,
+    signed_log2_gradient_scale,
 )
-from .plot_utils import apply_academic_style
-from .set_enrichment_overview import signed_log2_gradient_scale
 
 # One dot per subsystem takes the shared signed-log2 gradient (red for
 # over-representation among Target-higher features, blue for Target-lower); a
@@ -48,31 +52,6 @@ def _finite_number(value: object, *, default: float = 0.0) -> float:
     except (TypeError, ValueError):
         return default
     return number if math.isfinite(number) else default
-
-
-def _format_number(value: object, *, digits: int = 3) -> str:
-    try:
-        number = float(value)
-    except (TypeError, ValueError):
-        return "Not available"
-    if not math.isfinite(number):
-        return "Not available"
-    return f"{number:.{digits}f}"
-
-
-def _format_probability(value: object) -> str:
-    try:
-        number = float(value)
-    except (TypeError, ValueError):
-        return "Not available"
-    if not math.isfinite(number):
-        return "Not available"
-    if number <= 0:
-        return "&lt; 2.23 × 10<sup>−308</sup>"
-    if number < 0.001:
-        coefficient, exponent = f"{number:.2e}".split("e")
-        return f"{coefficient} × 10<sup>{int(exponent)}</sup>"
-    return f"{number:.3g}"
 
 
 def _direction_criterion_label(artifact: SetEnrichmentArtifact) -> str:
@@ -233,56 +212,70 @@ def _assign_gradient_colors(paired: pd.DataFrame):
 
 
 def _hover_html(row: pd.Series, *, artifact: SetEnrichmentArtifact) -> str:
-    family = (
-        "Reaction-Set Enrichment - Over-Representation Analysis"
-        if artifact.feature_type is SetEnrichmentFeatureType.REACTION
-        else "Gene-Set Enrichment - Over-Representation Analysis"
+    """A subsystem's hover, without its panel, which the tooltip template draws.
+
+    The same facts as its node in the network (set_enrichment_overview), and the
+    reaction direction criterion the reactions were read under.
+    """
+    reactions = artifact.feature_type is SetEnrichmentFeatureType.REACTION
+    return hover_panel.row(
+        "Subsystem",
+        f"{escape(str(row['subsystem_name']))} <span style='color:#888;'>({escape(str(row['category']))})</span>",
+    ) + hover_panel.row("Analysis", ora_family_label(artifact.feature_type)) + ora_hover_facts(
+        row,
+        target_significant=bool(row["target_significant"]),
+        baseline_significant=bool(row["baseline_significant"]),
+        feature_type=artifact.feature_type,
+        threshold=artifact.config.adjusted_pvalue_threshold,
+        criterion=_direction_criterion_label(artifact) if reactions else None,
     )
-    target_status = "Significant" if row["target_significant"] else "Not significant"
-    baseline_status = (
-        "Significant" if row["baseline_significant"] else "Not significant"
-    )
-    correction = {
-        "fdr_bh": "Benjamini–Hochberg FDR",
-        "holm": "Holm FWER",
-    }.get(row["correction"], row["correction"])
-    return (
-        "<div style='font-family:Inter,-apple-system,BlinkMacSystemFont,&quot;Segoe UI&quot;,sans-serif;"
-        "width:390px;max-width:390px;color:#1E2A32;background:#FFFFFF;"
-        "border:1px solid #D9E1E8;border-radius:8px;overflow:hidden;font-size:12px;'>"
-        "<div style='padding:10px 12px;background:#F7F9FB;border-bottom:1px solid #D9E1E8;'>"
-        f"<div style='font-size:14px;font-weight:700;color:#20435C;'>{escape(str(row['subsystem_name']))}</div>"
-        f"<div style='color:#5C6B76;'>{escape(str(row['category']))} · {family}</div></div>"
-        "<div style='display:grid;grid-template-columns:1fr 1fr;gap:8px 14px;padding:11px 12px;'>"
-        "<div style='border-left:4px solid #C62828;padding-left:8px;'><strong>Target-higher</strong><br/>"
-        f"{target_status}<br/>Ratio {_format_number(row['target_enrichment_ratio'])}<br/>"
-        f"Adjusted p {_format_probability(row['target_adjusted_pval'])}<br/>"
-        f"Overlap {row['target_overlap_size']} of {row['subsystem_size']} · query {row['target_query_size']}</div>"
-        "<div style='border-left:4px solid #1565C0;padding-left:8px;'><strong>Target-lower</strong><br/>"
-        f"{baseline_status}<br/>Ratio {_format_number(row['baseline_enrichment_ratio'])}<br/>"
-        f"Adjusted p {_format_probability(row['baseline_adjusted_pval'])}<br/>"
-        f"Overlap {row['baseline_overlap_size']} of {row['subsystem_size']} · query {row['baseline_query_size']}</div>"
-        "</div><div style='padding:8px 12px;border-top:1px solid #E5EBF0;background:#FBFCFD;color:#52616D;'>"
-        f"Background N={row['universe_size']} · {escape(str(correction))} over "
-        f"{row['correction_family_size']} hypotheses · q ≤ "
-        f"{_format_probability(artifact.config.adjusted_pvalue_threshold)}<br/>"
-        f"Reaction direction criterion: {escape(_direction_criterion_label(artifact))}"
-        "</div></div>"
-    )
+
+
+def set_enrichment_rows(artifact: SetEnrichmentArtifact) -> pd.DataFrame:
+    """One row per subsystem as the ORA ranking draws it, and its hover.
+
+    ``dominant_visual`` is where its dot sits, ``dominant_color`` its colour,
+    ``significant`` whether either direction is, and ``hover_html`` its hover,
+    both directions side by side; ``attrs["color_reference"]`` is the
+    distribution the colours come from. Step 3 reads one comparison's ORA from it,
+    so its rows say what step 4's do.
+    """
+    if not isinstance(artifact, SetEnrichmentArtifact):
+        raise TypeError("artifact must be a SetEnrichmentArtifact")
+    return _paired_frame(artifact)
 
 
 def plot_set_enrichment_category(
     artifact: SetEnrichmentArtifact,
     *,
     category_colors: Mapping[str, str] | None = None,
+    category_numbers: Mapping[str, int] | None = None,
+    navigation_event: str | None = None,
 ):
-    """Plot one dot per subsystem using the shared category-dot structure."""
+    """One dot per subsystem, in the subsystem rankings' layout (see ranking_layout).
+
+    ``category_colors`` is accepted for compatibility and unused: categories carry
+    no hue, so the colour is left to the enrichment score. ``category_numbers`` are
+    the network's numbers for every category in use, so the headings match it.
+    Returns the names panel and the dots as one grid.
+    """
     if not isinstance(artifact, SetEnrichmentArtifact):
         raise TypeError("artifact must be a SetEnrichmentArtifact")
 
     frame = _paired_frame(artifact)
-    factors = list(reversed(frame.get("y_factor", pd.Series(dtype=object)).tolist()))
-    y_range = FactorRange(factors=factors, bounds="auto", range_padding=0.02)
+    entries = [
+        RankedSubsystem(
+            subsystem_id=str(row["subsystem_id"]),
+            name=str(row["subsystem_name"]),
+            category=str(row["category"]),
+            score=float(row["maximum_visual_magnitude"])
+            if math.isfinite(float(row["maximum_visual_magnitude"]))
+            else 0.0,
+        )
+        for _, row in frame.iterrows()
+    ]
+    rows = order_rows(entries, numbers=category_numbers)
+    frame["y_factor"] = [rows.factor_of[str(sid)] for sid in frame.get("subsystem_id", [])]
 
     values = [
         value
@@ -294,50 +287,19 @@ def plot_set_enrichment_category(
     padding = (x_max - x_min) * 0.1 if x_max != x_min else 1.0
     x_range = Range1d(x_min - padding, x_max + padding)
 
-    colors = category_colors or {}
-    sorted_categories = list(dict.fromkeys(frame.get("category", [])))
-    ordered_data = {
-        "factors": list(reversed(factors)),
-        "y_factors": factors,
-        "sorted_categories": sorted_categories,
-        "category_info": {
-            category: {
-                "color": colors.get(
-                    category,
-                    VisualizationConstants.DEFAULT_CATEGORY_COLOR_UNMAPPED,
-                ),
-            }
-            for category in sorted_categories
-        },
-    }
     family = (
         "Reaction"
         if artifact.feature_type is SetEnrichmentFeatureType.REACTION
         else "Gene"
     )
-    plot = figure(
-        title=(
-            f"{family}-Set Enrichment - Over-Representation Analysis "
-            "by subsystem category"
-        ),
-        x_axis_label=(
-            "Signed log2(enrichment ratio): Target-lower ← 0 → Target-higher"
-        ),
+    plot = ranking_figure(
+        rows,
+        title=f"{family}-Set Enrichment (ORA)",
         x_range=x_range,
-        y_range=y_range,
-        height=max(600, 20 * len(factors)),
-        sizing_mode="stretch_width",
-        tools="pan,wheel_zoom,box_zoom,reset,save,tap",
-        toolbar_location="above",
-        x_axis_location="above",
-        border_fill_color="rgba(255,255,255,0)",
+        x_label="Signed log2(enrichment ratio), Target-lower to Target-higher",
+        tools="xpan,xwheel_zoom,reset,save,tap",
     )
-    apply_academic_style(plot)
-    _add_category_decorations_horizontal(
-        p=plot,
-        ordered_data=ordered_data,
-        x_range=x_range,
-    )
+    add_focus_link(plot, rows, navigation_event=navigation_event)
     source = ColumnDataSource(frame)
     points = plot.scatter(
         x="dominant_visual",
@@ -346,17 +308,19 @@ def plot_set_enrichment_category(
         size=10,
         marker="circle",
         fill_color="dominant_color",
-        line_color="dominant_color",
-        fill_alpha=0.9,
+        line_color=theme.MARK_EDGE,
+        line_width=theme.MARK_EDGE_WIDTH,
+        fill_alpha=0.95,
         name="set_enrichment_subsystem_points",
     )
     reference = frame.attrs.get("color_reference")
-    hover_tooltip = "@hover_html{safe}"
-    if reference is not None:
-        hover_tooltip += reference.hover_template(
-            marker_x_field="color_reference_marker_x",
-            value_field="color_reference_value",
-        )
+    # The colour reference sits in the subsystem's panel, as on a graph node's.
+    hover_tooltip = hover_panel.panel(
+        "@hover_html{safe}",
+        reference.hover_template(marker_x_field="color_reference_marker_x", value_field="color_reference_value")
+        if reference is not None
+        else "",
+    )
     plot.add_tools(
         HoverTool(
             renderers=[points],
@@ -365,27 +329,14 @@ def plot_set_enrichment_category(
             show_arrow=False,
         )
     )
-    plot.add_layout(
-        Span(
-            location=0.0,
-            dimension="height",
-            line_color=theme.THRESHOLD_LINE_COLOR,
-            line_dash=theme.THRESHOLD_LINE_DASH,
-            line_width=theme.THRESHOLD_LINE_WIDTH,
-            line_alpha=0.7,
-        )
+    names = names_panel(
+        rows,
+        plot,
+        x_label="Signed log2(enrichment ratio), Target-lower to Target-higher",
+        navigation_event=navigation_event,
     )
-    plot.xgrid.grid_line_color = "#404040"
-    plot.xgrid.grid_line_alpha = 0.5
-    plot.ygrid.grid_line_color = None
-    plot.yaxis.axis_label = None
-    plot.yaxis.visible = False
-    _create_zoom_dependent_labels(
-        p=plot,
-        ordered_data=ordered_data,
-        x_range=x_range,
-    )
-    plot.tags.append(
+    layout = ranking_layout(rows, names, plot)
+    layout.tags.append(
         {
             "artifact_id": artifact.metadata.artifact_id,
             "artifact_kind": artifact.metadata.kind.value,
@@ -393,7 +344,7 @@ def plot_set_enrichment_category(
             "presentation": "paired_set_enrichment_category",
         }
     )
-    return plot
+    return layout
 
 
-__all__ = ["plot_set_enrichment_category"]
+__all__ = ["plot_set_enrichment_category", "set_enrichment_rows"]

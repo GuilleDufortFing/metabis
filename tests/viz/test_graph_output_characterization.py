@@ -47,14 +47,27 @@ from metabis.viz.metabolic_visualization.pipeline import (
 SUBSYSTEM_NAME = "Glycolysis / Gluconeogenesis"
 SUBSYSTEM_ID = "glycolysis_gluconeogenesis"
 
-# Golden values recorded on 2026-07-14 from the pre-AM4 implementation.
-HUMAN1_STRUCTURE = "97aa9426b748b16100ebfdf9e7ea2bcdc7738d3628b16c271b7fad57ba54f42f"
+# Golden values recorded on 2026-07-14 from the pre-AM4 implementation;
+# HUMAN1_STRUCTURE re-recorded on 2026-11-03, when the packaged Human1 maps were
+# rebuilt from Human-maps' maps for Human-GEM 2.1.1 (scripts/import_human_maps.py).
+HUMAN1_STRUCTURE = "48696110a11ae97f44a5419b0fdf053e0869c459f0f79a425df563326d197226"
 # STANDARD_STRUCTURE is a coordinate digest of the packaged automatic layout, so
 # it is re-recorded whenever that resource is regenerated — 2026-07-25 for the
 # connectivity-preserving split, which redraws glycolysis as 10 components with
-# 124 nodes in the largest instead of 23 components with 34.
-STANDARD_STRUCTURE = "4233e408abb355939b0372d16f2a7f32657abedf48860333edb0158054894725"
-OVERVIEW_STRUCTURE = "83d72a62d7ae47fbe24182d8f067ce902076e960cbf602f8a1fddeff0e7831ed"
+# 124 nodes in the largest instead of 23 components with 34, and 2026-11-04 for
+# the model's move to Human-GEM 2.1.1 (scripts/regenerate_subsystem_graphs.py).
+STANDARD_STRUCTURE = "7d4f04f3f7f3d4be90e9e0648b79b0624badbe9d891ae7ce91c417f74616e20a"
+# OVERVIEW_STRUCTURE is re-recorded on 2026-10-21 for the spaced overview: the
+# packaged positions now seed a layout per category (spaced_network), so every
+# node moved, while the nodes, edges and their order stayed. Re-recorded on
+# 2026-10-22 for the numbered, packed categories: the categories moved, and with
+# them every node. Re-recorded the same day for transport divided by compartment:
+# nine transport subsystems replace one (165 nodes become 173), joined to each
+# other and to Exchange/demand where they share main metabolites (374 edges
+# become 407). Re-recorded on 2026-11-04 for Human-GEM 2.1.1: its transport
+# subsystems changed size, so the 22 nodes of their category moved; the nodes,
+# edges and their order stayed.
+OVERVIEW_STRUCTURE = "301553ea028765369a776cb4cc2fbef87d50e4305d69d2b33137cfad8d4b41b2"
 
 
 def prepare_graph(
@@ -191,8 +204,8 @@ def test_the_packaged_human1_subsystem_keeps_its_structure(model, structural_man
     assert artifact.used_runtime_layout is False
     assert artifact.warnings == ()
     assert artifact.display_title == SUBSYSTEM_NAME
-    assert artifact.node_count == 348
-    assert artifact.edge_count == 230
+    assert artifact.node_count == 350
+    assert artifact.edge_count == 248
     assert {node["glyph_class"] for node in artifact.nodes} == {
         "compartment",
         "enzyme_group",
@@ -223,12 +236,12 @@ def test_the_packaged_standard_subsystem_layout_is_a_different_graph(
 
 
 # Subsystems with no curated Human1 map — the case D-60 is about. `retinol` never
-# had one; `hippurate` and `drug_metabolism` shipped no automatic layout at all
-# until this slice repackaged them, so they exercise the "was runtime, now a
-# packaged standard resource" path as well.
+# had one; `drug_metabolism` shipped no automatic layout at all until this slice
+# repackaged it, so it exercises the "was runtime, now a packaged standard
+# resource" path as well. (`hippurate`, the other such, has had a Human1 map since
+# Human-maps' maps for Human-GEM 2.1.1.)
 NO_HUMAN1_MAP_SUBSYSTEMS = (
     "retinol_metabolism",
-    "hippurate_metabolism",
     "drug_metabolism",
 )
 
@@ -271,8 +284,8 @@ def test_the_overview_network_keeps_its_structure(model, structural_manager):
     )
 
     assert artifact.display_title == "Complete Metabolic Network"
-    assert artifact.node_count == 165
-    assert artifact.edge_count == 374
+    assert artifact.node_count == 173
+    assert artifact.edge_count == 407
     # The overview draws subsystems and their categories, never single reactions.
     assert {node["glyph_class"] for node in artifact.nodes} == {
         "subsystem",

@@ -18,12 +18,9 @@ from nbclient import NotebookClient
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 DEMO_DIRECTORY = REPOSITORY_ROOT / "demo"
 MAINTAINED_NOTEBOOKS = (
-    "01_metabolic_model_and_data_loading.ipynb",
-    "02_groups_and_dimensionality_reduction.ipynb",
-    "03_group_statistical_comparison.ipynb",
-    "04_metabolic_graphs_and_subsystems.ipynb",
-    "05_multi_group_comparisons_smillie.ipynb",
-    "case_study.ipynb",
+    "01_compass_th17.ipynb",
+    "02_smillie_pseudobulk.ipynb",
+    "03_metaflux_tcga_lung.ipynb",
 )
 RUNTIME_DIRECTORY = Path(tempfile.gettempdir()) / "metabis-notebook-runtime"
 
@@ -82,9 +79,12 @@ def require_example_data() -> None:
         "Th17_Compass_reactions.tsv",
         "Th17_Compass_expression.tsv",
         "Th17_Compass_metadata.tsv",
-        "smillie_clusters_pool_reactions.tsv",
-        "smillie_clusters_pool_expression_cpm.tsv",
-        "smillie_metadata.tsv",
+        "smillie_pseudobulk_reactions.tsv",
+        "smillie_pseudobulk_expression_cp10k.tsv",
+        "smillie_pseudobulk_metadata.tsv",
+        "metaflux_tcga_lung_reactions.tsv",
+        "metaflux_tcga_lung_expression.tsv",
+        "metaflux_tcga_lung_metadata.tsv",
     )
     missing = [
         name for name in required if not (REPOSITORY_ROOT / "data" / name).is_file()

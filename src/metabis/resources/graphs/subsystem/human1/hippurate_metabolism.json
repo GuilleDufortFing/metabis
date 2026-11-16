@@ -1,0 +1,222 @@
+{
+  "glyphs": [
+    {
+      "id": "compartment1",
+      "glyph_class": "compartment",
+      "label": "Mitochondria",
+      "x": 780.0,
+      "y": 789.4,
+      "width": 723.9,
+      "height": 669.8
+    },
+    {
+      "id": "met1",
+      "glyph_class": "metabolite",
+      "label": "MAM01597m",
+      "x": 1028.0,
+      "y": 955.3,
+      "width": 14.0,
+      "height": 14.0,
+      "original_id": "met1",
+      "subtype": "intermediate"
+    },
+    {
+      "id": "met2",
+      "glyph_class": "metabolite",
+      "label": "MAM01371m",
+      "x": 1028.0,
+      "y": 1005.3,
+      "width": 14.0,
+      "height": 14.0,
+      "original_id": "met2",
+      "subtype": "intermediate"
+    },
+    {
+      "id": "met3",
+      "glyph_class": "metabolite",
+      "label": "MAM01380m",
+      "x": 938.0,
+      "y": 1028.7,
+      "width": 60.0,
+      "height": 40.0,
+      "original_id": "met3",
+      "subtype": "main"
+    },
+    {
+      "id": "met4",
+      "glyph_class": "metabolite",
+      "label": "MAM03485m",
+      "x": 738.6,
+      "y": 700.6,
+      "width": 60.0,
+      "height": 40.0,
+      "original_id": "met4",
+      "subtype": "main"
+    },
+    {
+      "id": "met5",
+      "glyph_class": "metabolite",
+      "label": "MAM02759m",
+      "x": 1028.0,
+      "y": 725.3,
+      "width": 14.0,
+      "height": 14.0,
+      "original_id": "met5",
+      "subtype": "intermediate"
+    },
+    {
+      "id": "met6",
+      "glyph_class": "metabolite",
+      "label": "MAM01334m",
+      "x": 1028.0,
+      "y": 775.3,
+      "width": 14.0,
+      "height": 14.0,
+      "original_id": "met6",
+      "subtype": "intermediate"
+    },
+    {
+      "id": "met7",
+      "glyph_class": "metabolite",
+      "label": "MAM01986m",
+      "x": 626.1,
+      "y": 775.3,
+      "width": 14.0,
+      "height": 14.0,
+      "original_id": "met7",
+      "subtype": "intermediate"
+    },
+    {
+      "id": "met8",
+      "glyph_class": "metabolite",
+      "label": "MAM02039m",
+      "x": 626.1,
+      "y": 955.3,
+      "width": 14.0,
+      "height": 14.0,
+      "original_id": "met8",
+      "subtype": "intermediate"
+    },
+    {
+      "id": "met9",
+      "glyph_class": "metabolite",
+      "label": "MAM01597m",
+      "x": 626.1,
+      "y": 1005.3,
+      "width": 14.0,
+      "height": 14.0,
+      "original_id": "met9",
+      "subtype": "intermediate"
+    },
+    {
+      "id": "met10",
+      "glyph_class": "metabolite",
+      "label": "MAM02123m",
+      "x": 536.1,
+      "y": 1028.7,
+      "width": 60.0,
+      "height": 40.0,
+      "original_id": "met10",
+      "subtype": "main"
+    },
+    {
+      "id": "MAR10457",
+      "glyph_class": "reaction",
+      "label": "MAR10457",
+      "x": 938.0,
+      "y": 865.3,
+      "width": 50.0,
+      "height": 50.0,
+      "original_id": "process_MAR10457"
+    },
+    {
+      "id": "MAR10458",
+      "glyph_class": "reaction",
+      "label": "MAR10458",
+      "x": 536.1,
+      "y": 865.3,
+      "width": 50.0,
+      "height": 50.0,
+      "original_id": "process_MAR10458"
+    }
+  ],
+  "connections": [
+    {
+      "id": "process_MAR10457_c0",
+      "connection_class": "metabolic",
+      "source": "met1",
+      "target": "MAR10457",
+      "stoichiometry": null
+    },
+    {
+      "id": "process_MAR10457_c1",
+      "connection_class": "metabolic",
+      "source": "met2",
+      "target": "MAR10457",
+      "stoichiometry": null
+    },
+    {
+      "id": "process_MAR10457_c2",
+      "connection_class": "metabolic",
+      "source": "met3",
+      "target": "MAR10457",
+      "stoichiometry": null
+    },
+    {
+      "id": "process_MAR10457_p3",
+      "connection_class": "metabolic",
+      "source": "MAR10457",
+      "target": "met4",
+      "stoichiometry": null
+    },
+    {
+      "id": "process_MAR10457_p4",
+      "connection_class": "metabolic",
+      "source": "MAR10457",
+      "target": "met5",
+      "stoichiometry": null
+    },
+    {
+      "id": "process_MAR10457_p5",
+      "connection_class": "metabolic",
+      "source": "MAR10457",
+      "target": "met6",
+      "stoichiometry": null
+    },
+    {
+      "id": "process_MAR10458_c0",
+      "connection_class": "metabolic",
+      "source": "met4",
+      "target": "MAR10458",
+      "stoichiometry": null
+    },
+    {
+      "id": "process_MAR10458_c1",
+      "connection_class": "metabolic",
+      "source": "met7",
+      "target": "MAR10458",
+      "stoichiometry": null
+    },
+    {
+      "id": "process_MAR10458_p2",
+      "connection_class": "metabolic",
+      "source": "MAR10458",
+      "target": "met8",
+      "stoichiometry": null
+    },
+    {
+      "id": "process_MAR10458_p3",
+      "connection_class": "metabolic",
+      "source": "MAR10458",
+      "target": "met9",
+      "stoichiometry": null
+    },
+    {
+      "id": "process_MAR10458_p4",
+      "connection_class": "metabolic",
+      "source": "MAR10458",
+      "target": "met10",
+      "stoichiometry": null
+    }
+  ]
+}

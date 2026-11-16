@@ -6,6 +6,7 @@ import pandas as pd
 
 from ..analysis_workspace import WorkspaceProvenance
 from ..managers.workspace_mode import AnalysisWorkspaceMode
+from .adjustment import ComparisonAdjustment
 from .artifacts import (
     AnalysisArtifactMetadata,
     ArtifactDimension,
@@ -22,6 +23,7 @@ from .importance_analysis import (
     ImportanceAnalysis,
 )
 from .statistical_analysis import (
+    SUPPORTED_TESTS,
     StatisticalAnalysis,
 )
 
@@ -95,7 +97,7 @@ def _display_label_pairs(
 
 
 class GroupComparison:
-    def __init__(self, *, spec: GroupComparisonSpec | None = None, membership: ComparisonMembership | None = None, test: str = "wilcoxon", correction: str = "fdr_bh") -> None:
+    def __init__(self, *, spec: GroupComparisonSpec | None = None, membership: ComparisonMembership | None = None, test: str = "wilcoxon", correction: str = "fdr_bh", adjustment: ComparisonAdjustment | None = None) -> None:
         """Initialize a group comparison from an explicit specification or membership.
 
         Args:
@@ -103,7 +105,10 @@ class GroupComparison:
                 one or two canonical group IDs).
             membership (ComparisonMembership): Explicit left/right sample membership.
                 When omitted, `run_test` resolves it from the analysis workspace.
-            test (str): Statistical test to use ('wilcoxon' or 'ttest')
+            test (str): Statistical test to use ('wilcoxon', 'ttest' or
+                'moderated_t')
+            adjustment (ComparisonAdjustment): Sample-sheet columns to adjust
+                for. Only the moderated t-test accepts them.
 
         Exactly one of `spec` or `membership` is required; when both are given they
         must agree.
@@ -134,12 +139,14 @@ class GroupComparison:
         self.significant_genes = set()
 
         # Validate and store the statistical test
-        supported_tests = ["wilcoxon", "ttest"]
-        if test.lower() not in supported_tests:
+        if test.lower() not in SUPPORTED_TESTS:
             raise ValueError(
-                f"Unsupported statistical test: {test}. Supported tests: {supported_tests}"
+                f"Unsupported statistical test: {test}. Supported tests: {list(SUPPORTED_TESTS)}"
             )
         self.statistical_test = test.lower()
+        if adjustment is not None and self.statistical_test != "moderated_t":
+            raise ValueError("Only the moderated t-test can adjust for sample-sheet columns")
+        self.adjustment = adjustment
 
         # Initialize the StatisticalAnalysis instance
         self.stats_analyzer = StatisticalAnalysis(test_type=test, correction_type=correction)
@@ -260,6 +267,7 @@ class GroupComparison:
         configuration: Dict[str, Any] = {
             "correction": correction,
             "keep_reversed": bool(keep_reversed),
+            "adjusted_for": list(self.adjustment.labels) if self.adjustment else [],
             "reaction_thresholds": dict(
                 ComparisonThresholds.capture(
                     self.get_thresholds(for_genes=False)
@@ -504,7 +512,7 @@ class GroupComparison:
         Args:
             data_manager (Experiment): The data_manager object containing data
             for_genes (bool): If True, run the test on gene data; otherwise on reaction data
-            test (str): 'wilcoxon' or 'ttest' (default 'wilcoxon')
+            test (str): 'wilcoxon', 'ttest' or 'moderated_t' (default 'wilcoxon')
 
         Returns:
             None
@@ -512,6 +520,11 @@ class GroupComparison:
         membership = self.membership or self.resolve_membership(data_manager)
         group_1_samples = list(membership.target_samples)
         group_2_samples = list(membership.baseline_samples)
+        covariates = (
+            self.adjustment.design(group_1_samples + group_2_samples)
+            if self.adjustment is not None
+            else None
+        )
 
         if for_genes:
             # The gene test compares only the two groups' samples, so materialize
@@ -524,6 +537,10 @@ class GroupComparison:
             )
         else:
             data_df = data_manager.reaction_data.get_reaction_df()
+        # What the family's log2 fold change is depends on the scale it was loaded on;
+        # data that cannot say which have none.
+        source = data_manager.expression_data if for_genes else data_manager.reaction_data
+        fold_change = getattr(source, "fold_change_scale", None)
 
         # Use StatisticalAnalysis to perform the comparison
         results = self.stats_analyzer.run_statistical_test(
@@ -532,6 +549,8 @@ class GroupComparison:
             group_2_samples,
             test_type=test,
             correction_type=correction,
+            covariates=covariates,
+            fold_change=fold_change,
         )
 
         # Add group information

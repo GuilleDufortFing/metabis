@@ -215,3 +215,31 @@ def test_the_colour_manager_still_needs_bokeh():
 
     assert result.returncode != 0
     assert "Bokeh is unavailable" in result.stderr
+
+
+@pytest.mark.parametrize(
+    ("center", "spread"),
+    [("zero", "std"), ("mean", "mad"), ("zero", "saturating"), ("median", "asymmetric_saturating")],
+)
+def test_a_value_is_coloured_as_the_element_registered_with_it(center, spread):
+    """A family's Delta score, on its subsystems' scale, takes the colour a subsystem with that score has."""
+    values = pd.Series([-1.0, -0.4, -0.05, 0.0, 0.2, 0.55, 0.9, 1.0], index=[f"s{i}" for i in range(8)])
+    manager = ColorManager()
+    manager.register_distribution(
+        mode=MODE,
+        element_type="subsystem",
+        data=values,
+        metric_name="cohens_d",
+        center_method=center,
+        spread_method=spread,
+    )
+    for element, value in values.items():
+        assert manager.get_color_for_value(MODE, "subsystem", "cohens_d", value) == (
+            manager.get_element_color_from_distribution(MODE, "subsystem", element, "cohens_d")
+        )
+    # An unregistered distribution, or a value with no number, is neutral.
+    lookup = manager.color_lookup()
+    assert lookup.get_color_for_value(MODE, "gene", "cohens_d", 0.5) == lookup.neutral_color
+    assert manager.get_color_for_value(MODE, "subsystem", "cohens_d", float("nan")) == (
+        manager.get_element_color_from_distribution(MODE, "subsystem", "unknown", "cohens_d")
+    )

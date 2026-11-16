@@ -8,7 +8,7 @@ values; adapters only reshape those values for interchange.
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from functools import cached_property
 from types import MappingProxyType
 from typing import Any, Literal, Mapping
@@ -25,7 +25,7 @@ from .artifacts import (
     ArtifactProvenance,
     PlainTable,
 )
-from .comparison_membership import ComparisonMembership
+from .comparison_membership import ComparisonMembership, ComparisonMode
 
 
 @dataclass(frozen=True)
@@ -243,6 +243,11 @@ class GroupComparisonArtifact:
     # ------------------------------------------------------------------
 
     @property
+    def adjusted_for(self) -> tuple[str, ...]:
+        """The sample-sheet columns the model adjusted for, as labelled."""
+        return tuple(self.metadata.configuration.get("adjusted_for") or ())
+
+    @property
     def group_id_1(self) -> str:
         """The canonical ID of the left comparison group."""
         return " + ".join(self.membership.target_base_group_ids)
@@ -276,9 +281,14 @@ class GroupComparisonArtifact:
         frame = self._gene_frame if for_genes else self._reaction_frame
         return frame.copy() if frame is not None else None
 
-    def get_significant_elements(self, for_genes: bool = False) -> set:
-        """The set of significant feature IDs for one family."""
-        return set(self._significant_gene_set if for_genes else self._significant_reaction_set)
+    def get_significant_elements(self, for_genes: bool = False) -> frozenset[str]:
+        """The set of significant feature IDs for one family.
+
+        The artifact's own frozen set, shared rather than copied: every subsystem
+        summary holds it, and a copy each would cost a whole family's IDs per
+        subsystem.
+        """
+        return self._significant_gene_set if for_genes else self._significant_reaction_set
 
     def is_significant(self, element_id: str, for_genes: bool = False) -> bool:
         """Whether one feature is significant under the installed thresholds."""
@@ -336,6 +346,98 @@ class GroupComparisonArtifact:
             ),
             "is_significant": bool(row.get("is_significant", False)),
         }
+
+
+# Columns a reading the other way negates, and the pairs it exchanges.
+_SIGNED_COLUMNS = ("cohens_d", "log2_fc", "mean_difference")
+_PAIRED_COLUMNS = (("group_1_mean", "group_2_mean"), ("n_group_1", "n_group_2"), ("group_1", "group_2"))
+_SIGNED_METRICS = frozenset(_SIGNED_COLUMNS)
+# The neutral rows the test kernel leaves untested keep a zero statistic.
+_UNTESTED_STATUS = "neutral_constant"
+
+
+def _swapped_results(results: pd.DataFrame, test: str) -> pd.DataFrame:
+    """One family's results as a run with the sides exchanged computes them.
+
+    Every effect is Target minus Baseline, so it changes sign; the p-values do
+    not, the tests being two-sided. The t statistics change sign, and the
+    rank-sum U becomes the other side's, n1 n2 - U.
+    """
+    swapped = results.copy()
+    for column in _SIGNED_COLUMNS:
+        if column in swapped.columns:
+            swapped[column] = -swapped[column]
+    for first, second in _PAIRED_COLUMNS:
+        if first in swapped.columns and second in swapped.columns:
+            swapped[first], swapped[second] = results[second], results[first]
+    if "test_stat" in swapped.columns:
+        statistic = results["test_stat"].astype(float)
+        if test == "wilcoxon":
+            tested = results.get("calculation_status", pd.Series("ok", index=results.index)) != _UNTESTED_STATUS
+            pairs = results["n_group_1"].astype(float) * results["n_group_2"].astype(float)
+            swapped["test_stat"] = statistic.where(~tested, pairs - statistic)
+        else:
+            swapped["test_stat"] = -statistic
+    swapped.attrs = dict(results.attrs)
+    return swapped
+
+
+def _swapped_metrics(metrics: tuple[MetricSummary, ...]) -> tuple[MetricSummary, ...]:
+    return tuple(
+        MetricSummary(metric.name, metric.std, -metric.mean if metric.name in _SIGNED_METRICS else metric.mean)
+        for metric in metrics
+    )
+
+
+def swapped_comparison(artifact: GroupComparisonArtifact) -> GroupComparisonArtifact:
+    """The same comparison read the other way: its Baseline becomes its Target.
+
+    Only a comparison of two named sides has another way to read it. The numbers
+    are those a run with the sides exchanged gives, so nothing is tested again:
+    effects change sign, the sides' means and counts change places, p-values and
+    significance stay.
+    """
+    membership = artifact.membership
+    if membership.mode is not ComparisonMode.PAIRWISE:
+        raise ValueError("Only a comparison of two sides can be read the other way")
+    swapped = replace(
+        membership,
+        target_base_group_ids=membership.baseline_base_group_ids,
+        baseline_base_group_ids=membership.target_base_group_ids,
+        target_label=membership.baseline_label,
+        baseline_label=membership.target_label,
+        target_samples=membership.baseline_samples,
+        baseline_samples=membership.target_samples,
+    )
+    identity = dict(artifact.metadata.scientific_identity)
+    identity.update(
+        membership_fingerprint=swapped.fingerprint,
+        target_base_group_ids=swapped.target_base_group_ids,
+        baseline_base_group_ids=swapped.baseline_base_group_ids,
+        target_samples=swapped.target_samples,
+        baseline_samples=swapped.baseline_samples,
+    )
+    sizes = {"target_samples": len(swapped.target_samples), "baseline_samples": len(swapped.baseline_samples)}
+    metadata = replace(
+        artifact.metadata,
+        scientific_identity=identity,
+        dimensions=tuple(
+            ArtifactDimension(dimension.name, sizes.get(dimension.name, dimension.size), dimension.label)
+            for dimension in artifact.metadata.dimensions
+        ),
+    )
+    genes = artifact.gene_results
+    return replace(
+        artifact,
+        metadata=metadata,
+        membership=swapped,
+        reaction_results=PlainTable.capture(_swapped_results(artifact.reaction_results.to_frame(), artifact.test)),
+        gene_results=(
+            PlainTable.capture(_swapped_results(genes.to_frame(), artifact.test)) if genes is not None else None
+        ),
+        reaction_metrics=_swapped_metrics(artifact.reaction_metrics),
+        gene_metrics=_swapped_metrics(artifact.gene_metrics),
+    )
 
 
 def comparison_export_frame(
@@ -398,6 +500,7 @@ def comparison_export_frame(
     )
     export.insert(7, "effect_direction", "target_minus_baseline")
     export["test"] = artifact.test
+    export["adjusted_for"] = ", ".join(artifact.adjusted_for)
     export["correction"] = artifact.correction
     export["threshold_pval"] = thresholds.pval
     export["threshold_cohens_d"] = thresholds.cohens_d
@@ -426,4 +529,5 @@ __all__ = [
     "GroupComparisonArtifact",
     "MetricSummary",
     "comparison_export_frame",
+    "swapped_comparison",
 ]

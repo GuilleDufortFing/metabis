@@ -16,8 +16,8 @@ def test_group_colors_are_generated_for_a_normal_number_of_groups():
     assert len(set(colors.values())) == 3
 
 
-def test_activity_ramp_runs_white_through_amber_to_purple():
-    """Activity mode is a sequential magnitude scale, not a diverging one."""
+def test_activity_ramp_runs_purple_through_grey_to_gold():
+    """Activity mode places a level against the typical one, never as a change."""
     manager = ColorManager()
     # Two far outliers around a mass of typical values, so both extremes clip to
     # the ends of the ramp.
@@ -78,7 +78,7 @@ def test_a_standard_deviation_scale_paints_concentrated_data_all_neutral():
 
     color = _register(manager, scores, spread_method="std")
 
-    # Under a 4-SD palette, the extremes of the data barely leave the amber centre.
+    # Under a 4-SD palette, the extremes of the data barely leave the grey centre.
     assert color("r0").upper() != theme.ACTIVITY_LOW.upper()
     assert color("r59").upper() != theme.ACTIVITY_HIGH.upper()
 
@@ -89,8 +89,8 @@ def test_the_saturating_scale_stretches_the_palette_over_the_data_that_exists():
 
     color = _register(manager, scores)
 
-    # The same data now spans the whole ramp: least active is white, most active
-    # is purple, and the middle is the amber centre.
+    # The same data now spans the whole ramp: least active is purple, most active
+    # is gold, and the middle is the grey centre.
     assert color("r0").upper() == theme.ACTIVITY_LOW.upper()
     assert color("r59").upper() == theme.ACTIVITY_HIGH.upper()
     assert color("r30").upper() != color("r59").upper()
@@ -125,9 +125,42 @@ def test_group_colors_cycle_instead_of_failing_beyond_the_palette_limit():
     group_ids = [f"G{index}" for index in range(ColorManager.MAX_PALETTE_COLORS + 40)]
     manager = ColorManager()
 
-    colors = manager.generate_group_colors(group_ids)
+    colors = manager.generate_group_colors(group_ids, palette_name="turbo")
 
     assert len(colors) == len(group_ids)
     assert all(colors[group_id] for group_id in group_ids)
     # Colors repeat once the palette is exhausted, but nothing is left uncolored.
     assert len(set(colors.values())) == ColorManager.MAX_PALETTE_COLORS
+
+
+def test_default_group_colors_are_okabe_ito_then_scanpy():
+    """Up to five groups take Okabe-Ito; more take scanpy's palettes, then repeat."""
+    from metabis.managers.group_palettes import OKABE_ITO, SCANPY_20, SCANPY_102
+
+    manager = ColorManager()
+
+    def colors(n):
+        return list(manager.generate_group_colors([f"G{index}" for index in range(n)]).values())
+
+    assert colors(3) == list(OKABE_ITO[:3])
+    assert colors(5) == list(OKABE_ITO)
+    assert colors(6) == list(SCANPY_20[:6])
+    assert colors(9) == list(SCANPY_20[:9])
+    assert colors(102) == list(SCANPY_102)
+    beyond = colors(110)
+    assert beyond[102:] == list(SCANPY_102[:8])
+
+
+def test_group_colors_leave_out_the_greys_and_the_level_gold():
+    """Grey says "not significant", "average" or "no data", and orange is the
+    gold of a high level; black fades to grey when another group is highlighted."""
+    from metabis.managers.group_palettes import OKABE_ITO, SCANPY_20
+
+    def grey(color):
+        red, green, blue = (int(color[i:i + 2], 16) for i in (1, 3, 5))
+        return max(red, green, blue) - min(red, green, blue) < 16
+
+    assert not [color for color in OKABE_ITO + SCANPY_20 if grey(color)]
+    assert "#E69F00" not in OKABE_ITO
+    # Two groups take a cool and a warm, Okabe-Ito's blue and vermillion.
+    assert OKABE_ITO[:2] == ("#0072B2", "#D55E00")

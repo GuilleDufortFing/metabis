@@ -35,11 +35,62 @@ _MODULE_EXPORTS: dict[str, tuple[str, ...]] = {
         "displayed_feature_id",
         "resolve_display_direction",
     ),
+    ".analysis.adjustment": ("AdjustmentColumn", "ComparisonAdjustment"),
+    ".analysis.comparison_artifact": ("swapped_comparison",),
+    ".analysis.agreement": (
+        "AGREEMENT_CLASSES",
+        "Agreement",
+        "ResultEffects",
+        "compare_results",
+    ),
+    ".analysis.concordance": (
+        "CONCORDANCE_CLASSES",
+        "reaction_gene_concordance",
+    ),
+    ".analysis.landscape": (
+        "DEFAULT_LANDSCAPE_DELTA",
+        "EnrichmentLandscape",
+        "FeatureLandscape",
+        "Landscape",
+        "build_landscape",
+        "enrichment_landscape",
+        "feature_landscape",
+        "marker_reactions",
+        "select_comparison_subsystems",
+        "select_enriched_subsystems",
+        "select_landscape_subsystems",
+        "select_shared_subsystems",
+        "select_varying_features",
+        "subsystem_delta",
+        "subsystem_delta_ranking",
+        "subsystem_members",
+        "with_thresholds",
+    ),
+    ".analysis.markers": (
+        "group_means",
+        "pairwise_markers",
+        "top_markers",
+    ),
+    ".viz.plot_analysis_overview": ("OverviewCell", "plot_analysis_overview"),
+    ".viz.plot_comparison_ranking": ("RankingScore", "plot_comparison_ranking"),
+    ".viz.ranking_layout": ("RankedSubsystem",),
+    ".viz.plot_landscape": (
+        "marker_events",
+        "plot_feature_landscape",
+        "plot_marker_heatmap",
+        "plot_sample_heatmap",
+        "sample_heatmap_block",
+    ),
+    ".viz.plot_result_scatter": (
+        "plot_reaction_gene_concordance",
+        "plot_result_agreement",
+    ),
     ".analysis.comparison_membership": (
         "ComparisonMembership",
         "ComparisonMode",
         "ComparisonSideSpec",
         "GroupComparisonSpec",
+        "each_against_the_rest",
     ),
     ".analysis.dimensionality_reduction": ("ReductionKey", "ReductionResult"),
     ".analysis.h5ad_embeddings": (
@@ -82,7 +133,9 @@ _MODULE_EXPORTS: dict[str, tuple[str, ...]] = {
         "MetadataPredicate",
         "SampleGroup",
     ),
+    ".managers.group_palettes": ("group_palette",),
     ".managers.workspace": ("AnalysisWorkspace", "AnalysisWorkspaceMode"),
+    ".managers.element_details": ("element_details",),
     # Graph metadata only. The artifact seam itself is the public module
     # metabis.viz.metabolic_visualization (ADR-0008).
     ".viz.metabolic_visualization.pipeline": (
@@ -99,24 +152,35 @@ _MODULE_EXPORTS: dict[str, tuple[str, ...]] = {
         "plot_subsystem_influence_summary",
         "plot_subsystem_ranking_by_influence",
     ),
+    ".viz.graph_marks": ("outline_elements",),
     ".viz.plot_metabolic_graph": ("plot_metabolic_graph",),
     ".viz.plot_reaction_set_enrichment": ("plot_reaction_set_enrichment",),
-    ".viz.plot_set_enrichment": ("plot_set_enrichment_category",),
+    ".viz.plot_set_enrichment": ("plot_set_enrichment_category", "set_enrichment_rows"),
     ".viz.plot_reduction_artifact": (
+        "add_arrow_colouring",
+        "add_group_picking",
+        "biplot_arrow_features",
+        "FEATURE_CHOICE",
+        "FEATURE_ROWS",
+        "ReductionColouring",
         "ReductionFeaturePresentation",
         "ReductionGroupPresentation",
         "ReductionPlotPresentation",
         "ReductionSamplePresentation",
         "build_reduction_presentation",
         "plot_pca_biplot_artifact",
+        "plot_pca_components_artifact",
         "plot_pca_loadings_artifact",
         "plot_pca_variance_artifact",
         "plot_reduction_artifact",
+        "reduction_colouring",
     ),
     ".viz.plot_statistical_distributions": (
         "create_statistical_results_table",
         "plot_statistical_histograms",
         "plot_statistical_scatterplots",
+        "statistical_results_columns",
+        "statistical_results_rows",
     ),
     ".viz.plot_subsystem_artifact_ranking": (
         "RankingFeaturePresentation",
@@ -126,8 +190,43 @@ _MODULE_EXPORTS: dict[str, tuple[str, ...]] = {
     ".viz.plot_subsystem_ranking": (
         "plot_subsystem_activity_ranking",
         "plot_subsystem_comparison",
+        "subsystem_delta_reference",
     ),
-    ".viz.plot_utils": ("apply_academic_style",),
+    ".viz.color_bars": (
+        "add_category_key",
+        "add_pathway_key",
+        "overview_color_bar",
+        "registered_color_bar",
+    ),
+    ".viz.plot_utils": ("PLOT_THEME", "apply_academic_style"),
+    ".viz.subsystem_link": ("add_network_focus_link", "link_events"),
+    ".viz.transport_view": ("is_transport_subsystem", "plot_transport_view"),
+    ".viz.compartment_maps": (
+        "ATLAS_MAPS",
+        "COMPARTMENT_MAPS",
+        "TRANSPORT_MAPS",
+        "add_map_bands",
+        "add_map_find",
+        "add_map_links",
+        "band_name",
+        "fit_view_at_one_scale",
+        "highlight_reactions",
+        "keep_map_scale",
+        "map_bands",
+        "map_ids_for_reactions",
+        "map_metabolite_ids",
+        "map_metabolites",
+        "map_reaction_ids",
+        "map_reaction_names",
+        "map_subsystems",
+        "maps_for_reactions",
+        "resolve_map_reactions",
+        "use_model_identifiers",
+    ),
+    ".viz.metabolic_visualization.generation.graph_building.spaced_network": (
+        "category_numbers",
+    ),
+    ".visual_config": ("theme",),
     ".viz.plot_violins": ("plot_reaction_violins",),
     ".viz.table_formatting": (
         "build_external_link_formatter",
@@ -170,11 +269,24 @@ if TYPE_CHECKING:
         displayed_feature_id,
         resolve_display_direction,
     )
+    from .analysis.adjustment import AdjustmentColumn, ComparisonAdjustment
+    from .analysis.agreement import (
+        AGREEMENT_CLASSES,
+        Agreement,
+        ResultEffects,
+        compare_results,
+    )
+    from .analysis.comparison_artifact import swapped_comparison
     from .analysis.comparison_membership import (
         ComparisonMembership,
         ComparisonMode,
         ComparisonSideSpec,
         GroupComparisonSpec,
+        each_against_the_rest,
+    )
+    from .analysis.concordance import (
+        CONCORDANCE_CLASSES,
+        reaction_gene_concordance,
     )
     from .analysis.dimensionality_reduction import ReductionKey, ReductionResult
     from .analysis.experiment_analysis import ExperimentAnalysis
@@ -185,6 +297,26 @@ if TYPE_CHECKING:
         build_h5ad_reduction_artifact,
         discover_h5ad_embeddings,
     )
+    from .analysis.landscape import (
+        DEFAULT_LANDSCAPE_DELTA,
+        EnrichmentLandscape,
+        FeatureLandscape,
+        Landscape,
+        build_landscape,
+        enrichment_landscape,
+        feature_landscape,
+        marker_reactions,
+        select_comparison_subsystems,
+        select_enriched_subsystems,
+        select_landscape_subsystems,
+        select_shared_subsystems,
+        select_varying_features,
+        subsystem_delta,
+        subsystem_delta_ranking,
+        subsystem_members,
+        with_thresholds,
+    )
+    from .analysis.markers import group_means, pairwise_markers, top_markers
     from .domain.expression_data import ExpressionData
     from .domain.format_detection import (
         detect_expression_csv_params,
@@ -211,45 +343,106 @@ if TYPE_CHECKING:
     )
     from .domain.reaction_data import ReactionData
     from .domain.sample_metadata import MetadataAlignmentReport, SampleMetadata
+    from .managers.element_details import element_details
     from .managers.group_manager import (
         GroupDefinition,
         GroupLoadResult,
         MetadataPredicate,
         SampleGroup,
     )
+    from .managers.group_palettes import group_palette
     from .managers.workspace import AnalysisWorkspace, AnalysisWorkspaceMode
+    from .visual_config import theme
+    from .viz.color_bars import (
+        add_category_key,
+        add_pathway_key,
+        overview_color_bar,
+        registered_color_bar,
+    )
+    from .viz.compartment_maps import (
+        ATLAS_MAPS,
+        COMPARTMENT_MAPS,
+        TRANSPORT_MAPS,
+        add_map_bands,
+        add_map_find,
+        add_map_links,
+        band_name,
+        fit_view_at_one_scale,
+        highlight_reactions,
+        keep_map_scale,
+        map_bands,
+        map_ids_for_reactions,
+        map_metabolite_ids,
+        map_metabolites,
+        map_reaction_ids,
+        map_reaction_names,
+        map_subsystems,
+        maps_for_reactions,
+        resolve_map_reactions,
+        use_model_identifiers,
+    )
+    from .viz.graph_marks import outline_elements
+    from .viz.metabolic_visualization.generation.graph_building.spaced_network import (
+        category_numbers,
+    )
     from .viz.metabolic_visualization.pipeline import (
         GraphPipelineError,
         GraphRunMetadata,
         PipelinePhaseMetric,
     )
+    from .viz.plot_analysis_overview import OverviewCell, plot_analysis_overview
     from .viz.plot_comparison_artifact import (
         plot_comparison_histogram,
         plot_comparison_scatter,
     )
+    from .viz.plot_comparison_ranking import RankingScore, plot_comparison_ranking
     from .viz.plot_gene_reaction_influence import (
         plot_gene_reaction_influence_heatmap,
         plot_subsystem_influence_summary,
         plot_subsystem_ranking_by_influence,
     )
+    from .viz.plot_landscape import (
+        marker_events,
+        plot_feature_landscape,
+        plot_marker_heatmap,
+        plot_sample_heatmap,
+        sample_heatmap_block,
+    )
     from .viz.plot_metabolic_graph import plot_metabolic_graph
     from .viz.plot_reaction_set_enrichment import plot_reaction_set_enrichment
     from .viz.plot_reduction_artifact import (
+        FEATURE_CHOICE,
+        FEATURE_ROWS,
+        ReductionColouring,
         ReductionFeaturePresentation,
         ReductionGroupPresentation,
         ReductionPlotPresentation,
         ReductionSamplePresentation,
+        add_arrow_colouring,
+        add_group_picking,
+        biplot_arrow_features,
         build_reduction_presentation,
         plot_pca_biplot_artifact,
+        plot_pca_components_artifact,
         plot_pca_loadings_artifact,
         plot_pca_variance_artifact,
         plot_reduction_artifact,
+        reduction_colouring,
     )
-    from .viz.plot_set_enrichment import plot_set_enrichment_category
+    from .viz.plot_result_scatter import (
+        plot_reaction_gene_concordance,
+        plot_result_agreement,
+    )
+    from .viz.plot_set_enrichment import (
+        plot_set_enrichment_category,
+        set_enrichment_rows,
+    )
     from .viz.plot_statistical_distributions import (
         create_statistical_results_table,
         plot_statistical_histograms,
         plot_statistical_scatterplots,
+        statistical_results_columns,
+        statistical_results_rows,
     )
     from .viz.plot_subsystem_artifact_ranking import (
         RankingFeaturePresentation,
@@ -259,13 +452,17 @@ if TYPE_CHECKING:
     from .viz.plot_subsystem_ranking import (
         plot_subsystem_activity_ranking,
         plot_subsystem_comparison,
+        subsystem_delta_reference,
     )
-    from .viz.plot_utils import apply_academic_style
+    from .viz.plot_utils import PLOT_THEME, apply_academic_style
     from .viz.plot_violins import plot_reaction_violins
+    from .viz.ranking_layout import RankedSubsystem
+    from .viz.subsystem_link import add_network_focus_link, link_events
     from .viz.table_formatting import (
         build_external_link_formatter,
         build_statistical_number_formatter,
     )
+    from .viz.transport_view import is_transport_subsystem, plot_transport_view
 
 # The supported flat public surface. `from metabis import *` yields exactly
 # these names. Seams a coordinator installs and reads (the Analysis Workspace,
@@ -301,6 +498,7 @@ __all__ = [
     "AnalysisWorkspace",
     "AnalysisWorkspaceMode",
     "ExperimentAnalysis",
+    "element_details",
     # Group and comparison identity
     "SampleGroup",
     "GroupDefinition",
@@ -311,6 +509,50 @@ __all__ = [
     "ComparisonMode",
     "ComparisonSideSpec",
     "GroupComparisonSpec",
+    "each_against_the_rest",
+    "AdjustmentColumn",
+    "ComparisonAdjustment",
+    "swapped_comparison",
+    # Results across comparisons: landscape, agreement, reactions against genes
+    "AGREEMENT_CLASSES",
+    "Agreement",
+    "ResultEffects",
+    "compare_results",
+    "CONCORDANCE_CLASSES",
+    "reaction_gene_concordance",
+    "DEFAULT_LANDSCAPE_DELTA",
+    "EnrichmentLandscape",
+    "FeatureLandscape",
+    "Landscape",
+    "build_landscape",
+    "enrichment_landscape",
+    "feature_landscape",
+    "marker_reactions",
+    "select_enriched_subsystems",
+    "select_landscape_subsystems",
+    "select_shared_subsystems",
+    "select_varying_features",
+    "select_comparison_subsystems",
+    "subsystem_delta",
+    "subsystem_delta_ranking",
+    "subsystem_members",
+    "with_thresholds",
+    "group_means",
+    "group_palette",
+    "pairwise_markers",
+    "top_markers",
+    "plot_feature_landscape",
+    "plot_marker_heatmap",
+    "marker_events",
+    "plot_sample_heatmap",
+    "sample_heatmap_block",
+    "OverviewCell",
+    "plot_analysis_overview",
+    "RankedSubsystem",
+    "RankingScore",
+    "plot_comparison_ranking",
+    "plot_reaction_gene_concordance",
+    "plot_result_agreement",
     # Typed analysis results
     "ReductionKey",
     "ReductionResult",
@@ -334,9 +576,41 @@ __all__ = [
     "GraphPipelineError",
     "GraphRunMetadata",
     "PipelinePhaseMetric",
+    "outline_elements",
     "plot_metabolic_graph",
     # Plotting
+    "ATLAS_MAPS",
+    "COMPARTMENT_MAPS",
+    "PLOT_THEME",
+    "TRANSPORT_MAPS",
+    "add_category_key",
+    "add_map_bands",
+    "add_map_find",
+    "add_map_links",
+    "band_name",
+    "add_network_focus_link",
+    "link_events",
+    "add_pathway_key",
     "apply_academic_style",
+    "category_numbers",
+    "fit_view_at_one_scale",
+    "highlight_reactions",
+    "is_transport_subsystem",
+    "keep_map_scale",
+    "map_bands",
+    "map_ids_for_reactions",
+    "map_metabolite_ids",
+    "map_metabolites",
+    "map_reaction_ids",
+    "map_reaction_names",
+    "map_subsystems",
+    "maps_for_reactions",
+    "resolve_map_reactions",
+    "use_model_identifiers",
+    "overview_color_bar",
+    "plot_transport_view",
+    "registered_color_bar",
+    "theme",
     "build_external_link_formatter",
     "build_statistical_number_formatter",
     "build_reduction_presentation",
@@ -345,19 +619,31 @@ __all__ = [
     "plot_comparison_scatter",
     "plot_gene_reaction_influence_heatmap",
     "plot_pca_biplot_artifact",
+    "plot_pca_components_artifact",
     "plot_pca_loadings_artifact",
     "plot_pca_variance_artifact",
+    "reduction_colouring",
+    "add_arrow_colouring",
+    "add_group_picking",
+    "biplot_arrow_features",
     "plot_reaction_set_enrichment",
     "plot_set_enrichment_category",
+    "set_enrichment_rows",
     "plot_reaction_violins",
     "plot_reduction_artifact",
     "plot_statistical_histograms",
     "plot_statistical_scatterplots",
+    "statistical_results_columns",
+    "statistical_results_rows",
     "plot_subsystem_activity_ranking",
     "plot_subsystem_comparison",
+    "subsystem_delta_reference",
     "plot_subsystem_influence_summary",
     "plot_subsystem_ranking_artifact",
     "plot_subsystem_ranking_by_influence",
+    "FEATURE_CHOICE",
+    "FEATURE_ROWS",
+    "ReductionColouring",
     "ReductionFeaturePresentation",
     "ReductionGroupPresentation",
     "ReductionPlotPresentation",

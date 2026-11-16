@@ -2,11 +2,47 @@
 
 from __future__ import annotations
 
+import gzip
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, Sequence
 
 import pandas as pd
+
+# The separators a sample sheet may use, preferred in this order on a tie.
+METADATA_SEPARATORS = ("\t", ",", ";")
+
+
+def _header_line(path: Path) -> str:
+    opener = gzip.open if path.suffix.lower() == ".gz" else open
+    with opener(path, "rt", encoding="utf-8-sig", errors="replace") as handle:
+        return handle.readline()
+
+
+def read_metadata_table(path: str | Path, *, separator: str | None = None, nrows: int | None = None) -> pd.DataFrame:
+    """Read a sample sheet as text, the same way for its preview and its load.
+
+    A sheet saved by Excel starts with a byte-order mark, which would otherwise
+    become part of its first column's name. The separator is the one of tab, comma
+    and semicolon its header uses most, so a one-column sheet is not split on a
+    letter, and a column name keeps no surrounding spaces.
+    """
+    path = Path(path)
+    if separator is None:
+        header = _header_line(path)
+        separator = max(METADATA_SEPARATORS, key=lambda candidate: (header.count(candidate), -METADATA_SEPARATORS.index(candidate)))
+    frame = pd.read_csv(path, sep=separator, dtype=object, encoding="utf-8-sig", nrows=nrows)
+    frame.columns = [str(column).strip() for column in frame.columns]
+    return frame
+
+
+def _some(samples: Sequence[str], count: int = 3) -> str:
+    shown = ", ".join(list(samples)[:count])
+    return shown + (", ..." if len(samples) > count else "")
+
+
+def _samples(count: int) -> str:
+    return "1 sample" if count == 1 else f"{count:,} samples"
 
 
 @dataclass(frozen=True)
@@ -54,6 +90,11 @@ class SampleMetadata:
         self.display_label_column: str | None = None
         self.set_display_label_column(display_label_column)
 
+    @staticmethod
+    def read_table(path: str | Path, *, separator: str | None = None, nrows: int | None = None) -> pd.DataFrame:
+        """Read a sample sheet's rows as text, as :meth:`from_table` reads them (see :func:`read_metadata_table`)."""
+        return read_metadata_table(path, separator=separator, nrows=nrows)
+
     @classmethod
     def from_table(
         cls,
@@ -63,15 +104,17 @@ class SampleMetadata:
         sample_id_column: str | None = None,
         display_label_column: str | None = None,
     ) -> "SampleMetadata":
-        path = Path(path)
-        if separator is None:
-            separator = "\t" if path.suffix.lower() in {".tsv", ".txt"} else None
-        frame = pd.read_csv(path, sep=separator, engine="python", dtype=object)
+        try:
+            frame = read_metadata_table(path, separator=separator)
+        except pd.errors.EmptyDataError as error:
+            raise ValueError("The sample sheet is empty.") from error
+        except UnicodeDecodeError as error:
+            raise ValueError("The sample sheet is not text. Save it as CSV or TSV.") from error
         if frame.empty and not len(frame.columns):
-            raise ValueError("Metadata file has no columns")
+            raise ValueError("The sample sheet has no columns.")
         id_column = sample_id_column or str(frame.columns[0])
         if id_column not in frame.columns:
-            raise ValueError(f"Sample ID column '{id_column}' was not found")
+            raise ValueError(f"The sample sheet has no column '{id_column}' to read the sample IDs from.")
         if display_label_column == id_column:
             # The ID column becomes the index on the next line, so it is not a
             # column any more by the time the label is resolved. Asking to be
@@ -111,10 +154,17 @@ class SampleMetadata:
         reaction_sample_ids: Sequence[str],
         expression_sample_ids: Sequence[str] | None = None,
         *,
-        policy: Literal["strict", "reaction_required"] = "strict",
+        policy: Literal["strict", "partial"] = "strict",
     ) -> MetadataAlignmentReport:
-        if policy not in {"strict", "reaction_required"}:
-            raise ValueError("alignment policy must be 'strict' or 'reaction_required'")
+        """Align the sheet's rows with the measured samples.
+
+        ``partial`` accepts a sheet that leaves some samples out (they stay
+        ungrouped) or describes others the data lacks, as long as it describes one
+        of them; ``strict`` requires the sheet, the reaction data and any
+        expression data to name the same samples.
+        """
+        if policy not in {"strict", "partial"}:
+            raise ValueError("alignment policy must be 'strict' or 'partial'")
         reaction = tuple(map(str, reaction_sample_ids))
         expression = tuple(
             map(str, expression_sample_ids if expression_sample_ids is not None else ())
@@ -130,15 +180,28 @@ class SampleMetadata:
             metadata_only=tuple(sample for sample in self.sample_ids if sample not in reaction_set),
             missing_from_expression=tuple(sample for sample in reaction if expression and sample not in expression_set),
         )
-        errors = list(report.missing_from_metadata)
-        if policy == "strict":
-            errors.extend(report.metadata_only)
-            errors.extend(report.missing_from_expression)
-        if errors:
+        if not report.aligned_samples:
             raise ValueError(
-                "Metadata alignment failed: "
-                f"{len(report.missing_from_metadata)} reaction samples missing metadata, "
-                f"{len(report.metadata_only)} metadata-only samples, and "
-                f"{len(report.missing_from_expression)} reaction samples missing expression"
+                "No sample of the reaction data has a row in the sample sheet: the reaction data names its samples "
+                f"{_some(reaction)}, and the sheet {_some(self.sample_ids)}. Choose the column that holds these IDs."
             )
+        problems = []
+        if policy == "strict" and report.missing_from_metadata:
+            problems.append(
+                f"{_samples(len(report.missing_from_metadata))} of the reaction data's {len(reaction):,} "
+                f"{'has' if len(report.missing_from_metadata) == 1 else 'have'} no row in it "
+                f"({_some(report.missing_from_metadata)})"
+            )
+        if policy == "strict" and report.metadata_only:
+            problems.append(
+                f"{len(report.metadata_only):,} of its rows name no sample of the reaction data ({_some(report.metadata_only)})"
+            )
+        if policy == "strict" and report.missing_from_expression:
+            problems.append(
+                f"{_samples(len(report.missing_from_expression))} of the reaction data "
+                f"{'has' if len(report.missing_from_expression) == 1 else 'have'} no expression "
+                f"({_some(report.missing_from_expression)})"
+            )
+        if problems:
+            raise ValueError("The sample sheet does not match the data: " + "; ".join(problems) + ".")
         return report

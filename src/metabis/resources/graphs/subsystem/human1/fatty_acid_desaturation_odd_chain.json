@@ -1,237 +1,237 @@
 {
   "glyphs": [
     {
-      "id": "ID1",
+      "id": "compartment1",
       "glyph_class": "compartment",
       "label": "Cytosol",
-      "x": 6673.976998387403,
-      "y": 4849.2,
+      "x": 717.4,
+      "y": 456.5,
       "width": 0.0,
       "height": 0.0
     },
     {
-      "id": "ID2",
-      "glyph_class": "gene",
-      "label": "ENSG00000099194",
-      "x": 7090.0,
-      "y": 5334.2,
-      "width": 60.0,
-      "height": 30.0,
-      "associated_reaction": null,
-      "enzyme_group": null
-    },
-    {
-      "id": "ID3",
-      "glyph_class": "gene",
-      "label": "ENSG00000099194",
-      "x": 7510.0,
-      "y": 5334.2,
-      "width": 60.0,
-      "height": 30.0,
-      "associated_reaction": null,
-      "enzyme_group": null
-    },
-    {
-      "id": "ID4",
-      "glyph_class": "gene",
-      "label": "ENSG00000145284",
-      "x": 7510.0,
-      "y": 5364.2,
-      "width": 60.0,
-      "height": 30.0,
-      "associated_reaction": null,
-      "enzyme_group": null
-    },
-    {
-      "id": "ID5",
-      "glyph_class": "gene",
-      "label": "ENSG00000145284",
-      "x": 7090.0,
-      "y": 5364.2,
-      "width": 60.0,
-      "height": 30.0,
-      "associated_reaction": null,
-      "enzyme_group": null
-    },
-    {
-      "id": "ID6",
-      "glyph_class": "metabolite",
-      "label": "MAM02040c",
-      "x": 6910.0,
-      "y": 5209.2,
-      "width": 60.0,
-      "height": 40.0,
-      "original_id": "ID6",
-      "subtype": "intermediate"
-    },
-    {
-      "id": "ID7",
-      "glyph_class": "metabolite",
-      "label": "MAM02040c",
-      "x": 7690.0,
-      "y": 5209.2,
-      "width": 60.0,
-      "height": 40.0,
-      "original_id": "ID7",
-      "subtype": "intermediate"
-    },
-    {
-      "id": "ID8",
-      "glyph_class": "metabolite",
-      "label": "MAM01237c",
-      "x": 7000.0,
-      "y": 5149.2,
-      "width": 60.0,
-      "height": 40.0,
-      "original_id": "ID8",
-      "subtype": "main"
-    },
-    {
-      "id": "ID9",
+      "id": "met1",
       "glyph_class": "metabolite",
       "label": "MAM02555c",
-      "x": 7690.0,
-      "y": 5539.2,
-      "width": 60.0,
-      "height": 40.0,
-      "original_id": "ID9",
+      "x": 1715.6,
+      "y": 1016.8,
+      "width": 14.0,
+      "height": 14.0,
+      "original_id": "met1",
       "subtype": "intermediate"
     },
     {
-      "id": "ID10",
-      "glyph_class": "metabolite",
-      "label": "MAM02555c",
-      "x": 6910.0,
-      "y": 5539.2,
-      "width": 60.0,
-      "height": 40.0,
-      "original_id": "ID10",
-      "subtype": "intermediate"
-    },
-    {
-      "id": "ID11",
+      "id": "met2",
       "glyph_class": "metabolite",
       "label": "MAM02630c",
-      "x": 6910.0,
-      "y": 5489.2,
-      "width": 60.0,
-      "height": 40.0,
-      "original_id": "ID11",
+      "x": 1715.6,
+      "y": 966.8,
+      "width": 14.0,
+      "height": 14.0,
+      "original_id": "met2",
       "subtype": "intermediate"
     },
     {
-      "id": "ID12",
-      "glyph_class": "metabolite",
-      "label": "MAM02630c",
-      "x": 7690.0,
-      "y": 5489.2,
-      "width": 60.0,
-      "height": 40.0,
-      "original_id": "ID12",
-      "subtype": "intermediate"
-    },
-    {
-      "id": "ID13",
-      "glyph_class": "metabolite",
-      "label": "MAM00004c",
-      "x": 7600.0,
-      "y": 5149.2,
-      "width": 60.0,
-      "height": 40.0,
-      "original_id": "ID13",
-      "subtype": "main"
-    },
-    {
-      "id": "ID14",
+      "id": "met3",
       "glyph_class": "metabolite",
       "label": "MAM02101c",
-      "x": 7300.0,
-      "y": 5549.2,
+      "x": 1325.6,
+      "y": 1026.8,
       "width": 60.0,
       "height": 40.0,
-      "original_id": "ID14",
+      "original_id": "met3",
       "subtype": "main"
     },
     {
-      "id": "ID15",
-      "glyph_class": "metabolite",
-      "label": "MAM02554c",
-      "x": 7690.0,
-      "y": 5259.2,
-      "width": 60.0,
-      "height": 40.0,
-      "original_id": "ID15",
-      "subtype": "intermediate"
-    },
-    {
-      "id": "ID16",
-      "glyph_class": "metabolite",
-      "label": "MAM02554c",
-      "x": 6910.0,
-      "y": 5259.2,
-      "width": 60.0,
-      "height": 40.0,
-      "original_id": "ID16",
-      "subtype": "intermediate"
-    },
-    {
-      "id": "ID17",
+      "id": "met4",
       "glyph_class": "metabolite",
       "label": "MAM02039c",
-      "x": 7690.0,
-      "y": 5439.2,
-      "width": 60.0,
-      "height": 40.0,
-      "original_id": "ID17",
+      "x": 1715.6,
+      "y": 916.8,
+      "width": 14.0,
+      "height": 14.0,
+      "original_id": "met4",
       "subtype": "intermediate"
     },
     {
-      "id": "ID18",
+      "id": "met5",
       "glyph_class": "metabolite",
-      "label": "MAM02039c",
-      "x": 6910.0,
-      "y": 5439.2,
+      "label": "MAM02040c",
+      "x": 1715.6,
+      "y": 686.8,
+      "width": 14.0,
+      "height": 14.0,
+      "original_id": "met5",
+      "subtype": "intermediate"
+    },
+    {
+      "id": "met6",
+      "glyph_class": "metabolite",
+      "label": "MAM00004c",
+      "x": 1625.6,
+      "y": 626.8,
       "width": 60.0,
       "height": 40.0,
-      "original_id": "ID18",
+      "original_id": "met6",
+      "subtype": "main"
+    },
+    {
+      "id": "met7",
+      "glyph_class": "metabolite",
+      "label": "MAM02554c",
+      "x": 1715.6,
+      "y": 736.8,
+      "width": 14.0,
+      "height": 14.0,
+      "original_id": "met7",
+      "subtype": "intermediate"
+    },
+    {
+      "id": "met8",
+      "glyph_class": "metabolite",
+      "label": "MAM02555c",
+      "x": 935.6,
+      "y": 1016.8,
+      "width": 14.0,
+      "height": 14.0,
+      "original_id": "met8",
+      "subtype": "intermediate"
+    },
+    {
+      "id": "met9",
+      "glyph_class": "metabolite",
+      "label": "MAM02630c",
+      "x": 935.6,
+      "y": 966.8,
+      "width": 14.0,
+      "height": 14.0,
+      "original_id": "met9",
+      "subtype": "intermediate"
+    },
+    {
+      "id": "met10",
+      "glyph_class": "metabolite",
+      "label": "MAM02039c",
+      "x": 935.6,
+      "y": 916.8,
+      "width": 14.0,
+      "height": 14.0,
+      "original_id": "met10",
+      "subtype": "intermediate"
+    },
+    {
+      "id": "met11",
+      "glyph_class": "metabolite",
+      "label": "MAM02040c",
+      "x": 935.6,
+      "y": 686.8,
+      "width": 14.0,
+      "height": 14.0,
+      "original_id": "met11",
+      "subtype": "intermediate"
+    },
+    {
+      "id": "met12",
+      "glyph_class": "metabolite",
+      "label": "MAM01237c",
+      "x": 1025.6,
+      "y": 626.8,
+      "width": 60.0,
+      "height": 40.0,
+      "original_id": "met12",
+      "subtype": "main"
+    },
+    {
+      "id": "met13",
+      "glyph_class": "metabolite",
+      "label": "MAM02554c",
+      "x": 935.6,
+      "y": 736.8,
+      "width": 14.0,
+      "height": 14.0,
+      "original_id": "met13",
       "subtype": "intermediate"
     },
     {
       "id": "MAR02288",
       "glyph_class": "reaction",
       "label": "MAR02288",
-      "x": 7600.0,
-      "y": 5349.2,
+      "x": 1625.6,
+      "y": 826.8,
       "width": 50.0,
       "height": 50.0,
-      "original_id": "ID19"
+      "original_id": "process_MAR02288"
     },
     {
       "id": "MAR02289",
       "glyph_class": "reaction",
       "label": "MAR02289",
-      "x": 7000.0,
-      "y": 5349.2,
+      "x": 1025.6,
+      "y": 826.8,
       "width": 50.0,
       "height": 50.0,
-      "original_id": "ID27"
+      "original_id": "process_MAR02289"
     },
     {
-      "id": "enzyme_group_MAR02289_0",
+      "id": "gene1",
+      "glyph_class": "gene",
+      "label": "ENSG00000099194",
+      "x": 1535.6,
+      "y": 811.8,
+      "width": 60.0,
+      "height": 30.0,
+      "associated_reaction": null,
+      "enzyme_group": null
+    },
+    {
+      "id": "gene2",
+      "glyph_class": "gene",
+      "label": "ENSG00000145284",
+      "x": 1535.6,
+      "y": 841.8,
+      "width": 60.0,
+      "height": 30.0,
+      "associated_reaction": null,
+      "enzyme_group": null
+    },
+    {
+      "id": "gene3",
+      "glyph_class": "gene",
+      "label": "ENSG00000099194",
+      "x": 1115.6,
+      "y": 811.8,
+      "width": 60.0,
+      "height": 30.0,
+      "associated_reaction": null,
+      "enzyme_group": null
+    },
+    {
+      "id": "gene4",
+      "glyph_class": "gene",
+      "label": "ENSG00000145284",
+      "x": 1115.6,
+      "y": 841.8,
+      "width": 60.0,
+      "height": 30.0,
+      "associated_reaction": null,
+      "enzyme_group": null
+    },
+    {
+      "id": "enzyme_group_MAR02288_0",
       "glyph_class": "enzyme_group",
-      "label": "Enzymes for MAR02289",
-      "x": 7090.0,
-      "y": 5349.2,
+      "label": "Enzymes for MAR02288",
+      "x": 1535.6,
+      "y": 826.8,
       "width": 70.0,
       "height": 70.0,
-      "reaction_id": "MAR02289",
+      "reaction_id": "MAR02288",
       "enzymes": [
         "ENSG00000099194",
         "ENSG00000145284"
       ],
       "glyph_ids": [
-        "ID2",
-        "ID5"
+        "gene1",
+        "gene2"
       ],
       "outline_color": "#7B68EE",
       "outline_width": 2,
@@ -241,21 +241,21 @@
       ]
     },
     {
-      "id": "enzyme_group_MAR02288_1",
+      "id": "enzyme_group_MAR02289_1",
       "glyph_class": "enzyme_group",
-      "label": "Enzymes for MAR02288",
-      "x": 7510.0,
-      "y": 5349.2,
+      "label": "Enzymes for MAR02289",
+      "x": 1115.6,
+      "y": 826.8,
       "width": 70.0,
       "height": 70.0,
-      "reaction_id": "MAR02288",
+      "reaction_id": "MAR02289",
       "enzymes": [
         "ENSG00000099194",
         "ENSG00000145284"
       ],
       "glyph_ids": [
-        "ID3",
-        "ID4"
+        "gene3",
+        "gene4"
       ],
       "outline_color": "#7B68EE",
       "outline_width": 2,
@@ -267,115 +267,115 @@
   ],
   "connections": [
     {
-      "id": "ID20",
+      "id": "process_MAR02288_c0",
       "connection_class": "metabolic",
-      "source": "ID9",
+      "source": "met1",
       "target": "MAR02288",
       "stoichiometry": null
     },
     {
-      "id": "ID21",
+      "id": "process_MAR02288_c1",
       "connection_class": "metabolic",
-      "source": "ID12",
+      "source": "met2",
       "target": "MAR02288",
       "stoichiometry": null
     },
     {
-      "id": "ID22",
+      "id": "process_MAR02288_c2",
       "connection_class": "metabolic",
-      "source": "ID14",
+      "source": "met3",
       "target": "MAR02288",
       "stoichiometry": null
     },
     {
-      "id": "ID23",
+      "id": "process_MAR02288_c3",
       "connection_class": "metabolic",
-      "source": "ID17",
+      "source": "met4",
       "target": "MAR02288",
       "stoichiometry": null
     },
     {
-      "id": "ID24",
+      "id": "process_MAR02288_p4",
       "connection_class": "metabolic",
       "source": "MAR02288",
-      "target": "ID7",
+      "target": "met5",
       "stoichiometry": null
     },
     {
-      "id": "ID25",
+      "id": "process_MAR02288_p5",
       "connection_class": "metabolic",
       "source": "MAR02288",
-      "target": "ID13",
+      "target": "met6",
       "stoichiometry": null
     },
     {
-      "id": "ID26",
+      "id": "process_MAR02288_p6",
       "connection_class": "metabolic",
       "source": "MAR02288",
-      "target": "ID15",
+      "target": "met7",
       "stoichiometry": null
     },
     {
-      "id": "ID28",
+      "id": "process_MAR02289_c0",
       "connection_class": "metabolic",
-      "source": "ID10",
+      "source": "met8",
       "target": "MAR02289",
       "stoichiometry": null
     },
     {
-      "id": "ID29",
+      "id": "process_MAR02289_c1",
       "connection_class": "metabolic",
-      "source": "ID11",
+      "source": "met9",
       "target": "MAR02289",
       "stoichiometry": null
     },
     {
-      "id": "ID30",
+      "id": "process_MAR02289_c2",
       "connection_class": "metabolic",
-      "source": "ID14",
+      "source": "met3",
       "target": "MAR02289",
       "stoichiometry": null
     },
     {
-      "id": "ID31",
+      "id": "process_MAR02289_c3",
       "connection_class": "metabolic",
-      "source": "ID18",
+      "source": "met10",
       "target": "MAR02289",
       "stoichiometry": null
     },
     {
-      "id": "ID32",
+      "id": "process_MAR02289_p4",
       "connection_class": "metabolic",
       "source": "MAR02289",
-      "target": "ID6",
+      "target": "met11",
       "stoichiometry": null
     },
     {
-      "id": "ID33",
+      "id": "process_MAR02289_p5",
       "connection_class": "metabolic",
       "source": "MAR02289",
-      "target": "ID8",
+      "target": "met12",
       "stoichiometry": null
     },
     {
-      "id": "ID34",
+      "id": "process_MAR02289_p6",
       "connection_class": "metabolic",
       "source": "MAR02289",
-      "target": "ID16",
+      "target": "met13",
       "stoichiometry": null
     },
     {
-      "id": "regulatory_enzyme_group_MAR02289_0_MAR02289",
+      "id": "regulatory_enzyme_group_MAR02288_0_MAR02288",
       "connection_class": "regulatory",
-      "source": "enzyme_group_MAR02289_0",
-      "target": "MAR02289",
+      "source": "enzyme_group_MAR02288_0",
+      "target": "MAR02288",
       "stoichiometry": null
     },
     {
-      "id": "regulatory_enzyme_group_MAR02288_1_MAR02288",
+      "id": "regulatory_enzyme_group_MAR02289_1_MAR02289",
       "connection_class": "regulatory",
-      "source": "enzyme_group_MAR02288_1",
-      "target": "MAR02288",
+      "source": "enzyme_group_MAR02289_1",
+      "target": "MAR02289",
       "stoichiometry": null
     }
   ]

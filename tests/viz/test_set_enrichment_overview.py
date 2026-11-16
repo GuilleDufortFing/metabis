@@ -189,6 +189,10 @@ def test_distribution_is_registered_so_hover_reads_the_same_scale():
     hover = colors.hover_for("s1", show_stats=True, show_color_reference=True)
     assert "Target-higher" in hover and "Target-lower" in hover
     assert "Color Reference" in hover and "log2(ER)" in hover
+    # The hover panel every figure has, its facts in rows rather than run together.
+    from metabis.managers.hover.panel import PANEL_STYLE
+
+    assert hover.startswith(f"<div style='{PANEL_STYLE}'>") and "·" not in hover
 
 
 def _red(hex_color):
@@ -381,5 +385,5 @@ def test_ineligible_subsystem_paints_gray_and_never_reads_delta():
     )
 
     assert enriched["color"] == NOT_SIGNIFICANT_COLOR
-    assert "Not over-representation eligible" in enriched["hover"]
-    assert "3 measured genes" in enriched["hover"]
+    assert "Not tested" in enriched["hover"]
+    assert "fewer than 3 of its genes were measured" in enriched["hover"]

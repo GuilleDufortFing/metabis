@@ -137,6 +137,15 @@ def resolve_element_color(
                 if current_config:
                     target_metric = current_config.get("metric", "default")
 
+            # A subsystem with no score has no data, and draws neutral grey
+            # (Supplementary Section 1.5), not the white of a measured zero.
+            if not context.color_manager.has_value(
+                AnalysisWorkspaceMode.GROUP_COMPARISON,
+                element_type,
+                element_id,
+                target_metric,
+            ):
+                return theme.NOT_SIGNIFICANT
             return context.color_manager.get_element_color_from_distribution(
                 mode=AnalysisWorkspaceMode.GROUP_COMPARISON,
                 element_type=element_type,
@@ -159,8 +168,8 @@ def resolve_element_color(
 
         # Overview graphs use the selected overlay. Detailed subsystem graphs
         # resolve reaction and gene nodes to their own family through the provider.
-        # Gray, not the neutral center of the scale, keeps unavailable evidence
-        # from being read as "average activity".
+        # No data, white with a dashed edge, not the grey centre of the scale,
+        # keeps unavailable evidence from being read as "average activity".
         if not artifact.colors_element_type(overlay, element_type):
             return theme.ACTIVITY_UNAVAILABLE
 
@@ -168,8 +177,8 @@ def resolve_element_color(
         if element_type in ("subsystem", "subsystem_genes"):
             row = artifact.subsystem_row(overlay, element_id)
             if row is None or row.score is None:
-                # Not measured, or below the coverage threshold: say so with gray
-                # rather than imply a neutral measurement.
+                # Not measured, or below the coverage threshold: say so as no data
+                # rather than imply a typical measurement.
                 return theme.ACTIVITY_UNAVAILABLE
             lookup_id = element_id
             lookup_type = "subsystem"

@@ -204,11 +204,41 @@ def load_graph_resource(
     try:
         glyphs, connections = load_visualization_cache(resource_file)
         if glyphs is not None and connections is not None:
-            return glyphs, connections
+            return _with_atlas_metabolites(resource_file, glyphs), connections
     except Exception as e:
         print(f"⚠ Error loading packaged graph resource {resource_file}: {e}")
 
     return None, None
+
+
+def _with_atlas_metabolites(resource_file: str, glyphs: List[Glyph]) -> List[Glyph]:
+    """A Human1 layout's metabolites drawn as Metabolic Atlas draws them.
+
+    Some layouts class metabolites with Recon3D identifiers as reactions; Metabolic
+    Atlas draws them as metabolites, and its paths file lists them (atlas_paths).
+    A layout classes each metabolite as small (a dot) or main (an oval) once, for
+    all its places; a compartment map's metabolite takes the shape Metabolic Atlas
+    gives it where it is (its paths file's ``labels``), as its name does.
+    """
+    from ....atlas_paths import atlas_paths
+
+    atlas = atlas_paths(resource_file) or {}
+    metabolites = set(atlas.get("metabolites") or ())
+    placed = atlas.get("labels") or {}
+    if not metabolites and not placed:
+        return glyphs
+
+    def drawn(glyph: Glyph) -> Glyph:
+        glyph_id = str(glyph.get("id"))
+        if glyph.get("glyph_class") == "reaction" and glyph_id in metabolites:
+            glyph = {**glyph, "glyph_class": "metabolite", "subtype": "main"}
+        if glyph.get("glyph_class") == "metabolite" and glyph_id in placed:
+            subtype = "intermediate" if placed[glyph_id].get("dot") else "main"
+            if glyph.get("subtype") != subtype:
+                glyph = {**glyph, "subtype": subtype}
+        return glyph
+
+    return [drawn(glyph) for glyph in glyphs]
 
 
 def save_to_cache(

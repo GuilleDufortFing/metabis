@@ -11,7 +11,7 @@ import pandas as pd
 import pytest
 
 from metabis import MetabolicModel, ReactionPreprocessingConfig, ReactionTransform
-from metabis.domain.reaction_data import ReactionData
+from metabis.domain.reaction_data import ReactionData, _identifier_spellings
 
 resolve = ReactionData._resolve_reaction_id_collisions
 
@@ -142,7 +142,7 @@ def test_an_uncontested_reaction_produces_no_collision_record():
 
 
 # `GLYCTDle` and `GLYCt` both claim `MAR00444` in the shipped crosswalk - one of
-# the 39 contests present in the bundled Th17 data.
+# the contests present in the bundled Th17 data.
 CONTESTED = {
     "GLYCTDle_pos": [1.0, 1.0, 1.0],
     "GLYCt_pos": [9.0, 9.0, 9.0],
@@ -219,3 +219,171 @@ def test_mapping_is_injective_so_no_source_can_overwrite_another(tmp_path, model
     assert len(set(mapping.values())) == len(mapping)
     # And only the winner's values reach the frame.
     assert reaction_data.get_reaction_df()["MAR00444"].tolist() == [9.0, 9.0, 9.0]
+
+
+# --- Identifiers Human1 lists, and Recon2's spelling of them ----------------
+
+
+def recon2(tmp_path, model, columns, name="recon2.tsv"):
+    """Load a dual Recon2-named file read through Human1's Recon3D annotation."""
+    return load(
+        write_dual(tmp_path, columns, name=name),
+        model,
+        reaction_name_format="rxnRecon3DID",
+        check_old_identifiers=True,
+    )
+
+
+def test_a_recon2_compartment_is_also_read_in_recon3d_brackets():
+    assert _identifier_spellings("EX_glc(e)") == ["EX_glc(e)", "EX_glc[e]"]
+    assert _identifier_spellings("GLCt1r") == ["GLCt1r"]
+
+
+def test_an_identifier_listed_beside_others_maps_to_its_reaction(tmp_path, model):
+    # Human1 annotates MAR08572 as "HMR_8572;RE0944C". No file carries that
+    # string; a Recon2 file carries RE0944C.
+    frame = recon2(tmp_path, model, {"RE0944C_pos": [1.0, 2.0, 3.0]}).get_reaction_df()
+
+    assert list(frame.columns) == ["MAR08572"]
+
+
+def test_a_recon2_exchange_maps_through_its_recon3d_spelling(tmp_path, model):
+    # Recon2 writes EX_10fthf(e); Human1's Recon3D annotation, EX_10fthf[e].
+    frame = recon2(
+        tmp_path, model, {"EX_10fthf(e)_pos": [1.0, 2.0, 3.0]}
+    ).get_reaction_df()
+
+    assert list(frame.columns) == ["MAR09205"]
+
+
+def test_a_whole_annotation_keeps_its_reaction_over_a_list_naming_another(
+    tmp_path, model
+):
+    # RE3422C is MAR01334's whole annotation and one entry of MAR01338's
+    # "HMR_1338;RE3422C". The whole match decides, as it did before lists were read.
+    frame = recon2(tmp_path, model, {"RE3422C_pos": [1.0, 2.0, 3.0]}).get_reaction_df()
+
+    assert list(frame.columns) == ["MAR01334"]
+
+
+def test_human1s_own_identifier_outranks_the_legacy_table(tmp_path, model):
+    # The legacy table lists EX_ac(e), acetate exchange, under MAR09086 and also
+    # under MAR09239, the exchange of heptaglutamyl-folate, and its last claim
+    # used to win. Human1's Recon3D annotation names only MAR09086.
+    loaded = recon2(tmp_path, model, {"EX_ac(e)_pos": [1.0, 2.0, 3.0]})
+
+    assert list(loaded.get_reaction_df().columns) == ["MAR09086"]
+    assert loaded.mapping_stats["unmapped_count"] == 0
+
+
+def test_the_legacy_table_is_not_read_under_another_spelling(tmp_path, model):
+    # Respelled, EX_Rtotal(e) would meet the legacy table's EX_Rtotal[e], which
+    # it files under the exchange of ribose.
+    loaded = recon2(tmp_path, model, {"EX_Rtotal(e)_pos": [1.0, 2.0, 3.0]})
+
+    assert loaded.get_reaction_df().empty
+    assert loaded.mapping_stats["unmapped_count"] == 1
+
+
+def test_an_sbml_identifier_is_also_read_unescaped():
+    # Compass keeps Recon 2.2's SBML IDs: EX_glc(e) reaches a file escaped.
+    assert _identifier_spellings("R_EX_glc_LPAREN_e_RPAREN_") == [
+        "R_EX_glc_LPAREN_e_RPAREN_",
+        "EX_glc(e)",
+        "EX_glc[e]",
+    ]
+
+
+# --- The declared source model's table --------------------------------------
+
+
+def declared(tmp_path, model, columns, table, name="declared.tsv", **overrides):
+    return load(
+        write_dual(tmp_path, columns, name=name),
+        model,
+        **{
+            "reaction_name_format": "rxnRecon3DID",
+            "check_old_identifiers": True,
+            "source_reactions": table,
+            **overrides,
+        },
+    )
+
+
+def test_the_table_maps_the_ids_it_lists_and_names_their_reversals(tmp_path, model):
+    loaded = declared(
+        tmp_path, model, {"G3PD1_pos": [1.0, 2.0, 3.0]}, {"G3PD1": ("MAR00479", -1)}
+    )
+
+    assert list(loaded.get_reaction_df().columns) == ["MAR00479"]
+    assert loaded.reaction_mapping == {"G3PD1": "MAR00479"}
+    assert loaded.reversed_reactions == {"MAR00479"}
+    assert loaded.mapping_stats["reversed_count"] == 1
+
+
+def test_each_source_reaction_carries_its_own_orientation(tmp_path, model):
+    # MAR03146's thiolase step is r0634 written backwards in Recon2, and part of the
+    # lumped FAOXC101C8m written forwards: whichever backs it decides.
+    table = {"r0634": ("MAR03146", -1), "FAOXC101C8m": ("MAR03146", 1)}
+
+    specific = declared(tmp_path, model, {"r0634_pos": [1.0, 2.0, 3.0]}, table, name="a.tsv")
+    lumped = declared(tmp_path, model, {"FAOXC101C8m_pos": [1.0, 2.0, 3.0]}, table, name="b.tsv")
+
+    assert specific.reversed_reactions == {"MAR03146"}
+    assert lumped.reversed_reactions == frozenset()
+
+
+def test_a_table_pairing_still_counts_how_lumped_its_source_is(tmp_path, model):
+    # Both back MAR03146 by the table. Human1's Recon3D annotation lists the
+    # thiolase step r0634 under that reaction alone and the lumped FAOXC101C8m
+    # under three, so the step backs it, although it sorts last.
+    table = {"r0634": ("MAR03146", -1), "FAOXC101C8m": ("MAR03146", 1)}
+    loaded = declared(
+        tmp_path, model, {"FAOXC101C8m_pos": [1.0, 2.0, 3.0], "r0634_pos": [4.0, 5.0, 6.0]}, table
+    )
+
+    (record,) = loaded.mapping_stats["id_collisions"]
+    assert record["kept"] == "r0634"
+    assert record["discarded"] == [("FAOXC101C8m", 3)]
+
+
+def test_a_table_row_with_no_human1_reaction_leaves_the_id_unmapped(tmp_path, model):
+    # Recon2's r1446, butyryl-CoA dehydrogenation, under dodecenoyl-CoA hydration.
+    loaded = declared(tmp_path, model, {"r1446_pos": [1.0, 2.0, 3.0]}, {"r1446": ("", 0)})
+
+    assert loaded.get_reaction_df().empty
+    assert loaded.mapping_stats["unmapped_count"] == 1
+
+
+def test_an_id_the_table_does_not_list_takes_its_reactions_agreed_orientation(tmp_path, model):
+    agreed = declared(
+        tmp_path, model, {"G3PD1_pos": [1.0, 2.0, 3.0]}, {"OTHER": ("MAR00479", -1)}, name="a.tsv"
+    )
+    disputed = declared(
+        tmp_path,
+        model,
+        {"G3PD1_pos": [1.0, 2.0, 3.0]},
+        {"OTHER": ("MAR00479", -1), "ANOTHER": ("MAR00479", 1)},
+        name="b.tsv",
+    )
+
+    assert agreed.reversed_reactions == {"MAR00479"}
+    assert agreed.mapping_stats["unread_orientation_count"] == 0
+    assert disputed.reversed_reactions == frozenset()
+    assert disputed.mapping_stats["unread_orientation_count"] == 1
+
+
+def test_a_single_column_reaction_to_be_reversed_keeps_its_backward_direction(tmp_path, model):
+    # MAR00479 is irreversible in Human1; reversed, it is made reversible, so a
+    # single-column file keeps a backward column for it as it did before.
+    path = str(tmp_path / "single.tsv")
+    pd.DataFrame({"G3PD1": [1.0, 2.0, 3.0]}, index=["s1", "s2", "s3"]).to_csv(
+        path, sep="\t", index_label="sample_id"
+    )
+    options = dict(data_mode="single", reaction_name_format="rxnRecon3DID")
+
+    reversed_ = load(path, model, **options, source_reactions={"G3PD1": ("MAR00479", -1)})
+    plain = load(path, model, **options)
+
+    assert "MAR00479_back" in reversed_.get_reaction_df().columns
+    assert "MAR00479_back" not in plain.get_reaction_df().columns

@@ -13,9 +13,14 @@ __all__ = [
     "add_click_behavior",
     "get_external_reference_data",
     "CLICK_BEHAVIOR_TAG",
+    "OWN_TAP_TAG",
 ]
 
 CLICK_BEHAVIOR_TAG = "metabis_click_behavior_attached"
+# A source whose taps another callback answers, as a compartment map's reactions
+# are (compartment_maps.add_map_links): a tap on it opens no link and navigates
+# nowhere, though it still downloads the hover panel when downloading is on.
+OWN_TAP_TAG = "metabis_own_tap"
 
 
 CLICK_BEHAVIOR_CODE = r"""
@@ -88,7 +93,8 @@ try {
     const hoverContent = pickFirst(["hover", "desc", "hover_text"]);
 
     const downloadEnabled = (
-        typeof enabled_toggle !== "undefined" && enabled_toggle && enabled_toggle.active
+        (typeof enabled_toggle !== "undefined" && enabled_toggle && enabled_toggle.active)
+        || (typeof download_flag !== "undefined" && download_flag && Boolean(window[download_flag]))
     );
 
     const sanitizeName = (value) => {
@@ -190,7 +196,8 @@ try {
     };
 
     const navigateToSubsystem = () => {
-        if (typeof subsystem_select === "undefined" || !subsystem_select) {
+        const dispatchesEvent = typeof navigation_event === "string" && navigation_event;
+        if (!dispatchesEvent && (typeof subsystem_select === "undefined" || !subsystem_select)) {
             return false;
         }
 
@@ -205,6 +212,15 @@ try {
         let subsystemName = elementLabel.replace(/\n/g, " ").replace(/\s+/g, " ").trim();
         if (!subsystemName) {
             return false;
+        }
+
+        if (dispatchesEvent) {
+            // The page resolves the subsystem; a truncated overview label ends
+            // in "..." and is matched through element_id or by prefix there.
+            window.dispatchEvent(new CustomEvent(navigation_event, {
+                detail: { element_id: elementId, label: subsystemName },
+            }));
+            return true;
         }
 
         const isTruncated = subsystemName.endsWith("...");
@@ -270,12 +286,17 @@ try {
         return;
     }
 
-    if (navigateToSubsystem()) {
+    // A source whose taps another callback answers (OWN_TAP_TAG), such as a
+    // compartment map's reactions, neither navigates nor opens its link. Its tags
+    // are read now, so they hold whichever of the two callbacks came first.
+    const ownTap = typeof own_tap_tag !== "undefined" && (source.tags || []).includes(own_tap_tag);
+
+    if (!ownTap && navigateToSubsystem()) {
         clearSelection();
         return;
     }
 
-    if (openExternalLink()) {
+    if (!ownTap && openExternalLink()) {
         clearSelection();
         return;
     }
@@ -316,9 +337,12 @@ def get_external_reference_data(
             "external_url": "",
         }
 
+    display_label = reference_data.get("display_label", element_id_str)
     return {
         "element_id": reference_data.get("raw_id", element_id_str),
-        "display_label": reference_data.get("display_label", element_id_str),
+        "display_label": display_label,
+        # A reaction's short name (reaction_names); other elements, their label.
+        "short_name": reference_data.get("short_name", display_label),
         "external_url": reference_data.get("external_url", ""),
     }
 
@@ -328,9 +352,37 @@ def add_click_behavior(
     filename_prefix: str = "element",
     enabled_toggle: Any = None,
     subsystem_select: Any = None,
+    *,
+    navigation_event: str | None = None,
+    download_flag: str | None = None,
 ) -> Any:
-    """Attach click behavior to eligible Bokeh data sources in a model tree."""
+    """Attach click behavior to eligible Bokeh data sources in a model tree.
+
+    A tap downloads the element's hover panel when downloading is enabled,
+    otherwise navigates to a tapped subsystem, otherwise opens the element's
+    external link. A source tagged :data:`OWN_TAP_TAG` does neither of the last
+    two: another callback answers its taps.
+
+    ``enabled_toggle`` (a Bokeh ``Toggle``) and ``subsystem_select`` (a Bokeh
+    ``Select``) suit a Bokeh server document, where both widgets live beside the
+    plot. A figure embedded without a server (``bokeh.embed.json_item``) carries
+    hidden copies of them instead, so it uses the two keyword alternatives:
+
+    - ``navigation_event``: a subsystem tap dispatches this ``CustomEvent`` on
+      ``window`` with ``detail = {element_id, label}`` for the page to handle.
+    - ``download_flag``: the name of a ``window`` property the page sets to
+      enable downloading the hover panel on tap.
+
+    Each alternative replaces its widget, so passing both raises ``ValueError``.
+    """
     from bokeh.models import CustomJS, Plot, TapTool
+
+    if navigation_event is not None and subsystem_select is not None:
+        raise ValueError("Pass either subsystem_select or navigation_event, not both")
+    if download_flag is not None and enabled_toggle is not None:
+        raise ValueError("Pass either enabled_toggle or download_flag, not both")
+    navigates = subsystem_select is not None or navigation_event is not None
+    downloads = enabled_toggle is not None or download_flag is not None
 
     references = {model}
     if hasattr(model, "references"):
@@ -355,22 +407,26 @@ def add_click_behavior(
             data = getattr(source, "data", {}) or {}
             has_hover = any(field in data for field in ("hover", "desc", "hover_text"))
             has_links = any(bool(value) for value in data.get("external_url", []))
-            has_subsystem_navigation = (
-                subsystem_select is not None and "is_subsystem" in data
-            )
+            has_subsystem_navigation = navigates and "is_subsystem" in data
 
-            if (
-                has_links
-                or has_subsystem_navigation
-                or (enabled_toggle is not None and has_hover)
-            ):
+            if has_links or has_subsystem_navigation or (downloads and has_hover):
                 eligible_sources.append(source)
 
         if not eligible_sources:
             continue
 
+        # The tap selects only what it acts on, so a tap on the network's category
+        # circles leaves them as drawn (subsystem_link selects categories itself).
         if not plot.select(type=TapTool):
-            plot.add_tools(TapTool())
+            plot.add_tools(
+                TapTool(
+                    renderers=[
+                        renderer
+                        for renderer in plot.renderers
+                        if getattr(renderer, "data_source", None) in eligible_sources
+                    ]
+                )
+            )
 
         for source in eligible_sources:
             existing_tags = list(getattr(source, "tags", []) or [])
@@ -379,11 +435,15 @@ def add_click_behavior(
 
             source.tags = existing_tags + [CLICK_BEHAVIOR_TAG]
 
-            callback_args = {"source": source, "prefix": filename_prefix}
+            callback_args = {"source": source, "prefix": filename_prefix, "own_tap_tag": OWN_TAP_TAG}
             if enabled_toggle is not None:
                 callback_args["enabled_toggle"] = enabled_toggle
             if subsystem_select is not None:
                 callback_args["subsystem_select"] = subsystem_select
+            if navigation_event is not None:
+                callback_args["navigation_event"] = navigation_event
+            if download_flag is not None:
+                callback_args["download_flag"] = download_flag
 
             source.selected.js_on_change(
                 "indices",

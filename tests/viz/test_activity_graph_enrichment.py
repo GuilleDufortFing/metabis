@@ -19,6 +19,12 @@ from metabis import (
 )
 from metabis.viz.metabolic_visualization import EnrichmentConfig
 from metabis.viz.plot_subsystem_ranking import _saturating_axis_bounds
+from metabis.viz.ranking_layout import (
+    RANKING_DOTS,
+    RANKING_NAMES,
+    RANKING_PLOT,
+    RANKING_SCORE,
+)
 
 SUBSYSTEM_ID = "galactose_metabolism"
 
@@ -145,18 +151,43 @@ def test_activity_ranking_plots_measured_members_without_a_significance_filter(
 ):
     data_manager.activate_activity_mode(activity_config())
 
-    plot = plot_subsystem_activity_ranking(
+    layout = plot_subsystem_activity_ranking(
         data_manager=data_manager,
         activity_artifact=data_manager.get_activity_artifact(),
         return_plot=True,
     )
 
-    assert plot is not None
-    assert plot.xaxis[0].axis_label.startswith("Normalized group summary")
-    assert "Subsystem activity ranking - A" in plot.title.text
-    # Points pinned to the bounded axis are drawn as diamonds, not silently moved.
-    markers = set(plot.renderers[0].data_source.data["marker"])
-    assert markers <= {"circle", "diamond"}
+    assert layout is not None
+    # The names take a panel of their own; the dots' panel is the ranking.
+    plot = layout.select_one({"name": RANKING_PLOT})
+    assert layout.select_one({"name": RANKING_NAMES}) is not None
+    # The bottom axis carries the label; the title names the top one.
+    assert plot.below[0].axis_label.startswith("Normalized group summary")
+    assert plot.title.text == "Reaction activity in A"
+    # The subsystem's own score, as a diamond, takes a panel of its own.
+    assert layout.select_one({"name": RANKING_SCORE}) is not None
+    # Points pinned to the bounded axis are drawn as triangles, not silently moved.
+    markers = set(plot.select_one({"name": RANKING_DOTS}).data_source.data["marker"])
+    assert markers <= {"circle", "triangle"}
+
+
+@pytest.mark.integration
+def test_a_server_free_activity_ranking_reads_hover_downloads_from_a_page_flag(
+    data_manager,
+):
+    data_manager.activate_activity_mode(activity_config())
+
+    plot = plot_subsystem_activity_ranking(
+        data_manager=data_manager,
+        activity_artifact=data_manager.get_activity_artifact(),
+        return_plot=True,
+        download_flag="metabisDownloadHoverOnClick",
+    )
+
+    (callback,) = plot.select_one({"name": RANKING_DOTS}).data_source.selected.js_property_callbacks[
+        "change:indices"
+    ]
+    assert callback.args["download_flag"] == "metabisDownloadHoverOnClick"
 
 
 @pytest.mark.integration
@@ -174,8 +205,9 @@ def test_the_activity_ranking_carries_its_gradient_color_reference(data_manager)
         activity_artifact=data_manager.get_activity_artifact(),
         return_plot=True,
     )
-    source = plot.renderers[0].data_source.data
-    hover = plot.select_one(HoverTool)
+    source = plot.select_one({"name": RANKING_DOTS}).data_source.data
+    dots = plot.select_one({"name": RANKING_DOTS})
+    (hover,) = [tool for tool in plot.select({"type": HoverTool}) if dots in (tool.renderers or [])]
 
     assert source["desc"]
     assert "<strong>Color Reference:</strong>" in hover.tooltips
@@ -211,7 +243,7 @@ def test_the_ranking_axis_always_contains_the_reference():
 
 @pytest.mark.integration
 def test_activity_colors_use_the_full_palette_on_real_data(workspace, data_manager):
-    """The bug this guards: a 4-SD palette painted every real graph amber."""
+    """The bug this guards: a 4-SD palette painted every real graph its centre colour."""
     context = data_manager.activate_activity_mode(activity_config())
     scores = context.features.activity_score
 
@@ -245,3 +277,35 @@ def test_changing_the_group_recolors_the_same_reaction(workspace, data_manager):
     color_b = data_manager.get_element_color(planted, "reaction")
 
     assert color_a != color_b
+
+
+@pytest.mark.integration
+def test_an_unscored_node_is_drawn_as_no_data_white_and_dashed_never_the_typical_grey(model, data_manager):
+    """Grey is the typical level in single-group activity, and "not significant"
+    in a comparison; an element with no activity score is no data, as a
+    subsystem with no measured feature is drawn."""
+    from bokeh.models import ColumnDataSource
+
+    from metabis.visual_config import theme
+
+    context = data_manager.activate_activity_mode(activity_config())
+    plot = plot_metabolic_graph(
+        element_name=model.get_subsystem(SUBSYSTEM_ID).name,
+        data_manager=data_manager,
+        graph_type="subsystem",
+        show_plot=False,
+        add_click_interactions=False,
+        enrichment_config=EnrichmentConfig(color_metric=context.metric_key),
+    )
+
+    nodes = [
+        (str(color).lower(), dash)
+        for source in plot.select({"type": ColumnDataSource})
+        if {"element_id", "color", "line_dash"} <= set(source.data)
+        for color, dash in zip(source.data["color"], source.data["line_dash"])
+    ]
+    # No gene expression was loaded: the gene nodes have no score.
+    unscored = [dash for color, dash in nodes if color == theme.ACTIVITY_UNAVAILABLE.lower()]
+    assert unscored and set(unscored) == {"dashed"}
+    assert theme.ACTIVITY_UNAVAILABLE.lower() == "#ffffff"
+    assert not [color for color, _ in nodes if color == theme.NOT_SIGNIFICANT.lower()]

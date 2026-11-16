@@ -15,11 +15,13 @@ from __future__ import annotations
 
 import pandas as pd
 import pytest
-from bokeh.models import HoverTool
+from bokeh.models import GlyphRenderer, HoverTool, Text
 
 from metabis.managers.color_manager import ColorManager
+from metabis.managers.hover import panel as hover_panel
 from metabis.managers.workspace_mode import AnalysisWorkspaceMode
 from metabis.viz.plot_subsystem_ranking import plot_subsystem_comparison
+from metabis.viz.ranking_layout import RANKING_DOTS, RANKING_SCORE
 
 METRIC = "cohens_d"
 SUBSYSTEM = "Glycolysis"
@@ -103,20 +105,44 @@ def ranking():
         return_plot=True,
     )
     assert plot is not None
-    return plot, plot.renderers[0].data_source.data
+    return plot, _dots(plot).data_source.data
+
+
+def _dots(layout):
+    return layout.select_one({"name": RANKING_DOTS})
+
+
+def _dot_hover(layout):
+    dots = _dots(layout)
+    (hover,) = [tool for tool in layout.select({"type": HoverTool}) if dots in (tool.renderers or [])]
+    return hover
 
 
 def test_every_ranked_dot_hovers_with_its_own_statistics(ranking):
     plot, source = ranking
-    hover = plot.select_one(HoverTool)
+    hover = _dot_hover(plot)
 
-    assert hover.tooltips == "@desc{safe}"
+    # The panel every hover has, round the element's own statistics.
+    assert hover.tooltips == hover_panel.panel("@desc{safe}")
     assert len(source["desc"]) == len(EFFECTS)
+
+
+def test_a_delta_score_diamond_hovers_as_its_node_does(ranking):
+    plot, _source = ranking
+    (diamonds,) = [
+        renderer
+        for renderer in plot.select_one({"name": RANKING_SCORE}).select({"type": GlyphRenderer})
+        if "score" in renderer.data_source.data
+    ]
+    (hover,) = [tool for tool in plot.select({"type": HoverTool}) if diamonds in (tool.renderers or [])]
+
+    assert hover.tooltips == hover_panel.panel("@hover{safe}")
+    assert diamonds.data_source.data["hover"] == [f"<div>{SUBSYSTEM} statistics</div>"]
 
 
 def test_the_hover_carries_no_gradient_color_reference(ranking):
     plot, source = ranking
-    hover = plot.select_one(HoverTool)
+    hover = _dot_hover(plot)
 
     assert "Color Reference:" not in hover.tooltips
     assert "<svg" not in hover.tooltips
@@ -128,3 +154,76 @@ def test_no_color_reference_payload_is_shipped_per_point(ranking):
 
     assert "color_reference_value" not in source
     assert "color_reference_marker_x" not in source
+
+
+def test_a_server_free_ranking_reads_hover_downloads_from_a_page_flag():
+    stats = pd.DataFrame({"subsystem": [SUBSYSTEM], "delta_score": [1.4]})
+    plot = plot_subsystem_comparison(
+        data_manager=_Workspace(),
+        subsystem_stats=stats,
+        metric=METRIC,
+        return_plot=True,
+        download_flag="metabisDownloadHoverOnClick",
+    )
+
+    (callback,) = _dots(plot).data_source.selected.js_property_callbacks[
+        "change:indices"
+    ]
+    assert callback.args["download_flag"] == "metabisDownloadHoverOnClick"
+    assert "enabled_toggle" not in callback.args
+
+
+def test_rows_are_named_in_a_panel_beside_their_delta_score_and_dots(ranking):
+    layout, source = ranking
+    names, score, dots_panel = [child[0] for child in layout.children]
+
+    # The names are drawn in a panel of their own, which never pans with the
+    # dots, and the Delta score in another; no panel has a y-axis.
+    assert not names.yaxis and not score.yaxis and not dots_panel.yaxis
+    assert names.y_range is dots_panel.y_range is score.y_range
+    # The names keep their width, the score is narrow and the dots take the rest.
+    assert layout.cols == [f"{names.width}px", "120px", "1fr"]
+    # The category heads its rows, as a heading of its own, not as one of them.
+    assert names.y_range.factors == [SUBSYSTEM, "heading:1:0"]
+    texts = [r.data_source.data for r in names.renderers if isinstance(r.glyph, Text)]
+    assert any(data.get("text") == [SUBSYSTEM] for data in texts)
+    # The heading carries the category's number from the network.
+    assert any(
+        data.get("text") == [CATEGORY] and data.get("number") == ["1"] for data in texts
+    )
+    # Each dot sits at a fixed place within its row, the same on every render.
+    assert all(isinstance(y, tuple) and y[0] == SUBSYSTEM for y in source["y"])
+    assert all(abs(y[1]) < 0.5 for y in source["y"])
+
+
+def test_the_value_axis_is_drawn_above_and_below(ranking):
+    layout, _source = ranking
+    dots_panel = layout.children[2][0]
+
+    assert len(dots_panel.above) >= 1 and len(dots_panel.below) >= 1
+
+
+@pytest.mark.parametrize(
+    ("detail", "plots", "reference"),
+    [("light", False, False), ("medium", False, True), ("full", True, True)],
+)
+def test_the_elements_hover_at_the_graph_cards_hover_detail(detail, plots, reference):
+    """As a transport subsystem's view draws them: full detail shows each element's distributions."""
+    workspace = _Workspace()
+    asked = []
+
+    def hover(element_id, element_type, **options):
+        asked.append((element_type, options))
+        return f"<div>{element_id} statistics</div>"
+
+    workspace.get_element_hover = hover
+    stats = pd.DataFrame({"subsystem": [SUBSYSTEM], "delta_score": [1.4]})
+    plot = plot_subsystem_comparison(
+        data_manager=workspace, subsystem_stats=stats, metric=METRIC, return_plot=True, hover_detail=detail
+    )
+
+    elements = [options for element_type, options in asked if element_type == "reaction"]
+    assert len(elements) == len(EFFECTS)
+    assert all(options.get("show_plot") is plots for options in elements)
+    # The colour reference, once for every element, inside its panel.
+    assert ("Color Reference:" in _dot_hover(plot).tooltips) is reference

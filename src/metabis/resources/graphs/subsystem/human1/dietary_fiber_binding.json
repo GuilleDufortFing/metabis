@@ -1,644 +1,660 @@
 {
   "glyphs": [
     {
-      "id": "ID1",
+      "id": "compartment1",
       "glyph_class": "compartment",
       "label": "Extracellular",
-      "x": -47.50228478782424,
-      "y": 680.866081958814,
+      "x": 317.4,
+      "y": 499.4,
       "width": 0.0,
       "height": 0.0
     },
     {
-      "id": "ID2",
+      "id": "met1",
       "glyph_class": "metabolite",
-      "label": "MAM02964e",
-      "x": 449.0504555377439,
-      "y": 1720.6719854979206,
+      "label": "MAM03483e",
+      "x": 1053.4,
+      "y": 1296.0,
       "width": 60.0,
       "height": 40.0,
-      "original_id": "ID2",
+      "original_id": "met1",
       "subtype": "main"
     },
     {
-      "id": "psyl_s",
-      "glyph_class": "reaction",
-      "label": "psyl_s",
-      "x": 311.29128324061946,
-      "y": 953.3216080971238,
-      "width": 60.0,
-      "height": 40.0,
-      "original_id": "ID3"
-    },
-    {
-      "id": "pectingchol_s",
-      "glyph_class": "reaction",
-      "label": "pectingchol_s",
-      "x": 1752.518233195404,
-      "y": 1691.1533054392587,
-      "width": 60.0,
-      "height": 40.0,
-      "original_id": "ID4"
-    },
-    {
-      "id": "ID5",
-      "glyph_class": "metabolite",
-      "label": "MAM00745e",
-      "x": 1552.6465527983737,
-      "y": 1414.873085244462,
-      "width": 60.0,
-      "height": 40.0,
-      "original_id": "ID5",
-      "subtype": "main"
-    },
-    {
-      "id": "pect_s",
-      "glyph_class": "reaction",
-      "label": "pect_s",
-      "x": 1930.8765767366967,
-      "y": 1098.782923516185,
-      "width": 60.0,
-      "height": 40.0,
-      "original_id": "ID6"
-    },
-    {
-      "id": "ID7",
-      "glyph_class": "metabolite",
-      "label": "MAM02963e",
-      "x": 1000.863461787236,
-      "y": 1098.782923516185,
-      "width": 60.0,
-      "height": 40.0,
-      "original_id": "ID7",
-      "subtype": "main"
-    },
-    {
-      "id": "psyltchol_s",
-      "glyph_class": "reaction",
-      "label": "psyltchol_s",
-      "x": 758.4316676318474,
-      "y": 800.756230441384,
-      "width": 60.0,
-      "height": 40.0,
-      "original_id": "ID8"
-    },
-    {
-      "id": "psylchol_s",
-      "glyph_class": "reaction",
-      "label": "psylchol_s",
-      "x": 146.87405599779214,
-      "y": 1971.3799010025623,
-      "width": 60.0,
-      "height": 40.0,
-      "original_id": "ID9"
-    },
-    {
-      "id": "bglc_s",
-      "glyph_class": "reaction",
-      "label": "bglc_s",
-      "x": 705.9158256462458,
-      "y": 1528.7974210649493,
-      "width": 60.0,
-      "height": 40.0,
-      "original_id": "ID10"
-    },
-    {
-      "id": "gumtchol_s",
-      "glyph_class": "reaction",
-      "label": "gumtchol_s",
-      "x": 1415.5712559811914,
-      "y": 1244.690228192625,
-      "width": 60.0,
-      "height": 40.0,
-      "original_id": "ID11"
-    },
-    {
-      "id": "psyltdechol_s",
-      "glyph_class": "reaction",
-      "label": "psyltdechol_s",
-      "x": 600.7179711359612,
-      "y": 1407.8414388333163,
-      "width": 60.0,
-      "height": 40.0,
-      "original_id": "ID12"
-    },
-    {
-      "id": "ID13",
-      "glyph_class": "metabolite",
-      "label": "MAM02039e",
-      "x": 1392.442642478756,
-      "y": 1008.7829235161851,
-      "width": 60.0,
-      "height": 40.0,
-      "original_id": "ID13",
-      "subtype": "intermediate"
-    },
-    {
-      "id": "ID14",
-      "glyph_class": "metabolite",
-      "label": "MAM02039e",
-      "x": 1616.2067194672445,
-      "y": 1154.690228192625,
-      "width": 60.0,
-      "height": 40.0,
-      "original_id": "ID14",
-      "subtype": "intermediate"
-    },
-    {
-      "id": "ID15",
-      "glyph_class": "metabolite",
-      "label": "MAM02039e",
-      "x": 1840.8765767366967,
-      "y": 1601.1533054392587,
-      "width": 60.0,
-      "height": 40.0,
-      "original_id": "ID15",
-      "subtype": "intermediate"
-    },
-    {
-      "id": "gumgchol_s",
-      "glyph_class": "reaction",
-      "label": "gumgchol_s",
-      "x": 944.5535685305806,
-      "y": 1722.1948793536153,
-      "width": 60.0,
-      "height": 40.0,
-      "original_id": "ID16"
-    },
-    {
-      "id": "gltdechol_s",
-      "glyph_class": "reaction",
-      "label": "gltdechol_s",
-      "x": 705.9158256462458,
-      "y": 1843.1055350440497,
-      "width": 60.0,
-      "height": 40.0,
-      "original_id": "ID17"
-    },
-    {
-      "id": "pectindchac_s",
-      "glyph_class": "reaction",
-      "label": "pectindchac_s",
-      "x": 1706.2067194672445,
-      "y": 1346.5219912428188,
-      "width": 60.0,
-      "height": 40.0,
-      "original_id": "ID18"
-    },
-    {
-      "id": "gum_s",
-      "glyph_class": "reaction",
-      "label": "gum_s",
-      "x": 1220.5826011617794,
-      "y": 1536.4872934024784,
-      "width": 60.0,
-      "height": 40.0,
-      "original_id": "ID19"
-    },
-    {
-      "id": "ID20",
+      "id": "met2",
       "glyph_class": "metabolite",
       "label": "MAM01988e",
-      "x": 1373.0712559811914,
-      "y": 1971.3799010025623,
+      "x": 1720.6,
+      "y": 1738.5,
       "width": 60.0,
       "height": 40.0,
-      "original_id": "ID20",
+      "original_id": "met2",
       "subtype": "main"
     },
     {
-      "id": "gumdchac_s",
-      "glyph_class": "reaction",
-      "label": "gumdchac_s",
-      "x": 1552.6465527983737,
-      "y": 1689.0609234057322,
-      "width": 60.0,
-      "height": 53.928809012736565,
-      "original_id": "ID21"
-    },
-    {
-      "id": "glgchlo_s",
-      "glyph_class": "reaction",
-      "label": "glgchlo_s",
-      "x": 976.3432040844173,
-      "y": 1407.326972147178,
+      "id": "met3",
+      "glyph_class": "metabolite",
+      "label": "MAM03595e",
+      "x": 1323.8,
+      "y": 1174.5,
       "width": 60.0,
       "height": 40.0,
-      "original_id": "ID22"
+      "original_id": "met3",
+      "subtype": "main"
     },
     {
-      "id": "pectintchol_s",
-      "glyph_class": "reaction",
-      "label": "pectintchol_s",
-      "x": 1302.442642478756,
-      "y": 953.3216080971238,
+      "id": "met4",
+      "glyph_class": "metabolite",
+      "label": "MAM03907e",
+      "x": 658.8,
+      "y": 720.5,
       "width": 60.0,
       "height": 40.0,
-      "original_id": "ID23"
+      "original_id": "met4",
+      "subtype": "main"
     },
     {
-      "id": "gltcho_s",
-      "glyph_class": "reaction",
-      "label": "gltcho_s",
-      "x": 857.0839268415433,
-      "y": 1244.690228192625,
+      "id": "met5",
+      "glyph_class": "metabolite",
+      "label": "MAM02963e",
+      "x": 1348.4,
+      "y": 865.9,
       "width": 60.0,
       "height": 40.0,
-      "original_id": "ID24"
+      "original_id": "met5",
+      "subtype": "main"
+    },
+    {
+      "id": "met6",
+      "glyph_class": "metabolite",
+      "label": "MAM03909e",
+      "x": 1105.9,
+      "y": 567.9,
+      "width": 60.0,
+      "height": 40.0,
+      "original_id": "met6",
+      "subtype": "main"
+    },
+    {
+      "id": "met7",
+      "glyph_class": "metabolite",
+      "label": "MAM03908e",
+      "x": 494.4,
+      "y": 1738.5,
+      "width": 60.0,
+      "height": 40.0,
+      "original_id": "met7",
+      "subtype": "main"
+    },
+    {
+      "id": "met8",
+      "glyph_class": "metabolite",
+      "label": "MAM03638e",
+      "x": 1568.1,
+      "y": 1303.7,
+      "width": 60.0,
+      "height": 40.0,
+      "original_id": "met8",
+      "subtype": "main"
+    },
+    {
+      "id": "met9",
+      "glyph_class": "metabolite",
+      "label": "MAM03640e",
+      "x": 1292.1,
+      "y": 1489.4,
+      "width": 60.0,
+      "height": 40.0,
+      "original_id": "met9",
+      "subtype": "main"
+    },
+    {
+      "id": "met10",
+      "glyph_class": "metabolite",
+      "label": "MAM02964e",
+      "x": 796.6,
+      "y": 1487.8,
+      "width": 60.0,
+      "height": 40.0,
+      "original_id": "met10",
+      "subtype": "main"
+    },
+    {
+      "id": "met11",
+      "glyph_class": "metabolite",
+      "label": "MAM03910e",
+      "x": 948.2,
+      "y": 1175.0,
+      "width": 60.0,
+      "height": 40.0,
+      "original_id": "met11",
+      "subtype": "main"
+    },
+    {
+      "id": "met12",
+      "glyph_class": "metabolite",
+      "label": "MAM00745e",
+      "x": 1900.1,
+      "y": 1182.0,
+      "width": 60.0,
+      "height": 40.0,
+      "original_id": "met12",
+      "subtype": "main"
+    },
+    {
+      "id": "met13",
+      "glyph_class": "metabolite",
+      "label": "MAM03639e",
+      "x": 1900.1,
+      "y": 1456.2,
+      "width": 60.0,
+      "height": 40.0,
+      "original_id": "met13",
+      "subtype": "main"
+    },
+    {
+      "id": "met14",
+      "glyph_class": "metabolite",
+      "label": "MAM03604e",
+      "x": 1204.6,
+      "y": 1011.9,
+      "width": 60.0,
+      "height": 40.0,
+      "original_id": "met14",
+      "subtype": "main"
+    },
+    {
+      "id": "met15",
+      "glyph_class": "metabolite",
+      "label": "MAM03605e",
+      "x": 1053.4,
+      "y": 1610.3,
+      "width": 60.0,
+      "height": 40.0,
+      "original_id": "met15",
+      "subtype": "main"
+    },
+    {
+      "id": "met16",
+      "glyph_class": "metabolite",
+      "label": "MAM03641e",
+      "x": 1763.1,
+      "y": 1011.9,
+      "width": 60.0,
+      "height": 40.0,
+      "original_id": "met16",
+      "subtype": "main"
+    },
+    {
+      "id": "met17",
+      "glyph_class": "metabolite",
+      "label": "MAM03851e",
+      "x": 2278.4,
+      "y": 865.9,
+      "width": 60.0,
+      "height": 40.0,
+      "original_id": "met17",
+      "subtype": "main"
+    },
+    {
+      "id": "met18",
+      "glyph_class": "metabolite",
+      "label": "MAM02039e",
+      "x": 1963.7,
+      "y": 921.9,
+      "width": 14.0,
+      "height": 14.0,
+      "original_id": "met18",
+      "subtype": "intermediate"
+    },
+    {
+      "id": "met19",
+      "glyph_class": "metabolite",
+      "label": "MAM03852e",
+      "x": 2053.7,
+      "y": 1113.7,
+      "width": 60.0,
+      "height": 40.0,
+      "original_id": "met19",
+      "subtype": "main"
+    },
+    {
+      "id": "met20",
+      "glyph_class": "metabolite",
+      "label": "MAM02039e",
+      "x": 1739.9,
+      "y": 775.9,
+      "width": 14.0,
+      "height": 14.0,
+      "original_id": "met20",
+      "subtype": "intermediate"
+    },
+    {
+      "id": "met21",
+      "glyph_class": "metabolite",
+      "label": "MAM03854e",
+      "x": 1649.9,
+      "y": 720.5,
+      "width": 60.0,
+      "height": 40.0,
+      "original_id": "met21",
+      "subtype": "main"
+    },
+    {
+      "id": "met22",
+      "glyph_class": "metabolite",
+      "label": "MAM02039e",
+      "x": 2188.4,
+      "y": 1368.3,
+      "width": 14.0,
+      "height": 14.0,
+      "original_id": "met22",
+      "subtype": "intermediate"
+    },
+    {
+      "id": "met23",
+      "glyph_class": "metabolite",
+      "label": "MAM03853e",
+      "x": 2100.0,
+      "y": 1458.3,
+      "width": 60.0,
+      "height": 40.0,
+      "original_id": "met23",
+      "subtype": "main"
     },
     {
       "id": "MAR06867",
       "glyph_class": "reaction",
       "label": "MAR06867",
-      "x": 976.3432040844173,
-      "y": 1528.7974210649493,
-      "width": 60.0,
-      "height": 60.0,
-      "original_id": "ID25"
+      "x": 1323.8,
+      "y": 1296.0,
+      "width": 50.0,
+      "height": 50.0,
+      "original_id": "process_MAR06867"
     },
     {
       "id": "MAR07255",
       "glyph_class": "reaction",
       "label": "MAR07255",
-      "x": 758.4316676318474,
-      "y": 953.3216080971238,
-      "width": 60.0,
-      "height": 60.0,
-      "original_id": "ID29"
+      "x": 1105.9,
+      "y": 720.5,
+      "width": 50.0,
+      "height": 50.0,
+      "original_id": "process_MAR07255"
     },
     {
       "id": "MAR07195",
       "glyph_class": "reaction",
       "label": "MAR07195",
-      "x": 311.29128324061946,
-      "y": 1971.3799010025623,
-      "width": 60.0,
-      "height": 60.0,
-      "original_id": "ID33"
+      "x": 658.8,
+      "y": 1738.5,
+      "width": 50.0,
+      "height": 50.0,
+      "original_id": "process_MAR07195"
     },
     {
       "id": "MAR06920",
       "glyph_class": "reaction",
       "label": "MAR06920",
-      "x": 1220.5826011617794,
-      "y": 1722.1948793536153,
-      "width": 60.0,
-      "height": 60.0,
-      "original_id": "ID37"
+      "x": 1568.1,
+      "y": 1489.4,
+      "width": 50.0,
+      "height": 50.0,
+      "original_id": "process_MAR06920"
     },
     {
       "id": "MAR07439",
       "glyph_class": "reaction",
       "label": "MAR07439",
-      "x": 449.0504555377439,
-      "y": 1407.8414388333163,
-      "width": 60.0,
-      "height": 60.0,
-      "original_id": "ID41"
+      "x": 796.6,
+      "y": 1175.0,
+      "width": 50.0,
+      "height": 50.0,
+      "original_id": "process_MAR07439"
     },
     {
       "id": "MAR06919",
       "glyph_class": "reaction",
       "label": "MAR06919",
-      "x": 1552.6465527983737,
-      "y": 1536.4872934024784,
-      "width": 60.0,
-      "height": 60.0,
-      "original_id": "ID45"
+      "x": 1900.1,
+      "y": 1303.7,
+      "width": 50.0,
+      "height": 50.0,
+      "original_id": "process_MAR06919"
     },
     {
       "id": "MAR06868",
       "glyph_class": "reaction",
       "label": "MAR06868",
-      "x": 705.9158256462458,
-      "y": 1244.690228192625,
-      "width": 60.0,
-      "height": 60.0,
-      "original_id": "ID49"
+      "x": 1053.4,
+      "y": 1011.9,
+      "width": 50.0,
+      "height": 50.0,
+      "original_id": "process_MAR06868"
     },
     {
       "id": "MAR06869",
       "glyph_class": "reaction",
       "label": "MAR06869",
-      "x": 705.9158256462458,
-      "y": 1720.6719854979206,
-      "width": 60.0,
-      "height": 60.0,
-      "original_id": "ID53"
+      "x": 1053.4,
+      "y": 1487.8,
+      "width": 50.0,
+      "height": 50.0,
+      "original_id": "process_MAR06869"
     },
     {
       "id": "MAR06922",
       "glyph_class": "reaction",
       "label": "MAR06922",
-      "x": 1220.5826011617794,
-      "y": 1244.690228192625,
-      "width": 60.0,
-      "height": 60.0,
-      "original_id": "ID57"
+      "x": 1568.1,
+      "y": 1011.9,
+      "width": 50.0,
+      "height": 50.0,
+      "original_id": "process_MAR06922"
     },
     {
       "id": "MAR07159",
       "glyph_class": "reaction",
       "label": "MAR07159",
-      "x": 1706.2067194672445,
-      "y": 1244.690228192625,
-      "width": 60.0,
-      "height": 60.0,
-      "original_id": "ID61"
+      "x": 2053.7,
+      "y": 1011.9,
+      "width": 50.0,
+      "height": 50.0,
+      "original_id": "process_MAR07159"
     },
     {
       "id": "MAR07177",
       "glyph_class": "reaction",
       "label": "MAR07177",
-      "x": 1302.442642478756,
-      "y": 1098.782923516185,
-      "width": 60.0,
-      "height": 60.0,
-      "original_id": "ID66"
+      "x": 1649.9,
+      "y": 865.9,
+      "width": 50.0,
+      "height": 50.0,
+      "original_id": "process_MAR07177"
     },
     {
       "id": "MAR07176",
       "glyph_class": "reaction",
       "label": "MAR07176",
-      "x": 1930.8765767366967,
-      "y": 1691.1533054392587,
-      "width": 60.0,
-      "height": 60.0,
-      "original_id": "ID71"
+      "x": 2278.4,
+      "y": 1458.3,
+      "width": 50.0,
+      "height": 50.0,
+      "original_id": "process_MAR07176"
     }
   ],
   "connections": [
     {
-      "id": "ID26",
+      "id": "process_MAR06867_c0",
       "connection_class": "metabolic",
-      "source": "bglc_s",
+      "source": "met1",
       "target": "MAR06867",
       "stoichiometry": null
     },
     {
-      "id": "ID27",
+      "id": "process_MAR06867_c1",
       "connection_class": "metabolic",
-      "source": "ID20",
+      "source": "met2",
       "target": "MAR06867",
       "stoichiometry": null
     },
     {
-      "id": "ID28",
+      "id": "process_MAR06867_p2",
       "connection_class": "metabolic",
       "source": "MAR06867",
-      "target": "glgchlo_s",
+      "target": "met3",
       "stoichiometry": null
     },
     {
-      "id": "ID30",
+      "id": "process_MAR07255_c0",
       "connection_class": "metabolic",
-      "source": "psyl_s",
+      "source": "met4",
       "target": "MAR07255",
       "stoichiometry": null
     },
     {
-      "id": "ID31",
+      "id": "process_MAR07255_c1",
       "connection_class": "metabolic",
-      "source": "ID7",
+      "source": "met5",
       "target": "MAR07255",
       "stoichiometry": null
     },
     {
-      "id": "ID32",
+      "id": "process_MAR07255_p2",
       "connection_class": "metabolic",
       "source": "MAR07255",
-      "target": "psyltchol_s",
+      "target": "met6",
       "stoichiometry": null
     },
     {
-      "id": "ID34",
+      "id": "process_MAR07195_c0",
       "connection_class": "metabolic",
-      "source": "psyl_s",
+      "source": "met4",
       "target": "MAR07195",
       "stoichiometry": null
     },
     {
-      "id": "ID35",
+      "id": "process_MAR07195_c1",
       "connection_class": "metabolic",
-      "source": "ID20",
+      "source": "met2",
       "target": "MAR07195",
       "stoichiometry": null
     },
     {
-      "id": "ID36",
+      "id": "process_MAR07195_p2",
       "connection_class": "metabolic",
       "source": "MAR07195",
-      "target": "psylchol_s",
+      "target": "met7",
       "stoichiometry": null
     },
     {
-      "id": "ID38",
+      "id": "process_MAR06920_c0",
       "connection_class": "metabolic",
-      "source": "gum_s",
+      "source": "met8",
       "target": "MAR06920",
       "stoichiometry": null
     },
     {
-      "id": "ID39",
+      "id": "process_MAR06920_c1",
       "connection_class": "metabolic",
-      "source": "ID20",
+      "source": "met2",
       "target": "MAR06920",
       "stoichiometry": null
     },
     {
-      "id": "ID40",
+      "id": "process_MAR06920_p2",
       "connection_class": "metabolic",
       "source": "MAR06920",
-      "target": "gumgchol_s",
+      "target": "met9",
       "stoichiometry": null
     },
     {
-      "id": "ID42",
+      "id": "process_MAR07439_c0",
       "connection_class": "metabolic",
-      "source": "ID2",
+      "source": "met10",
       "target": "MAR07439",
       "stoichiometry": null
     },
     {
-      "id": "ID43",
+      "id": "process_MAR07439_c1",
       "connection_class": "metabolic",
-      "source": "psyl_s",
+      "source": "met4",
       "target": "MAR07439",
       "stoichiometry": null
     },
     {
-      "id": "ID44",
+      "id": "process_MAR07439_p2",
       "connection_class": "metabolic",
       "source": "MAR07439",
-      "target": "psyltdechol_s",
+      "target": "met11",
       "stoichiometry": null
     },
     {
-      "id": "ID46",
+      "id": "process_MAR06919_c0",
       "connection_class": "metabolic",
-      "source": "ID5",
+      "source": "met12",
       "target": "MAR06919",
       "stoichiometry": null
     },
     {
-      "id": "ID47",
+      "id": "process_MAR06919_c1",
       "connection_class": "metabolic",
-      "source": "gum_s",
+      "source": "met8",
       "target": "MAR06919",
       "stoichiometry": null
     },
     {
-      "id": "ID48",
+      "id": "process_MAR06919_p2",
       "connection_class": "metabolic",
       "source": "MAR06919",
-      "target": "gumdchac_s",
+      "target": "met13",
       "stoichiometry": null
     },
     {
-      "id": "ID50",
+      "id": "process_MAR06868_c0",
       "connection_class": "metabolic",
-      "source": "ID7",
+      "source": "met5",
       "target": "MAR06868",
       "stoichiometry": null
     },
     {
-      "id": "ID51",
+      "id": "process_MAR06868_c1",
       "connection_class": "metabolic",
-      "source": "bglc_s",
+      "source": "met1",
       "target": "MAR06868",
       "stoichiometry": null
     },
     {
-      "id": "ID52",
+      "id": "process_MAR06868_p2",
       "connection_class": "metabolic",
       "source": "MAR06868",
-      "target": "gltcho_s",
+      "target": "met14",
       "stoichiometry": null
     },
     {
-      "id": "ID54",
+      "id": "process_MAR06869_c0",
       "connection_class": "metabolic",
-      "source": "ID2",
+      "source": "met10",
       "target": "MAR06869",
       "stoichiometry": null
     },
     {
-      "id": "ID55",
+      "id": "process_MAR06869_c1",
       "connection_class": "metabolic",
-      "source": "bglc_s",
+      "source": "met1",
       "target": "MAR06869",
       "stoichiometry": null
     },
     {
-      "id": "ID56",
+      "id": "process_MAR06869_p2",
       "connection_class": "metabolic",
       "source": "MAR06869",
-      "target": "gltdechol_s",
+      "target": "met15",
       "stoichiometry": null
     },
     {
-      "id": "ID58",
+      "id": "process_MAR06922_c0",
       "connection_class": "metabolic",
-      "source": "ID7",
+      "source": "met5",
       "target": "MAR06922",
       "stoichiometry": null
     },
     {
-      "id": "ID59",
+      "id": "process_MAR06922_c1",
       "connection_class": "metabolic",
-      "source": "gum_s",
+      "source": "met8",
       "target": "MAR06922",
       "stoichiometry": null
     },
     {
-      "id": "ID60",
+      "id": "process_MAR06922_p2",
       "connection_class": "metabolic",
       "source": "MAR06922",
-      "target": "gumtchol_s",
+      "target": "met16",
       "stoichiometry": null
     },
     {
-      "id": "ID62",
+      "id": "process_MAR07159_c0",
       "connection_class": "metabolic",
-      "source": "ID5",
+      "source": "met12",
       "target": "MAR07159",
       "stoichiometry": null
     },
     {
-      "id": "ID63",
+      "id": "process_MAR07159_c1",
       "connection_class": "metabolic",
-      "source": "pect_s",
+      "source": "met17",
       "target": "MAR07159",
       "stoichiometry": null
     },
     {
-      "id": "ID64",
+      "id": "process_MAR07159_c2",
       "connection_class": "metabolic",
-      "source": "ID14",
+      "source": "met18",
       "target": "MAR07159",
       "stoichiometry": null
     },
     {
-      "id": "ID65",
+      "id": "process_MAR07159_p3",
       "connection_class": "metabolic",
       "source": "MAR07159",
-      "target": "pectindchac_s",
+      "target": "met19",
       "stoichiometry": null
     },
     {
-      "id": "ID67",
+      "id": "process_MAR07177_c0",
       "connection_class": "metabolic",
-      "source": "pect_s",
+      "source": "met17",
       "target": "MAR07177",
       "stoichiometry": null
     },
     {
-      "id": "ID68",
+      "id": "process_MAR07177_c1",
       "connection_class": "metabolic",
-      "source": "ID7",
+      "source": "met5",
       "target": "MAR07177",
       "stoichiometry": null
     },
     {
-      "id": "ID69",
+      "id": "process_MAR07177_c2",
       "connection_class": "metabolic",
-      "source": "ID13",
+      "source": "met20",
       "target": "MAR07177",
       "stoichiometry": null
     },
     {
-      "id": "ID70",
+      "id": "process_MAR07177_p3",
       "connection_class": "metabolic",
       "source": "MAR07177",
-      "target": "pectintchol_s",
+      "target": "met21",
       "stoichiometry": null
     },
     {
-      "id": "ID72",
+      "id": "process_MAR07176_c0",
       "connection_class": "metabolic",
-      "source": "pect_s",
+      "source": "met17",
       "target": "MAR07176",
       "stoichiometry": null
     },
     {
-      "id": "ID73",
+      "id": "process_MAR07176_c1",
       "connection_class": "metabolic",
-      "source": "ID15",
+      "source": "met22",
       "target": "MAR07176",
       "stoichiometry": null
     },
     {
-      "id": "ID74",
+      "id": "process_MAR07176_c2",
       "connection_class": "metabolic",
-      "source": "ID20",
+      "source": "met2",
       "target": "MAR07176",
       "stoichiometry": null
     },
     {
-      "id": "ID75",
+      "id": "process_MAR07176_p3",
       "connection_class": "metabolic",
       "source": "MAR07176",
-      "target": "pectingchol_s",
+      "target": "met23",
       "stoichiometry": null
     }
   ]

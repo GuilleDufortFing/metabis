@@ -201,9 +201,16 @@ class ColorDistributionRegistry:
         """Colours for many elements at once, indexed by element ID."""
         return self.lookup().get_element_colors_from_distribution(*args, **kwargs)
 
+    def has_value(self, *args: Any, **kwargs: Any) -> bool:
+        return self.lookup().has_value(*args, **kwargs)
+
     def get_color_limit(self, *args: Any, **kwargs: Any) -> Optional[float]:
         """Distance from the centre at which the registered palette saturates."""
         return self.lookup().get_color_limit(*args, **kwargs)
+
+    def get_distribution_values(self, *args: Any, **kwargs: Any):
+        """Every element's value of a registered distribution, by element ID."""
+        return self.lookup().get_distribution_values(*args, **kwargs)
 
     def get_distribution_details(self, *args: Any, **kwargs: Any) -> Dict[str, Any]:
         """Histogram, bin, colour, and value for one element's distribution."""

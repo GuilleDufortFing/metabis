@@ -121,7 +121,7 @@
       "glyph_class": "reaction",
       "label": "MAR08968",
       "x": 777.0,
-      "y": 36.0,
+      "y": 31.0,
       "width": 50.0,
       "height": 50.0,
       "original_id": "MAR08968"
@@ -131,7 +131,7 @@
       "glyph_class": "metabolite",
       "label": "MAM01802e",
       "x": 668.0,
-      "y": 124.0,
+      "y": 119.0,
       "width": 40.0,
       "height": 30.0,
       "original_id": "MAM01802e",
@@ -142,7 +142,7 @@
       "glyph_class": "metabolite",
       "label": "MAM02040e",
       "x": 668.0,
-      "y": 58.0,
+      "y": 53.0,
       "width": 40.0,
       "height": 30.0,
       "original_id": "MAM02040e",
@@ -160,41 +160,41 @@
       "subtype": "main"
     },
     {
-      "id": "m_MAR08968_MAM02039e",
-      "glyph_class": "metabolite",
-      "label": "MAM02039e",
-      "x": 896.0,
-      "y": 91.0,
-      "width": 40.0,
-      "height": 30.0,
-      "original_id": "MAM02039e",
-      "subtype": "intermediate"
-    },
-    {
       "id": "m_extracellular_MAM01828e",
       "glyph_class": "metabolite",
       "label": "MAM01828e",
       "x": 896.0,
-      "y": 20.0,
+      "y": 86.0,
       "width": 60.0,
       "height": 40.0,
       "original_id": "MAM01828e",
       "subtype": "main"
     },
     {
+      "id": "m_MAR08968_MAM02039e",
+      "glyph_class": "metabolite",
+      "label": "MAM02039e",
+      "x": 896.0,
+      "y": 15.0,
+      "width": 40.0,
+      "height": 30.0,
+      "original_id": "MAM02039e",
+      "subtype": "intermediate"
+    },
+    {
       "id": "eg_r_MAR08968",
       "glyph_class": "enzyme_group",
       "label": "Enzymes for MAR08968",
       "x": 777.0,
-      "y": 151.0,
+      "y": 146.0,
       "width": 70.0,
       "height": 40.0,
       "reaction_id": "MAR08968",
       "enzymes": [
-        "ENSG00000197594"
+        "ENSG00000135318"
       ],
       "glyph_ids": [
-        "g_r_MAR08968_ENSG00000197594"
+        "g_r_MAR08968_ENSG00000135318"
       ],
       "outline_color": "#7B68EE",
       "outline_width": 2,
@@ -204,11 +204,11 @@
       ]
     },
     {
-      "id": "g_r_MAR08968_ENSG00000197594",
+      "id": "g_r_MAR08968_ENSG00000135318",
       "glyph_class": "gene",
-      "label": "ENSG00000197594",
+      "label": "ENSG00000135318",
       "x": 777.0,
-      "y": 151.0,
+      "y": 146.0,
       "width": 60.0,
       "height": 30.0,
       "associated_reaction": "r_MAR08968",
@@ -280,17 +280,17 @@
       "stoichiometry": null
     },
     {
-      "id": "conn_r_MAR08968_to_m_MAR08968_MAM02039e",
-      "connection_class": "metabolic",
-      "source": "r_MAR08968",
-      "target": "m_MAR08968_MAM02039e",
-      "stoichiometry": null
-    },
-    {
       "id": "conn_r_MAR08968_to_m_extracellular_MAM01828e",
       "connection_class": "metabolic",
       "source": "r_MAR08968",
       "target": "m_extracellular_MAM01828e",
+      "stoichiometry": null
+    },
+    {
+      "id": "conn_r_MAR08968_to_m_MAR08968_MAM02039e",
+      "connection_class": "metabolic",
+      "source": "r_MAR08968",
+      "target": "m_MAR08968_MAM02039e",
       "stoichiometry": null
     },
     {

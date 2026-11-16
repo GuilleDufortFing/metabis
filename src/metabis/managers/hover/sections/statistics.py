@@ -1,3 +1,4 @@
+import math
 from html import escape
 from typing import Any, Dict, List
 
@@ -5,6 +6,7 @@ from ....visual_config import theme
 from ...workspace_mode import AnalysisWorkspaceMode
 from ..interfaces import HoverSection
 from ..models import HoverContext, HoverData
+from ..panel import significance
 
 
 class StatisticsSection(HoverSection):
@@ -62,7 +64,8 @@ class StatisticsSection(HoverSection):
             )
 
         log2_fc = values.get("log2_fc")
-        if log2_fc is not None:
+        # NaN where the values have no fold change (Compass scores, transforms).
+        if log2_fc is not None and math.isfinite(log2_fc):
             column_parts.append(f"<div>Log2 FC: {log2_fc:.3f}</div>")
 
         cohens_d = values.get("cohens_d")
@@ -73,14 +76,7 @@ class StatisticsSection(HoverSection):
         if mean_diff is not None:
             column_parts.append(f"<div>Mean Δ: {mean_diff:.3f}</div>")
 
-        if values.get("is_significant"):
-            column_parts.append(
-                "<div style='color:red; font-weight:bold;'>Significant</div>"
-            )
-        else:
-            column_parts.append(
-                "<div style='color:#aaaaaa; font-weight:bold;'>Not Significant</div>"
-            )
+        column_parts.append(significance(bool(values.get("is_significant"))))
 
         column_parts.append("</div>")
         return "".join(column_parts)
@@ -111,7 +107,8 @@ class StatisticsSection(HoverSection):
             group_color = "black"
 
         return (
-            f" (<span style='color:{theme.ACTIVITY_UP}; font-weight:bold;'>"
+            # The activity gold underlines the words: as text it is too light to read.
+            f" (<span style='font-weight:bold; border-bottom:2px solid {theme.ACTIVITY_UP};'>"
             f"more active direction</span> in {population} "
             f"<span style='color:{group_color};'>{escape(str(group_name))}</span>)"
         )

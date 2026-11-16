@@ -6,6 +6,16 @@ from typing import Dict, List, Optional, Tuple
 import numpy as np
 import pandas as pd
 
+from .table_values import SEPARATOR_NAMES
+
+
+def _unreadable(path: str, error: Exception) -> str:
+    """Say why a file's layout could not be read, as its reader would want to know."""
+    name = os.path.basename(path)
+    if isinstance(error, UnicodeDecodeError):
+        return f"{name} is not text. Save it as CSV or TSV; a gzipped file's name must end in .gz."
+    return f"{name} could not be read: {error}"
+
 
 def _open_text_stream(path: str):
     """Open ``path`` as a UTF-8 text stream, transparently decompressing gzip.
@@ -51,15 +61,15 @@ def _detect_csv_separator(path: str, n_lines: int = 10) -> Optional[str]:
                 line_counts.append(counts_in_line)
 
         if not line_counts:
-            warnings.warn(
-                f"Could not read any non-empty lines from {path} for separator detection."
-            )
+            warnings.warn(f"{os.path.basename(path)} has no line to read.")
             return None
 
         total_counts = {sep: sum(lc[sep] for lc in line_counts) for sep in separators}
 
         if not any(total_counts.values()):
-            warnings.warn(f"Could not detect any common separators in {path}")
+            warnings.warn(
+                f"{os.path.basename(path)} has no tab, comma or semicolon between its columns."
+            )
             return None
 
         likely_sep = max(total_counts, key=total_counts.get)
@@ -70,7 +80,8 @@ def _detect_csv_separator(path: str, n_lines: int = 10) -> Optional[str]:
         if len(counts_for_likely_sep) > 1:
             if max(counts_for_likely_sep) > 2 * min(counts_for_likely_sep) + 1:
                 warnings.warn(
-                    f"Separator '{likely_sep}' count varies significantly between lines in {path}. Detection might be unreliable."
+                    f"The lines of {os.path.basename(path)} hold different numbers of "
+                    f"{SEPARATOR_NAMES.get(likely_sep, repr(likely_sep))}; check its separator."
                 )
         elif not counts_for_likely_sep:
             warnings.warn(
@@ -79,7 +90,7 @@ def _detect_csv_separator(path: str, n_lines: int = 10) -> Optional[str]:
             return None
         return likely_sep
     except Exception as e:
-        warnings.warn(f"Error reading file {path} for separator detection: {e}")
+        warnings.warn(_unreadable(path, e))
         return None
 
 
@@ -148,9 +159,9 @@ def _detect_compass_software_and_orientation(
             )
 
     except pd.errors.EmptyDataError:
-        warnings.warn(f"File {path} is empty for Compass detection.")
+        warnings.warn(f"{os.path.basename(path)} is empty.")
     except Exception as e:
-        warnings.warn(f"Error during Compass software detection for {path}: {e}")
+        warnings.warn(_unreadable(path, e))
         # traceback.print_exc() # For debugging
 
     return {"is_compass": is_compass, "orientation_if_compass": orientation_if_compass}
@@ -234,7 +245,7 @@ def _detect_data_mode(
         return None  # Inconclusive
 
     except Exception as e:
-        warnings.warn(f"Error during data mode detection for {path}: {e}")
+        warnings.warn(_unreadable(path, e))
         return None
 
 def _detect_id_format_and_orientation(
@@ -287,18 +298,14 @@ def _detect_id_format_and_orientation(
                     # df_no_index is already limited by nrows
                     first_col_candidates = {str(val) for val in df_no_index.iloc[:, 0]}
         except pd.errors.EmptyDataError:
-            warnings.warn(
-                f"File {path} is empty or could not be parsed for ID detection."
-            )
+            warnings.warn(f"{os.path.basename(path)} is empty.")
             return None, None
         except Exception as e:
-            warnings.warn(f"Error reading CSV for ID detection: {path} - {e}")
+            warnings.warn(_unreadable(path, e))
             return None, None
 
     if not header_candidates and not index_candidates and not first_col_candidates:
-        warnings.warn(
-            f"No ID candidates found in file {path} (checked up to {n_check} rows/columns)."
-        )
+        warnings.warn(f"No identifiers were found in {os.path.basename(path)}.")
         return None, None
 
     best_match = {"format": None, "orientation": None, "score": -1.0}
@@ -434,18 +441,14 @@ def _detect_id_format_and_orientation(
         and final_fmt_actual_matches >= min_matches_heuristic
     ):
         warnings.warn(
-            f"Detected format '{best_match['format']}' with orientation '{best_match['orientation']}' for {os.path.basename(path)} "
-            f"based on a score of {best_match['score']:.4f} ({final_fmt_actual_matches} matches of model IDs found in file's first {n_check} candidates). "
-            f"This score is below the primary threshold of {threshold} but met secondary heuristic criteria. Please verify."
+            f"The identifiers of {os.path.basename(path)} were read as '{best_match['format']}' from only "
+            f"{final_fmt_actual_matches} that Human1 knows; check that this is their format."
         )
         return best_match["format"], best_match["orientation"]
     else:
         warnings.warn(
-            f"Could not reliably detect ID format/orientation in {os.path.basename(path)}. "
-            f"Best format '{best_match['format']}' had score {best_match['score']:.4f} ({final_fmt_actual_matches} matches of model IDs in file's first {n_check} candidates). "
-            f"This may be due to `n_check` ({n_check}) limiting file candidates relative to the number of model IDs, "
-            f"a poor match between file IDs and model IDs for any format, or the model lacking IDs for the file's true format. "
-            f"Consider increasing `n_check` if the file is large and diverse, or verifying file content and model definitions."
+            f"The identifier format of {os.path.basename(path)} could not be told: too few of its "
+            "identifiers are Human1's in any format. Choose the format by hand."
         )
         return None, None
 

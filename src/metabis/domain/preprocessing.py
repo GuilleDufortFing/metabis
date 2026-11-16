@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import math
+
 from dataclasses import dataclass
 from enum import Enum
 from typing import Literal, Mapping, TypeAlias
@@ -98,10 +100,16 @@ class ReactionPreprocessingConfig:
     minimum_feature_range: float = 0.0
     rank_axis: RankAxis | None = None
     compass_activity: bool = False
+    # Values smaller than this in magnitude are read as zero, before a signed
+    # reaction is split into its two directions: a flux solver leaves values at
+    # its tolerance (an irreversible reaction at -1e-9) that are not a direction.
+    zero_below: float = 0.0
 
     def __post_init__(self) -> None:
         if self.minimum_feature_range < 0:
             raise ValueError("minimum_feature_range must be non-negative")
+        if not math.isfinite(self.zero_below) or self.zero_below < 0:
+            raise ValueError("zero_below must be a non-negative number")
         # Normalize the supported serialized alias at the input boundary. Dataset
         # declarations and stored configuration may contain ``"compass_neg_log"``,
         # but analysis sees only the canonical two-stage representation.
@@ -155,6 +163,19 @@ class ReactionPreprocessingConfig:
             object.__setattr__(self, "filter_low_variance", True)
             object.__setattr__(self, "minimum_feature_range", COMPASS_MINIMUM_RANGE)
 
+    @property
+    def fold_change_scale(self) -> str | None:
+        """The scale the loaded reaction values are on (statistical_analysis.FoldChangeScale), or None.
+
+        Read with no transform and split into their directions, the values are
+        linear and non-negative, so a ratio of their means is a fold change.
+        Compass activity scores (a shifted -log1p of the penalties) and every
+        transform (cube root, ranks, quantiles) have none.
+        """
+        if self.compass_activity or self.transform is not ReactionTransform.NONE:
+            return None
+        return "linear"
+
 
 class ExpressionInputState(str, Enum):
     """Declared state of an expression matrix before preprocessing."""
@@ -172,10 +193,28 @@ class ExpressionPreprocessingConfig:
     log1p: bool = False
     input_state: ExpressionInputState = ExpressionInputState.UNKNOWN
     target_sum: float = 1_000_000.0
+    # The scale of the values as uploaded, when nothing here transforms them:
+    # "linear" (counts, TPM), "log2" (log2(x + 1)), "ln" (ln(x + 1)) or "unknown".
+    input_scale: Literal["unknown", "linear", "log2", "ln"] = "unknown"
 
     def __post_init__(self) -> None:
         if self.target_sum <= 0:
             raise ValueError("target_sum must be positive")
+        if self.input_scale not in ("unknown", "linear", "log2", "ln"):
+            raise ValueError("input_scale must be unknown, linear, log2 or ln")
+
+    @property
+    def fold_change_scale(self) -> str | None:
+        """The scale the loaded values are on (statistical_analysis.FoldChangeScale), or None.
+
+        log1p puts them on a natural-log scale and CPM alone keeps them linear;
+        untransformed, they are on the scale the upload declared, if it declared one.
+        """
+        if self.log1p:
+            return "ln"
+        if self.normalize_total:
+            return "linear"
+        return None if self.input_scale == "unknown" else self.input_scale
 
 
 @dataclass(frozen=True)

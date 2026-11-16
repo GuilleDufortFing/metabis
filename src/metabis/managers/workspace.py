@@ -44,6 +44,7 @@ from ..analysis.set_enrichment import (
 from ..analysis.source_identity import (
     PreparedDatasetFingerprints,
     SourceIdentityCache,
+    fingerprint_model,
     prepare_reaction_fingerprints,
 )
 from ..analysis.statistical_analysis import StatisticalAnalysis
@@ -64,7 +65,7 @@ from ..visual_config import theme
 # Initialize ExperimentAnalysis for within-group analysis
 # No longer need GlyphClass import since we use string element types
 from .cache_manager import CacheManager
-from .color_manager import ColorManager
+from .color_manager import DEFAULT_GROUP_PALETTE, ColorManager
 from .data_provider import DataProvider
 from .element_presentation import (
     resolve_display_direction,
@@ -87,6 +88,17 @@ _ACTIVITY_DEPENDENCIES = frozenset(
         RevisionKind.PREPROCESSING,
     }
 )
+
+
+# What each revision axis is, as a message about a result made stale names it.
+_CHANGED = {
+    "dataset": "data",
+    "metadata": "sample sheet",
+    "groups": "groups",
+    "preprocessing": "preprocessing",
+    "thresholds": "significance",
+    "visualization": "display settings",
+}
 
 
 class AnalysisWorkspace:
@@ -177,7 +189,7 @@ class AnalysisWorkspace:
             },
             experiment_analysis_config={
                 "max_z_score": max_z_score,
-                # Sequential ramp: white (low) -> amber (typical) -> purple (high).
+                # Purple (low) -> light grey (typical) -> gold (high).
                 # The bin machinery interpolates neutral->up and neutral->down, so the
                 # "neutral" centre is the typical activity, not an absence of signal.
                 "up_color": theme.ACTIVITY_HIGH,
@@ -369,7 +381,8 @@ class AnalysisWorkspace:
         for kind in provenance.dependencies:
             if provenance.revisions.value_for(kind) != current_revisions.value_for(kind):
                 raise StaleAnalysisResultError(
-                    f"The workspace {kind.value} revision changed during analysis"
+                    f"The {_CHANGED.get(kind.value, kind.value)} changed while this was computed, "
+                    "so its result was set aside; run it again."
                 )
 
         data_dependencies = {
@@ -562,6 +575,29 @@ class AnalysisWorkspace:
             clear_metadata=False,
         )
 
+    def apply_category_transition(self, prepared_model) -> None:
+        """Install a fresh model whose only change is its subsystem categories.
+
+        Categories group the subsystems for presentation (the metabolic overview,
+        its ranking, a table's category column); no analysis reads them, and the
+        model's identity leaves them out. So the data, the groups and every result
+        stay current, and only the VISUALIZATION revision moves, for what shows
+        categories to be drawn again. A model whose network changed too is
+        refused, before anything changes: that is :meth:`apply_model_transition`.
+        """
+        if prepared_model is None or prepared_model is self.metabolic_model:
+            raise ValueError("A category transition installs a fresh model object")
+        fingerprint = fingerprint_model(prepared_model)
+        if fingerprint != self._source_identity.fingerprints.get("model"):
+            raise ValueError("Only the subsystem categories may change in a category transition")
+        clear_memory_cache = getattr(prepared_model, "clear_memory_cache", None)
+        if callable(clear_memory_cache):
+            clear_memory_cache()
+        self.metabolic_model = prepared_model
+        self.data_provider.metabolic_model = prepared_model
+        self._source_identity.replace_model(prepared_model, fingerprint)
+        self.mark_visualization_changed()
+
     def replace_metabolic_model(self, metabolic_model) -> None:
         """Atomically replace the model and invalidate every derived result.
 
@@ -578,8 +614,14 @@ class AnalysisWorkspace:
         output_reaction_format: str | None = None,
         preprocessing_changed: bool = True,
         prepared_fingerprints: PreparedDatasetFingerprints | None = None,
+        clear_expression: bool = False,
     ) -> None:
-        """Atomically install prepared Reaction Data and, optionally, its model."""
+        """Atomically install prepared Reaction Data and, optionally, its model.
+
+        The sample metadata is always cleared, since it was aligned to the old
+        samples. ``clear_expression`` clears the Expression Data in the same
+        transition, for a caller that treats new reaction data as a new dataset.
+        """
         if reaction_data is None:
             raise ValueError("Reaction Data is required; use reset_dataset() to clear it")
         if metabolic_model is None:
@@ -587,6 +629,7 @@ class AnalysisWorkspace:
         self._replace_dataset_inputs(
             metabolic_model=metabolic_model,
             reaction_data=reaction_data,
+            expression_data=None if clear_expression else _UNCHANGED,
             preprocessing_changed=preprocessing_changed,
             clear_metadata=True,
             output_reaction_format=output_reaction_format,
@@ -698,7 +741,7 @@ class AnalysisWorkspace:
         self.group_revision += 1
         self._invalidate_downstream_analysis(clear_groups=False)
         if self.group_manager.has_groups():
-            self.color_manager.generate_group_colors(self.get_group_ids(), palette_name="turbo")
+            self.color_manager.generate_group_colors(self.get_group_ids(), palette_name=DEFAULT_GROUP_PALETTE)
         return result
 
     def define_group_from_predicates(self, name, predicates, *, replace: bool = False):
@@ -714,7 +757,7 @@ class AnalysisWorkspace:
         )
         self.group_revision += 1
         self._invalidate_downstream_analysis(clear_groups=False)
-        self.color_manager.generate_group_colors(self.get_group_ids(), palette_name="turbo")
+        self.color_manager.generate_group_colors(self.get_group_ids(), palette_name=DEFAULT_GROUP_PALETTE)
         return group
 
     def define_group_union(self, name, source_group_ids, *, replace: bool = False):
@@ -726,7 +769,7 @@ class AnalysisWorkspace:
         )
         self.group_revision += 1
         self._invalidate_downstream_analysis(clear_groups=False)
-        self.color_manager.generate_group_colors(self.get_group_ids(), palette_name="turbo")
+        self.color_manager.generate_group_colors(self.get_group_ids(), palette_name=DEFAULT_GROUP_PALETTE)
         return group
 
     # ============================================================================
@@ -1177,7 +1220,7 @@ class AnalysisWorkspace:
         if self.group_manager.has_groups():
             group_ids = self.group_manager.get_group_ids()
             self.color_manager.generate_group_colors(
-                group_ids, palette_name="turbo"
+                group_ids, palette_name=DEFAULT_GROUP_PALETTE
             )
 
         return grouping_result
@@ -1245,7 +1288,7 @@ class AnalysisWorkspace:
         return self.color_manager.get_group_color(group_id)
 
     def regenerate_group_colors(
-        self, palette_name: str = "turbo", custom_colors: Dict[str, str] = None
+        self, palette_name: str = DEFAULT_GROUP_PALETTE, custom_colors: Dict[str, str] = None
     ) -> Dict[str, str]:
         """Regenerate colors for all groups with new palette.
 
@@ -1349,6 +1392,22 @@ class AnalysisWorkspace:
     def get_group_comparison_artifact(self) -> GroupComparisonArtifact | None:
         """Return the installed authoritative comparison artifact, if any."""
         return self.group_comparison_artifact
+
+    def clear_group_comparison_artifact(self) -> None:
+        """Take the comparison out of view, as when the analysis it came from is deleted.
+
+        The groups and their summaries stay, so the workspace is back to its groups'
+        activity; what read the comparison (enrichment, subsystem state, hover) is
+        cleared with it.
+        """
+        self._set_group_comparison_artifact(None)
+        self.subsystem_analysis.set_group_comparison(None)
+        self.hover_manager.update_group_comparison(None)
+        self.set_mode(
+            AnalysisWorkspaceMode.EXPERIMENT_ANALYSIS
+            if self.experiment_analysis is not None
+            else AnalysisWorkspaceMode.NO_EXPERIMENT
+        )
 
     def install_reaction_set_enrichment_artifact(
         self,

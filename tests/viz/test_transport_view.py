@@ -1,0 +1,105 @@
+"""Transport subsystems drawn by transporter family."""
+
+import pandas as pd
+import pytest
+
+from metabis import MetabolicModel
+from metabis.viz.transport_view import (
+    MOST_ROWS,
+    NO_GENE,
+    _exchanged,
+    group_delta_score,
+    is_transport_subsystem,
+    transport_rows,
+    transporter_family,
+)
+
+
+@pytest.mark.parametrize(
+    "symbol, family",
+    [("SLC7A5", "SLC7"), ("SLC25A1", "SLC25"), ("SLCO1B1", "SLCO1"), ("ABCA1", "ABCA"), ("AQP9", "AQP"), ("LPL", None)],
+)
+def test_a_gene_names_its_hgnc_transporter_group(symbol, family):
+    assert transporter_family(symbol) == family
+
+
+def test_only_transport_and_exchange_are_drawn_by_family():
+    assert is_transport_subsystem("transport_extracellular")
+    assert is_transport_subsystem("exchange_demand_reactions")
+    assert not is_transport_subsystem("glycolysis_gluconeogenesis")
+
+
+@pytest.fixture(scope="module")
+def model():
+    return MetabolicModel(use_cache=True)
+
+
+def test_a_transport_subsystems_rows_are_its_families(model):
+    rows = transport_rows(model, "transport_extracellular")
+    keys = [row.key for row in rows]
+
+    # At most MOST_ROWS families, then the rest together, then the special rows.
+    assert len([key for key in keys if key.startswith(("SLC", "ABC", "AQP"))]) == MOST_ROWS
+    assert NO_GENE in keys
+    every = {reaction for row in rows for reaction in row.reactions}
+    assert every == set(model.get_reactions_for_subsystem("transport_extracellular"))
+
+
+def test_exchange_rows_are_metabolites(model):
+    rows = transport_rows(model, "exchange_demand_reactions")
+    assert all("[" not in row.name for row in rows)
+
+
+def test_among_rows_of_equal_weight_the_largest_change_takes_a_row_first(model):
+    reactions = list(model.get_reactions_for_subsystem("exchange_demand_reactions"))
+    # Every exchange measured and significant, as a large comparison makes them:
+    # by weight they all tie, and the last alphabetically changes most.
+    names = {reaction: _exchanged(model.reactions.get(reaction).equation) for reaction in reactions}
+    last = max(names, key=names.get)
+    strength = {reaction: 0.1 for reaction in reactions} | {f"{last}_back": -2.0}
+    rows = transport_rows(
+        model,
+        "exchange_demand_reactions",
+        measured=[f"{reaction}_back" for reaction in reactions],
+        significant=[f"{reaction}_back" for reaction in reactions],
+        strength=strength,
+    )
+
+    assert rows[0].key == names[last]
+    # Without effect sizes, a tie is still settled the same way every time.
+    tied = transport_rows(model, "exchange_demand_reactions", measured=reactions, significant=reactions)
+    assert tied[0].key == min(row.key for row in tied[:MOST_ROWS])
+
+
+def test_a_familys_delta_score_is_computed_as_a_subsystems():
+    results = pd.DataFrame({"cohens_d": [1.2, -0.4, 0.3, None]}, index=["r1", "r2", "r3", "r4"])
+    options = {"metric": "cohens_d", "transform": "sign", "numerator_filter": "significant", "denominator_filter": "all"}
+
+    # Two significant reactions of opposite sign, over three measured.
+    assert group_delta_score(results, ["r1", "r2", "r3", "r4"], {"r1", "r2"}, options) == 0.0
+    assert group_delta_score(results, ["r1", "r3"], {"r1"}, options) == pytest.approx(0.5)
+    assert group_delta_score(results, ["r9"], {"r1"}, options) is None
+
+
+def test_a_tap_on_a_rows_reaction_asks_the_page_for_its_details_and_opens_no_page():
+    from bokeh.layouts import column
+    from bokeh.models import ColumnDataSource, TapTool
+    from bokeh.plotting import figure
+
+    from metabis.viz.click_behavior import OWN_TAP_TAG
+    from metabis.viz.compartment_maps import MAP_ELEMENT_EVENT
+    from metabis.viz.ranking_layout import RANKING_DOTS
+    from metabis.viz.transport_view import add_details_on_tap
+
+    plot = figure()
+    source = ColumnDataSource({"x": [0, 1], "y": [0, 0], "element_id": ["MAR1_back", "MAR2"], "display_label": ["MAR1", "MAR2"]})
+    dots = plot.scatter("x", "y", source=source, name=RANKING_DOTS)
+    plot.add_tools(TapTool(renderers=[dots]))
+
+    add_details_on_tap(column(plot), "reaction")
+
+    # By the reaction's own identifier, either direction; the tap tool already there takes the taps.
+    assert source.data["model_id"] == ["MAR1", "MAR2"]
+    assert OWN_TAP_TAG in source.tags and len(plot.select(type=TapTool)) == 1
+    (callback,) = source.selected.js_property_callbacks["change:indices"]
+    assert callback.args["event"] == MAP_ELEMENT_EVENT and callback.args["kind"] == "reaction"

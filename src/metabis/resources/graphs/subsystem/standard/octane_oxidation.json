@@ -95,14 +95,14 @@
       "height": 100.0,
       "reaction_id": "MAR20017",
       "enzymes": [
-        "ENSG00000072210",
         "ENSG00000006534",
-        "ENSG00000132746"
+        "ENSG00000132746",
+        "ENSG00000072210"
       ],
       "glyph_ids": [
-        "g_r_MAR20017_ENSG00000072210",
         "g_r_MAR20017_ENSG00000006534",
-        "g_r_MAR20017_ENSG00000132746"
+        "g_r_MAR20017_ENSG00000132746",
+        "g_r_MAR20017_ENSG00000072210"
       ],
       "outline_color": "#7B68EE",
       "outline_width": 2,
@@ -112,22 +112,11 @@
       ]
     },
     {
-      "id": "g_r_MAR20017_ENSG00000072210",
-      "glyph_class": "gene",
-      "label": "ENSG00000072210",
-      "x": 149.0,
-      "y": 140.0,
-      "width": 60.0,
-      "height": 30.0,
-      "associated_reaction": "r_MAR20017",
-      "enzyme_group": "eg_r_MAR20017"
-    },
-    {
       "id": "g_r_MAR20017_ENSG00000006534",
       "glyph_class": "gene",
       "label": "ENSG00000006534",
       "x": 149.0,
-      "y": 170.0,
+      "y": 140.0,
       "width": 60.0,
       "height": 30.0,
       "associated_reaction": "r_MAR20017",
@@ -137,6 +126,17 @@
       "id": "g_r_MAR20017_ENSG00000132746",
       "glyph_class": "gene",
       "label": "ENSG00000132746",
+      "x": 149.0,
+      "y": 170.0,
+      "width": 60.0,
+      "height": 30.0,
+      "associated_reaction": "r_MAR20017",
+      "enzyme_group": "eg_r_MAR20017"
+    },
+    {
+      "id": "g_r_MAR20017_ENSG00000072210",
+      "glyph_class": "gene",
+      "label": "ENSG00000072210",
       "x": 149.0,
       "y": 200.0,
       "width": 60.0,
@@ -186,14 +186,14 @@
       "subtype": "intermediate"
     },
     {
-      "id": "m_endoplasmic_reticulum_MAM20053r",
+      "id": "m_endoplasmic_reticulum_MAM20013r",
       "glyph_class": "metabolite",
-      "label": "MAM20053r",
+      "label": "MAM20013r",
       "x": 678.0,
       "y": 20.0,
       "width": 60.0,
       "height": 40.0,
-      "original_id": "MAM20053r",
+      "original_id": "MAM20013r",
       "subtype": "main"
     },
     {
@@ -328,9 +328,9 @@
       "stoichiometry": null
     },
     {
-      "id": "conn_m_endoplasmic_reticulum_MAM20053r_to_r_MAR20061",
+      "id": "conn_m_endoplasmic_reticulum_MAM20013r_to_r_MAR20061",
       "connection_class": "metabolic",
-      "source": "m_endoplasmic_reticulum_MAM20053r",
+      "source": "m_endoplasmic_reticulum_MAM20013r",
       "target": "r_MAR20061",
       "stoichiometry": null
     },

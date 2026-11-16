@@ -13,6 +13,7 @@ import pytest
 
 from metabis import MetabolicModel
 from metabis.domain.metabolic_model.loaders import _clean_subsystem_name
+from metabis.domain.metabolic_model.model import TRANSPORT_PART_IDS
 from metabis.viz.click_behavior import get_external_reference_data
 
 _ATLAS_SUBSYSTEM_BASE = (
@@ -73,9 +74,12 @@ def test_subsystem_atlas_slug_is_deterministically_derived():
         )
         seen_slugs[slug] = subsystem.name
 
-        # The reference URL is that slug appended to the gem-browser base.
+        # The reference URL is that slug appended to the gem-browser base; the
+        # parts of the divided transport, which Metabolic Atlas does not divide,
+        # link to its Transport reactions page.
         reference = model.get_subsystem_reference_data(slug)
-        assert reference["external_url"] == _ATLAS_SUBSYSTEM_BASE + slug
+        page = "transport_reactions" if slug in TRANSPORT_PART_IDS else slug
+        assert reference["external_url"] == _ATLAS_SUBSYSTEM_BASE + page
 
     # Documented A-17 example maps exactly to the Metabolic Atlas slug.
     assert (
